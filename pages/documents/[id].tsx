@@ -43,7 +43,7 @@ export const getStaticProps = async ({ params }: Params) => {
 export default function DocumentPage({ document }: DocumentPageProps) {
   return (
    <div>
-    <h1>You are editing: {document.title}</h1>
+    <h1 className="text-3xl font-bold underline">You are editing: {document.title}</h1>
     <Link href={'/documents'}>
       <a>All Documents</a>
     </Link>

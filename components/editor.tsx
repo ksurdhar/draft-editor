@@ -21,12 +21,13 @@ const Editor = ({ documentText, documentId }: EditorProps) => {
   return (
     <>
       <h2>Editor</h2>
-      <form onSubmit={handleSubmit}>
+      <form className="" onSubmit={handleSubmit}>
         <label>
           Content:
-          <input type="text" value={text} onChange={handleChange} />
+          <input className="border-solid border-2 border-black rounded-md" 
+            type="text" value={text} onChange={handleChange} />
         </label>
-        <input type="submit" value="Submit" />
+        <input className="px-8 py-3 font-semibold rounded dark:bg-gray-100 dark:text-gray-800 cursor-pointer" type="submit" value="submit" />
       </form>
     </>
   );
