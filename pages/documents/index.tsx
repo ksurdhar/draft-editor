@@ -1,6 +1,5 @@
 import { InferGetServerSidePropsType } from "next"
 import Link from "next/link"
-import HeaderComponent from "../../components/header"
 import Layout from "../../components/layout"
 
 // question for discord, how do you share the results of a single 

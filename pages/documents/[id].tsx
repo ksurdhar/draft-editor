@@ -1,6 +1,6 @@
-// import { GetStaticProps } from "next"
 import Link from "next/link"
 import Editor from "../../components/editor"
+import Layout from "../../components/layout"
 
 type DocumentPageProps = {
   document: DocumentData
@@ -42,12 +42,12 @@ export const getStaticProps = async ({ params }: Params) => {
 
 export default function DocumentPage({ document }: DocumentPageProps) {
   return (
-   <div>
+   <Layout>
     <h1 className="text-3xl font-bold underline">You are editing: {document.title}</h1>
     <Link href={'/documents'}>
       <a>All Documents</a>
     </Link>
     <Editor documentText={document.content} documentId={document.id} />
-   </div> 
+   </Layout> 
   )
 }
