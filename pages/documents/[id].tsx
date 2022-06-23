@@ -1,4 +1,5 @@
 // import { GetStaticProps } from "next"
+import Link from "next/link"
 import Editor from "../../components/editor"
 
 type DocumentPageProps = {
@@ -42,7 +43,10 @@ export const getStaticProps = async ({ params }: Params) => {
 export default function DocumentPage({ document }: DocumentPageProps) {
   return (
    <div>
-    <h1>Document page for: {document.title}</h1>
+    <h1>You are editing: {document.title}</h1>
+    <Link href={'/documents'}>
+      <a>All Documents</a>
+    </Link>
     <Editor documentText={document.content} documentId={document.id} />
    </div> 
   )

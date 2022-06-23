@@ -16,7 +16,6 @@ export const getServerSideProps = async () => {
 
 const DocumentsPage = ({ documents }: InferGetServerSidePropsType<typeof getServerSideProps>) => {
   const documentItems = documents.map((doc: DocumentData) => {
-    console.log('DOCUMENT', doc)
     const path = doc.id
     return (
       <div key={path}>
@@ -29,7 +28,7 @@ const DocumentsPage = ({ documents }: InferGetServerSidePropsType<typeof getServ
   
   return (
     <>
-      <h1>This is the Documents page</h1>
+      <h1>Documents</h1>
       { documentItems }
       <h2>
         <Link href="/">
