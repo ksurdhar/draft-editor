@@ -1,5 +1,7 @@
 import { InferGetServerSidePropsType } from "next"
 import Link from "next/link"
+import HeaderComponent from "../../components/header"
+import Layout from "../../components/layout"
 
 // question for discord, how do you share the results of a single 
 // http call between components / page that are using SSR?
@@ -27,7 +29,7 @@ const DocumentsPage = ({ documents }: InferGetServerSidePropsType<typeof getServ
   })
   
   return (
-    <>
+    <Layout>
       <h1>Documents</h1>
       { documentItems }
       <h2>
@@ -35,7 +37,7 @@ const DocumentsPage = ({ documents }: InferGetServerSidePropsType<typeof getServ
           <a>Back to home</a>
         </Link>
       </h2>
-    </>
+    </Layout>
   )
 }
 
