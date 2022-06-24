@@ -1,5 +1,7 @@
-import React, { useState } from "react";
-import API from "../lib/utils";
+import React, { useState } from 'react'
+import { useDebouncedCallback } from 'use-debounce'
+
+import API from '../lib/utils'
 
 type EditorProps = {
   documentText: string
@@ -8,24 +10,27 @@ type EditorProps = {
 
 const Editor = ({ documentText, documentId }: EditorProps) => {
   const [ text, setText ] = useState((documentText || ''))
+  const [ isUpdated, setIsUpdated ] = useState(true)
 
-  const handleSubmit = (e: React.SyntheticEvent) => {
-    e.preventDefault()
-    API.patch(`documents/${documentId}`, { content: text })
-  }
+  const debouncedSave = useDebouncedCallback(
+    async () => { 
+      setIsUpdated(false)
+      await API.patch(`documents/${documentId}`, { content: text }) 
+      setIsUpdated(true)
+    }, 1000
+  )
 
-  const handleChange = (e: React.FormEvent<HTMLTextAreaElement>) => {
+  const handleChange = (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
     setText(e.currentTarget.value)
+    debouncedSave()
   }
 
   return (
-    <>
-      <form className="flex-grow" onSubmit={handleSubmit}>
-        <textarea className="border-solid border-2 border-slate-300 rounded-md w-full h-full" value={text} onChange={handleChange} />
-        {/* <input className="px-8 py-3 font-semibold rounded dark:bg-gray-100 dark:text-gray-800 cursor-pointer" type="submit" value="submit" /> */}
-      </form>
-    </>
-  );
+    <div className='flex-grow'>
+      { !isUpdated ? <span>updating</span> : <span>up to date</span>}
+      <textarea className='border-solid border-2 border-slate-300 rounded-md w-full h-full' value={text} onChange={handleChange} />
+    </div>
+  )
 }
 
 export default Editor
