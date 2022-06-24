@@ -3,7 +3,7 @@ import Link from "next/link"
 const HeaderComponent = () => {
   return (
     <header className="p-4 bg-gray-800 text-gray-100">
-      <div className="container flex justify-between h-6 mx-auto">
+      <div className="container flex flex-end h-6 mx-auto">
         <ul className="items-stretch hidden space-x-3 md:flex">
           <li className="flex">
             <Link href="/documents">

@@ -14,20 +14,15 @@ const Editor = ({ documentText, documentId }: EditorProps) => {
     API.patch(`documents/${documentId}`, { content: text })
   }
 
-  const handleChange = (e: React.FormEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.FormEvent<HTMLTextAreaElement>) => {
     setText(e.currentTarget.value)
   }
 
   return (
     <>
-      <h2>Editor</h2>
-      <form className="" onSubmit={handleSubmit}>
-        <label>
-          Content:
-          <input className="border-solid border-2 border-black rounded-md" 
-            type="text" value={text} onChange={handleChange} />
-        </label>
-        <input className="px-8 py-3 font-semibold rounded dark:bg-gray-100 dark:text-gray-800 cursor-pointer" type="submit" value="submit" />
+      <form className="flex-grow" onSubmit={handleSubmit}>
+        <textarea className="border-solid border-2 border-slate-300 rounded-md w-full h-full" value={text} onChange={handleChange} />
+        {/* <input className="px-8 py-3 font-semibold rounded dark:bg-gray-100 dark:text-gray-800 cursor-pointer" type="submit" value="submit" /> */}
       </form>
     </>
   );

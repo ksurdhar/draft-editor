@@ -6,9 +6,8 @@ type Props = {
 
 const Layout = ({ children }: Props) => {
   return (
-    <div>
-      <HeaderComponent />
-      <div className="">
+    <div className="h-screen w-screen">
+      <div className="flex flex-col h-screen mx-40 py-10">
         { children }
       </div>
     </div>

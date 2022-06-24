@@ -43,10 +43,7 @@ export const getStaticProps = async ({ params }: Params) => {
 export default function DocumentPage({ document }: DocumentPageProps) {
   return (
    <Layout>
-    <h1 className="text-3xl font-bold underline">You are editing: {document.title}</h1>
-    <Link href={'/documents'}>
-      <a>All Documents</a>
-    </Link>
+    <h1 className="mb-2 text-3xl font-bold underline">{document.title}</h1>
     <Editor documentText={document.content} documentId={document.id} />
    </Layout> 
   )
