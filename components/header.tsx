@@ -25,7 +25,12 @@ const HeaderComponent = () => {
             className="hover:text-indigo-500 cursor-pointer h-5 w-5"/>
         </li>
         <li>
-          <MenuIcon className="cursor-pointer h-5 w-5"/>
+          <MenuIcon 
+            onClick={() => {
+              // replace with open menu
+              router.push('/documents')
+            }}
+            className="cursor-pointer hover:text-indigo-500 h-5 w-5"/>
         </li>
       </ul>
     </header>

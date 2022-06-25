@@ -1,6 +1,9 @@
+import { XIcon } from "@heroicons/react/solid"
 import { InferGetServerSidePropsType } from "next"
 import Link from "next/link"
+import { useState } from "react"
 import Layout from "../../components/layout"
+import API from "../../lib/utils"
 
 // question for discord, how do you share the results of a single 
 // http call between components / page that are using SSR?
@@ -16,13 +19,25 @@ export const getServerSideProps = async () => {
 }
 
 const DocumentsPage = ({ documents }: InferGetServerSidePropsType<typeof getServerSideProps>) => {
-  const documentItems = documents.map((doc: DocumentData) => {
-    const path = doc.id
+  const [ docs, setDocs ] = useState(documents)
+
+  const documentItems = docs.map(({ id, title }: DocumentData) => {
     return (
-      <div key={path}>
-        <Link href={`/documents/${path}`}>
-          <a>{doc.title}</a>
+      <div key={id} className='flex'>
+        <Link href={`/documents/${id}`}>
+          <a>{title}</a>
         </Link>
+        <XIcon 
+          onClick={async (e) => {
+            try {
+              await API.delete(`documents/${id}`)
+              const newDocs = docs.filter((doc) => doc.id !== id)
+              setDocs(newDocs)
+            } catch(e) {
+              console.log(e)
+            }
+          }}
+          className='ml-2.5 h-5 w-5 self-center cursor-pointer hover:text-indigo-500'/>
       </div>
     )
   })
