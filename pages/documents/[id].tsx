@@ -44,7 +44,7 @@ export default function DocumentPage({ document }: DocumentPageProps) {
   return (
    <Layout>
     <h1 className="mb-2 text-3xl font-bold underline">{document.title}</h1>
-    <Editor documentText={document.content} documentId={document.id} />
+    <Editor documentText={document.content} documentId={document.id} key={document.id}/>
    </Layout> 
   )
 }
