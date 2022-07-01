@@ -1,4 +1,4 @@
-import Link from "next/link"
+import { Descendant } from "slate"
 import Editor from "../../components/editor"
 import Layout from "../../components/layout"
 
@@ -41,10 +41,23 @@ export const getStaticProps = async ({ params }: Params) => {
 }
 
 export default function DocumentPage({ document }: DocumentPageProps) {
+  let slateFriendlyText: Descendant[] = []
+
+  if (document.content.length > 0) {
+    slateFriendlyText = JSON.parse(document.content) 
+  } else {
+    slateFriendlyText = [
+      {
+        type: 'default',
+        children: [{ text: '' }],
+      },
+    ]
+  }
+
   return (
    <Layout>
     <h1 className="mb-2 text-3xl font-bold underline">{document.title}</h1>
-    <Editor documentText={document.content} documentId={document.id} key={document.id}/>
+    <Editor documentText={slateFriendlyText} documentId={document.id} key={document.id}/>
    </Layout> 
   )
 }
