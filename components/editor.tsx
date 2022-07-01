@@ -4,7 +4,9 @@ import { createEditor, BaseEditor, Descendant, Editor, Transforms, Text } from '
 import { Slate, Editable, withReact, ReactEditor } from 'slate-react'
 import API from '../lib/utils'
 
-type DefaultText = { text: string, isHighlighted: boolean }
+type HighlightType = 'none' | 'red' | 'orange' | 'green' | 'blue' 
+
+type DefaultText = { text: string, highlight: HighlightType }
 type DefaultElement = { type: 'default'; children: DefaultText[] }
 type Group1Element = { type: 'group1'; children: DefaultText[] }
 type Group2Element = { type: 'group2'; children: DefaultText[] }
@@ -79,8 +81,24 @@ type RenderLeafProps = {
 }
 
 const Leaf = ({ attributes, leaf, children }: RenderLeafProps) => {
+  let highlighting = ''
+  switch(leaf.highlight) {
+    case 'blue':
+      highlighting = 'bg-blue-200'
+      break
+    case 'green':
+      highlighting = 'bg-green-200'
+      break
+    case 'orange':
+      highlighting = 'bg-orange-200'
+      break
+    case 'red':
+      highlighting = 'bg-red-200'
+      break
+  }
+  
   return (
-    <span {...attributes} className={`transition duration-500 ${ leaf.isHighlighted ? 'bg-orange-200' : ''}`}>
+    <span {...attributes} className={`transition duration-500 ${highlighting}`}>
       {children}
     </span>
   )
@@ -111,7 +129,6 @@ const EditorComponent = ({ documentText, documentId }: EditorProps) => {
       { !isUpdated ? <span>Unsaved Changes</span> : <span>Saved</span>}
       <Slate editor={editor} value={documentText} 
         onChange={value => {
-          console.log('change' + JSON.stringify(value))
           const isAstChange = editor.operations.some(
             op => 'set_selection' !== op.type
           )
@@ -130,13 +147,12 @@ const EditorComponent = ({ documentText, documentId }: EditorProps) => {
                 case '1': {
                   event.preventDefault()
                   const [match] = Editor.nodes(editor, {
-                    match: n => Text.isText(n) && n.isHighlighted,
+                    match: n => Text.isText(n) && n.highlight === 'red',
                     universal: true,
                   })
-
                   Transforms.setNodes(
                     editor,
-                    { isHighlighted: !!match ? false : true },
+                    { highlight: !!match ? 'none' : 'red' },
                     { match: n => Text.isText(n), split: true }
                   )
                   break
@@ -144,24 +160,39 @@ const EditorComponent = ({ documentText, documentId }: EditorProps) => {
                 case '2': {
                   event.preventDefault()
                   const [match] = Editor.nodes(editor, {
-                    match: n => Editor.isBlock(editor, n) && n.type === 'group2',
+                    match: n => Text.isText(n) && n.highlight === 'orange',
+                    universal: true,
                   })
                   Transforms.setNodes(
                     editor,
-                    { type: match ? 'default' : 'group2' },
-                    { match: n => Editor.isBlock(editor, n) }
+                    { highlight: !!match ? 'none' : 'orange' },
+                    { match: n => Text.isText(n), split: true }
                   )
                   break
                 }
                 case '3': {
                   event.preventDefault()
                   const [match] = Editor.nodes(editor, {
-                    match: n => Editor.isBlock(editor, n) && n.type === 'group3',
+                    match: n => Text.isText(n) && n.highlight === 'green',
+                    universal: true,
                   })
                   Transforms.setNodes(
                     editor,
-                    { type: match ? 'default' : 'group3' },
-                    { match: n => Editor.isBlock(editor, n) }
+                    { highlight: !!match ? 'none' : 'green' },
+                    { match: n => Text.isText(n), split: true }
+                  )
+                  break
+                }
+                case '4': {
+                  event.preventDefault()
+                  const [match] = Editor.nodes(editor, {
+                    match: n => Text.isText(n) && n.highlight === 'blue',
+                    universal: true,
+                  })
+                  Transforms.setNodes(
+                    editor,
+                    { highlight: !!match ? 'none' : 'blue' },
+                    { match: n => Text.isText(n), split: true }
                   )
                   break
                 }
