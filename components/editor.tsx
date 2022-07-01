@@ -1,10 +1,10 @@
 import { useDebouncedCallback } from 'use-debounce'
-import { useState } from 'react'
-import { createEditor, BaseEditor, Descendant, Editor, Transforms } from 'slate'
+import { useCallback, useState } from 'react'
+import { createEditor, BaseEditor, Descendant, Editor, Transforms, Text } from 'slate'
 import { Slate, Editable, withReact, ReactEditor } from 'slate-react'
 import API from '../lib/utils'
 
-type DefaultText = { text: string }
+type DefaultText = { text: string, isHighlighted: boolean }
 type DefaultElement = { type: 'default'; children: DefaultText[] }
 type Group1Element = { type: 'group1'; children: DefaultText[] }
 type Group2Element = { type: 'group2'; children: DefaultText[] }
@@ -25,31 +25,31 @@ type RenderElementProps = {
   children: React.ReactNode
 }
 
-const BodyElement = ({ attributes, children} : RenderElementProps)  => {
+const BodyElement = ({ attributes, children} : RenderElementProps) => {
   return (
     <div {...attributes}>
-      <div>{children}</div>
+      <div className='transition'>{children}</div>
     </div>
   )
 }
-const Group1Element = ({ attributes, children} : RenderElementProps)  => {
+const Group1Element = ({ attributes, children} : RenderElementProps) => {
   return (
     <div {...attributes}>
-      <div className='bg-orange-300'>{children}</div>
+      <div className={`transition`}>{children}</div>
     </div>
   )
 }
-const Group2Element = ({ attributes, children} : RenderElementProps)  => {
+const Group2Element = ({ attributes, children} : RenderElementProps) => {
   return (
     <div {...attributes}>
-      <div className='bg-blue-300'>{children}</div>
+      <div className={`transition`}>{children}</div>
     </div>
   )
 }
 const Group3Element = ({ attributes, children} : RenderElementProps)  => {
   return (
     <div {...attributes}>
-      <div className='bg-green-300'>{children}</div>
+      <div className={`transition`}>{children}</div>
     </div>
   )
 }
@@ -72,6 +72,20 @@ type EditorProps = {
   documentId: string
 }
 
+type RenderLeafProps = {
+  attributes: Object
+  leaf: DefaultText
+  children: React.ReactNode
+}
+
+const Leaf = ({ attributes, leaf, children }: RenderLeafProps) => {
+  return (
+    <span {...attributes} className={`transition duration-500 ${ leaf.isHighlighted ? 'bg-orange-200' : ''}`}>
+      {children}
+    </span>
+  )
+}
+
 const EditorComponent = ({ documentText, documentId }: EditorProps) => {
   const [ editor ] = useState(() => withReact(createEditor()))
   const [ isUpdated, setIsUpdated ] = useState(true)
@@ -83,10 +97,14 @@ const EditorComponent = ({ documentText, documentId }: EditorProps) => {
     }, 1000
   )
 
-  const handleChange = (stringifiedText: string) => {
+  const handleChange = useCallback((stringifiedText: string) => {
     setIsUpdated(false)
     debouncedSave(stringifiedText)
-  }
+  }, [])
+
+  const renderLeaf = useCallback((props: any) => {
+    return <Leaf {...props} />
+  }, [])
 
   return (
     <div className='flex-grow'>
@@ -103,20 +121,23 @@ const EditorComponent = ({ documentText, documentId }: EditorProps) => {
           }
         }}>
         <Editable 
-          className='border-solid border-2 border-slate-300 rounded-md w-full h-full'
+          className='border-solid border-2 border-slate-100 rounded-md w-full h-full p-8'
           renderElement={renderElement}
+          renderLeaf={renderLeaf}
           onKeyDown={event => {
             if (event.metaKey) {
               switch (event.key) {
                 case '1': {
                   event.preventDefault()
                   const [match] = Editor.nodes(editor, {
-                    match: n => Editor.isBlock(editor, n) && n.type === 'group1',
+                    match: n => Text.isText(n) && n.isHighlighted,
+                    universal: true,
                   })
+
                   Transforms.setNodes(
                     editor,
-                    { type: match ? 'default' : 'group1' },
-                    { match: n => Editor.isBlock(editor, n) }
+                    { isHighlighted: !!match ? false : true },
+                    { match: n => Text.isText(n), split: true }
                   )
                   break
                 }
