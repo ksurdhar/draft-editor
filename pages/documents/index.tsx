@@ -5,9 +5,6 @@ import { useState } from "react"
 import Layout from "../../components/layout"
 import API from "../../lib/utils"
 
-// question for discord, how do you share the results of a single 
-// http call between components / page that are using SSR?
-
 export const getServerSideProps = async () => {
   const res = await fetch('http://localhost:1000/documents')
   const documents: DocumentData[] = await res.json()

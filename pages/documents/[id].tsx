@@ -6,11 +6,12 @@ type DocumentPageProps = {
   document: DocumentData
 }
 
+// this is necessary / idiomatic to help prerender these pages
 export async function getStaticPaths() {
   const res = await fetch('http://localhost:1000/documents')
   const documents: DocumentData[] = await res.json()
 
-  const paths =  documents.map((document) => {
+  const paths = documents.map((document) => {
     return {
       params: {
         id: document.id,
@@ -30,6 +31,7 @@ type Params = {
   }
 }
 
+// I should replace this with client side data fetching since things get updated so frequently
 export const getStaticProps = async ({ params }: Params) => {
   const res = await fetch(`http://localhost:1000/documents/${params.id}`)
   const document: DocumentData = await res.json()
@@ -38,20 +40,19 @@ export const getStaticProps = async ({ params }: Params) => {
       document,
     },
   }
-}
+} 
 
 export default function DocumentPage({ document }: DocumentPageProps) {
-  let slateFriendlyText: Descendant[] = []
+  let slateFriendlyText: Descendant[] = [
+    {
+      type: 'default',
+      children: [{ text: '', highlight: 'none' }],
+    },
+  ]
 
+  // replace with loading state for document
   if (document.content.length > 0) {
     slateFriendlyText = JSON.parse(document.content) 
-  } else {
-    slateFriendlyText = [
-      {
-        type: 'default',
-        children: [{ text: '' }],
-      },
-    ]
   }
 
   return (
