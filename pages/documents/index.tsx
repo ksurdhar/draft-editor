@@ -4,13 +4,17 @@ import Link from "next/link"
 import { useState } from "react"
 import Layout from "../../components/layout"
 import API from "../../lib/utils"
+import { getDocuments } from "../api/apiUtils"
 
 export const getServerSideProps = async () => {
-  const res = await fetch('http://localhost:1000/documents')
-  const documents: DocumentData[] = await res.json()
+  const documents: DocumentData[] = await getDocuments() as DocumentData[]
+  console.log('DOCUMENTS', documents)
+
+  console.log('DOCUMENTS', JSON.parse(JSON.stringify(documents)))
+
   return {
     props: {
-      documents,
+      documents: JSON.parse(JSON.stringify(documents))
     },
   }
 }
