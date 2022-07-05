@@ -1,23 +1,17 @@
-import { Descendant } from "slate"
+import { GetStaticPaths, GetStaticProps, InferGetStaticPropsType } from "next"
+import useSWR from "swr"
 import Editor from "../../components/editor"
 import Layout from "../../components/layout"
+import { getDocuments } from "../../lib/apiUtils"
 
-type DocumentPageProps = {
-  document: DocumentData
-}
+export const getStaticPaths: GetStaticPaths = async () => {
+  const documents = await getDocuments()
 
-// this is necessary / idiomatic to help prerender these pages
-export async function getStaticPaths() {
-  const res = await fetch('http://localhost:1000/documents')
-  const documents: DocumentData[] = await res.json()
-
-  const paths = documents.map((document) => {
-    return {
-      params: {
-        id: document.id,
-      },
-    }
-  })
+  const paths = documents.map((document) => ({
+    params: {
+      id: `${document.id}`,
+    },
+  }))
 
   return { 
     paths: paths, 
@@ -25,40 +19,29 @@ export async function getStaticPaths() {
   }
 }
 
-type Params = {
-  params: {
-    id: string
+export const getStaticProps: GetStaticProps = async ({ params }) => {
+  return {
+    props: {
+      id: params && params.id
+    },
   }
 }
 
-// I should replace this with client side data fetching since things get updated so frequently
-export const getStaticProps = async ({ params }: Params) => {
-  const res = await fetch(`http://localhost:1000/documents/${params.id}`)
-  const document: DocumentData = await res.json()
-  return {
-    props: {
-      document,
-    },
-  }
-} 
+const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
-export default function DocumentPage({ document }: DocumentPageProps) {
-  let slateFriendlyText: Descendant[] = [
-    {
-      type: 'default',
-      children: [{ text: '', highlight: 'none' }],
-    },
-  ]
+export default function DocumentPage({ id }: InferGetStaticPropsType<typeof getStaticProps>) {
+  const { data: document } = useSWR<DocumentData>(`/api/documents/${id}`, fetcher,  { refreshInterval: 1000 }) 
 
-  // replace with loading state for document
-  if (document.content.length > 0) {
-    slateFriendlyText = JSON.parse(document.content) 
-  }
+  if (!document) return (
+    <Layout>
+      <div>rendering</div>
+    </Layout>
+  )
 
   return (
    <Layout>
     <h1 className="mb-2 text-3xl font-bold underline">{document.title}</h1>
-    <Editor documentText={slateFriendlyText} documentId={document.id} key={document.id}/>
+    <Editor id={id} text={JSON.parse(document.content)} />
    </Layout> 
   )
 }

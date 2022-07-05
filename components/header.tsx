@@ -13,8 +13,7 @@ const HeaderComponent = () => {
           <PlusIcon 
             onClick={async (e) => {
               try {
-                const res = await API.post(`documents`, { title: 'New Document' })
-                console.log('res', res)
+                const res = await API.post(`/api/documents`, { title: 'Brand New Document' })
                 const documentId = res.data.id
                 router.push(`/documents/${documentId}`)
               } catch (e) {

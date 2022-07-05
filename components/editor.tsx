@@ -69,10 +69,6 @@ const renderElement = (props: RenderElementProps) => {
   }
 }
 
-type EditorProps = {
-  documentText: Descendant[]
-  documentId: string
-}
 
 type RenderLeafProps = {
   attributes: Object
@@ -104,13 +100,19 @@ const Leaf = ({ attributes, leaf, children }: RenderLeafProps) => {
   )
 }
 
-const EditorComponent = ({ documentText, documentId }: EditorProps) => {
+type EditorProps = {
+  id: string
+  text: Descendant[]
+}
+
+
+const EditorComponent = ({ id, text }: EditorProps) => {
   const [ editor ] = useState(() => withReact(createEditor()))
   const [ isUpdated, setIsUpdated ] = useState(true)
 
   const debouncedSave = useDebouncedCallback(
     async (content: string) => { 
-      await API.patch(`documents/${documentId}`, { content }) 
+      await API.patch(`/api/documents/${id}`, { content }) 
       setIsUpdated(true)
     }, 1000
   )
@@ -127,7 +129,7 @@ const EditorComponent = ({ documentText, documentId }: EditorProps) => {
   return (
     <div className='flex-grow'>
       { !isUpdated ? <span>Unsaved Changes</span> : <span>Saved</span>}
-      <Slate editor={editor} value={documentText} 
+      <Slate editor={editor} key={id} value={text} 
         onChange={value => {
           const isAstChange = editor.operations.some(
             op => 'set_selection' !== op.type

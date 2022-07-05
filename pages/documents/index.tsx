@@ -4,17 +4,14 @@ import Link from "next/link"
 import { useState } from "react"
 import Layout from "../../components/layout"
 import API from "../../lib/utils"
-import { getDocuments } from "../api/apiUtils"
+import { getDocuments } from "../../lib/apiUtils"
 
 export const getServerSideProps = async () => {
-  const documents: DocumentData[] = await getDocuments() as DocumentData[]
-  console.log('DOCUMENTS', documents)
-
-  console.log('DOCUMENTS', JSON.parse(JSON.stringify(documents)))
+  const documents = await getDocuments() 
 
   return {
     props: {
-      documents: JSON.parse(JSON.stringify(documents))
+      documents: documents as DocumentData[]
     },
   }
 }
@@ -22,7 +19,7 @@ export const getServerSideProps = async () => {
 const DocumentsPage = ({ documents }: InferGetServerSidePropsType<typeof getServerSideProps>) => {
   const [ docs, setDocs ] = useState(documents)
 
-  const documentItems = docs.map(({ id, title }: DocumentData) => {
+  const documentItems = docs.map(({ id, title }) => {
     return (
       <div key={id} className='flex'>
         <Link href={`/documents/${id}`}>
@@ -31,7 +28,7 @@ const DocumentsPage = ({ documents }: InferGetServerSidePropsType<typeof getServ
         <XIcon 
           onClick={async (e) => {
             try {
-              await API.delete(`documents/${id}`)
+              await API.delete(`/api/documents/${id}`)
               const newDocs = docs.filter((doc) => doc.id !== id)
               setDocs(newDocs)
             } catch(e) {
