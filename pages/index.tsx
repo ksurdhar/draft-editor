@@ -19,9 +19,7 @@ const Home: NextPage = () => {
         </h1>
 
         <h1 className="title">
-          <Link href='/documents'>
-            <a>View All Documents</a>
-          </Link>
+          <a href="/api/auth/login">Login</a>
         </h1>
       </main>
 
