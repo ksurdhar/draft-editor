@@ -1,4 +1,7 @@
+import { useUser } from "@auth0/nextjs-auth0"
 import { GetStaticPaths, GetStaticProps, InferGetStaticPropsType } from "next"
+import Router from "next/router"
+import { useEffect } from "react"
 import useSWR from "swr"
 import Editor from "../../components/editor"
 import Layout from "../../components/layout"
@@ -30,6 +33,14 @@ export const getStaticProps: GetStaticProps = async ({ params }) => {
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 export default function DocumentPage({ id }: InferGetStaticPropsType<typeof getStaticProps>) {
+  const { user, isLoading } = useUser()
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      Router.push('/')
+    }
+  }, [isLoading])
+
   const { data: document } = useSWR<DocumentData>(`/api/documents/${id}`, fetcher,  { refreshInterval: 1000 }) 
 
   if (!document) return (

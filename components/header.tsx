@@ -66,7 +66,9 @@ const HeaderComponent = () => {
             <Menu.Item>
               {({ active }) => (
                 <div className={`${active && 'bg-blue-500'} my-3`}>
-                  Sign Out
+                  <Link href='/api/auth/logout'>
+                    <a>Sign Out</a>
+                  </Link>
                 </div>
                 )}
             </Menu.Item>
