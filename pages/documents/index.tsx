@@ -1,28 +1,21 @@
 import { XIcon } from "@heroicons/react/solid"
-import { InferGetServerSidePropsType } from "next"
 import Link from "next/link"
-import { useState } from "react"
-
 import Layout from "../../components/layout"
 import API from "../../lib/utils"
-import { getDocuments } from "../../lib/apiUtils"
 import { withPageAuthRequired } from "@auth0/nextjs-auth0"
+import useSWR from "swr"
 
-export const getServerSideProps = withPageAuthRequired({ 
-  returnTo: '/documents', // I think this is where it ought to redirect to?
-  async getServerSideProps() {
-    const documents = await getDocuments() 
+const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
-    return {
-      props: {
-        documents: documents as DocumentData[]
-      }
-    }
-  }
-})
+const DocumentsPage = withPageAuthRequired(({ user }) => {
+  const { data: docs, mutate } = useSWR<DocumentData[]>('/api/documents', fetcher) 
 
-const DocumentsPage = ({ documents, user }: InferGetServerSidePropsType<typeof getServerSideProps>) => {
-  const [ docs, setDocs ] = useState(documents)
+  if (!docs) return (
+    <Layout>
+      <h1>Loading documents...</h1>
+    </Layout>
+  )
+  
 
   const documentItems = docs.map(({ id, title }) => {
     return (
@@ -34,8 +27,7 @@ const DocumentsPage = ({ documents, user }: InferGetServerSidePropsType<typeof g
           onClick={async (e) => {
             try {
               await API.delete(`/api/documents/${id}`)
-              const newDocs = docs.filter((doc) => doc.id !== id)
-              setDocs(newDocs)
+              mutate()
             } catch(e) {
               console.log(e)
             }
@@ -44,7 +36,7 @@ const DocumentsPage = ({ documents, user }: InferGetServerSidePropsType<typeof g
       </div>
     )
   })
-  
+
   // some kind of empty state when you have no documents
   // document name, last modified
   return (
@@ -58,6 +50,6 @@ const DocumentsPage = ({ documents, user }: InferGetServerSidePropsType<typeof g
       </h2>
     </Layout>
   )
-}
+})
 
 export default DocumentsPage

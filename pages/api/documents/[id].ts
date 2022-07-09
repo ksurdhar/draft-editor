@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { createDocument, deleteDocument, getDocument, updateDocument } from "../../../lib/apiUtils"
+import { deleteDocument, getDocument, updateDocument } from "../../../lib/apiUtils"
 
 export default async function documentHandler(req: NextApiRequest, res: NextApiResponse) {
   const { query, method } = req

@@ -22,9 +22,16 @@ const connectToMongo = () => {
 type DocumentAttributes = {
   title?: string
   content?: string
+  userId: string
 }
 
-export const getDocuments = async () => {
+export const getDocuments = async (userId: string) => {
+  connectToMongo()
+  const documents = await Document.find({ userId })
+  return documents.map((document) => document.toJSON())
+}
+
+export const getEverybodysDocuments = async () => {
   connectToMongo()
   const documents = await Document.find({})
   return documents.map((document) => document.toJSON())
@@ -33,7 +40,7 @@ export const getDocuments = async () => {
 export const createDocument = async (body: DocumentAttributes) => {
   connectToMongo()
   const defaultContent = JSON.stringify([{ type: 'default', children: [{ text: '', highlight: 'none' }],}])
-  const document = await Document.create({ title: body.title, content: defaultContent })
+  const document = await Document.create({ title: body.title, content: defaultContent, userId: body.userId })
   await document.save()
   return document.toJSON()
 }

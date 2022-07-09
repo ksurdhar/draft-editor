@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-// import { useUser } from '@auth0/nextjs-auth0'
+import { useUser } from '@auth0/nextjs-auth0'
 import { useState } from 'react'
 import { Menu, Transition } from '@headlessui/react'
 
@@ -11,7 +11,7 @@ import API from '../lib/utils'
 
 const HeaderComponent = () => {
   const router = useRouter()
-  // const { user } = useUser()
+  const { user } = useUser()
   const [ menuOpen, setMenuOpen ] = useState(false)
 
   return (
@@ -42,7 +42,7 @@ const HeaderComponent = () => {
                 <div onClick={async () => {
                   setMenuOpen(!menuOpen)
                   try {
-                    const res = await API.post(`/api/documents`, { title: 'Brand New Document' })
+                    const res = await API.post(`/api/documents`, { title: 'Document with my Id', userId: user?.sub })
                     const documentId = res.data.id
                     router.push(`/documents/${documentId}`)
                   } catch (e) {

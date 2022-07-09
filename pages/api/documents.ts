@@ -1,8 +1,12 @@
+import { getSession, withApiAuthRequired } from '@auth0/nextjs-auth0'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { createDocument, getDocuments } from "../../lib/apiUtils"
 
-export default async function documentsHandler(req: NextApiRequest, res: NextApiResponse) {
-  const { query, method } = req
+
+// possible to type ApiResponse?
+export default withApiAuthRequired(async function documentsHandler(req: NextApiRequest, res: NextApiResponse) {
+  const { method } = req
+  const session = getSession(req, res)
 
   switch (method) {
     case 'POST': 
@@ -10,11 +14,13 @@ export default async function documentsHandler(req: NextApiRequest, res: NextApi
       res.status(200).json(newDocument)
       break
     case 'GET':
-      const document = await getDocuments()
-      res.status(200).json(document)
+      if (session) {
+        const documents = await getDocuments(session.user.sub)
+        res.status(200).json(documents)
+      }
       break
     default:
       res.setHeader('Allow', ['GET', 'POST'])
       res.status(405).end(`Method ${method} Not Allowed`)
   }
-} 
+})

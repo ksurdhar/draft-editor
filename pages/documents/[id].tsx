@@ -5,10 +5,10 @@ import { useEffect } from "react"
 import useSWR from "swr"
 import Editor from "../../components/editor"
 import Layout from "../../components/layout"
-import { getDocuments } from "../../lib/apiUtils"
+import { getEverybodysDocuments } from "../../lib/apiUtils"
 
 export const getStaticPaths: GetStaticPaths = async () => {
-  const documents = await getDocuments()
+  const documents = await getEverybodysDocuments()
 
   const paths = documents.map((document) => ({
     params: {

@@ -2,13 +2,17 @@ import Mongoose, { Document, Model } from 'mongoose'
 
 const DocumentSchema = new Mongoose.Schema({
   title: {
-    type: String,
+    type: Mongoose.Schema.Types.String,
     default: '',
   },
   content: {
-    type: String,
+    type: Mongoose.Schema.Types.String,
     default: '',
   },
+  userId: {
+    type: Mongoose.Schema.Types.String,
+    required: true
+  }
 })
 
 // replaces _id with id and removes versionKey when converted to json
@@ -21,10 +25,11 @@ DocumentSchema.set('toJSON', {
 export interface IDoc {
   title: string
   content: string
+  userId: string
 }
 export interface IDocDocument extends IDoc, Document {}
 export interface IDocModel extends Model<IDocDocument> {}
 
-const Doc = Mongoose.models.Document || Mongoose.model<IDocDocument>('Document', DocumentSchema) 
+const Doc = Mongoose.models && Mongoose.models.Document || Mongoose.model<IDocDocument>('Document', DocumentSchema) 
 
 export default Doc as IDocModel
