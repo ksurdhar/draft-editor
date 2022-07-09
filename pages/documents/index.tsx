@@ -2,21 +2,26 @@ import { XIcon } from "@heroicons/react/solid"
 import { InferGetServerSidePropsType } from "next"
 import Link from "next/link"
 import { useState } from "react"
+
 import Layout from "../../components/layout"
 import API from "../../lib/utils"
 import { getDocuments } from "../../lib/apiUtils"
+import { withPageAuthRequired } from "@auth0/nextjs-auth0"
 
-export const getServerSideProps = async () => {
-  const documents = await getDocuments() 
+export const getServerSideProps = withPageAuthRequired({ 
+  returnTo: '/documents', // I think this is where it ought to redirect to?
+  async getServerSideProps() {
+    const documents = await getDocuments() 
 
-  return {
-    props: {
-      documents: documents as DocumentData[]
-    },
+    return {
+      props: {
+        documents: documents as DocumentData[]
+      }
+    }
   }
-}
+})
 
-const DocumentsPage = ({ documents }: InferGetServerSidePropsType<typeof getServerSideProps>) => {
+const DocumentsPage = ({ documents, user }: InferGetServerSidePropsType<typeof getServerSideProps>) => {
   const [ docs, setDocs ] = useState(documents)
 
   const documentItems = docs.map(({ id, title }) => {
@@ -40,6 +45,8 @@ const DocumentsPage = ({ documents }: InferGetServerSidePropsType<typeof getServ
     )
   })
   
+  // some kind of empty state when you have no documents
+  // document name, last modified
   return (
     <Layout>
       <h1>Documents</h1>
