@@ -112,7 +112,10 @@ const EditorComponent = ({ id, text }: EditorProps) => {
 
   const debouncedSave = useDebouncedCallback(
     async (content: string) => { 
-      await API.patch(`/api/documents/${id}`, { content }) 
+      await API.patch(`/api/documents/${id}`, { // create a wrapper function for better typing, this is a exit point
+        content,
+        lastUpdated: Date.now()
+      }) 
       setIsUpdated(true)
     }, 1000
   )

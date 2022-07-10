@@ -4,6 +4,7 @@ import Layout from "../../components/layout"
 import API from "../../lib/utils"
 import { withPageAuthRequired } from "@auth0/nextjs-auth0"
 import useSWR from "swr"
+import { formatDistance } from "date-fns"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
@@ -15,14 +16,16 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
       <h1>Loading documents...</h1>
     </Layout>
   )
-  
 
-  const documentItems = docs.map(({ id, title }) => {
+  const documentItems = docs.map(({ id, title, lastUpdated }, idx) => {
     return (
-      <div key={id} className='flex'>
-        <Link href={`/documents/${id}`}>
-          <a>{title}</a>
-        </Link>
+      <div key={id} className={`flex justify-between h-12 ${idx !== docs.length - 1 ? 'border-b' : ''} border-solid border-slate-200`}>
+        <div className="grow self-center">
+          <Link href={`/documents/${id}`}>{title}</Link>
+        </div>
+
+        <div className="w-44 self-center">{formatDistance(new Date(lastUpdated), new Date(), { addSuffix: true })}</div>
+
         <XIcon 
           onClick={async (e) => {
             try {
@@ -41,13 +44,7 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
   // document name, last modified
   return (
     <Layout>
-      <h1>Documents</h1>
       { documentItems }
-      <h2>
-        <Link href="/">
-          <a>Back to home</a>
-        </Link>
-      </h2>
     </Layout>
   )
 })

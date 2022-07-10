@@ -22,7 +22,8 @@ const connectToMongo = () => {
 type DocumentAttributes = {
   title?: string
   content?: string
-  userId: string
+  userId?: string
+  lastUpdated?: number
 }
 
 export const getDocuments = async (userId: string) => {
@@ -40,7 +41,7 @@ export const getEverybodysDocuments = async () => {
 export const createDocument = async (body: DocumentAttributes) => {
   connectToMongo()
   const defaultContent = JSON.stringify([{ type: 'default', children: [{ text: '', highlight: 'none' }],}])
-  const document = await Document.create({ title: body.title, content: defaultContent, userId: body.userId })
+  const document = await Document.create({ title: body.title, content: defaultContent, userId: body.userId }) // see if default value in model applies
   await document.save()
   return document.toJSON()
 }

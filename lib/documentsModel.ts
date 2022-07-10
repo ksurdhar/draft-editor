@@ -12,6 +12,10 @@ const DocumentSchema = new Mongoose.Schema({
   userId: {
     type: Mongoose.Schema.Types.String,
     required: true
+  },
+  lastUpdated: {
+    type: Mongoose.Schema.Types.Number,
+    default: Date.now()
   }
 })
 
@@ -26,6 +30,7 @@ export interface IDoc {
   title: string
   content: string
   userId: string
+  lastUpdated: number
 }
 export interface IDocDocument extends IDoc, Document {}
 export interface IDocModel extends Model<IDocDocument> {}
