@@ -28,6 +28,7 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
       onClick={() => {
         router.push(`/documents/${id}`)
       }}
+      key={id}
       >
         <div className="grow self-center">
           {title}

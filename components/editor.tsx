@@ -141,8 +141,9 @@ const EditorComponent = ({ id, text }: EditorProps) => {
             handleChange(content)
           }
         }}>
-        <Editable 
-          className='border-solid border border-slate-100 rounded-md w-full h-full p-8 static'
+        <Editable
+          spellCheck='false'
+          className='rounded-md w-full h-full static text-[19px] md:text-[22px]'
           renderElement={renderElement}
           renderLeaf={renderLeaf}
           onKeyDown={event => {

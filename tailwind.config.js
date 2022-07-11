@@ -5,7 +5,10 @@ module.exports = {
     "./components/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {},
+    fontFamily: {
+      'editor': ['EB Garamond', 'serif'],
+      'editor2': ['Ibarra Real Nova', 'serif'],
+    }
   },
   plugins: [],
 }
