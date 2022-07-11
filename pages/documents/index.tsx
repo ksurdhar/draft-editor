@@ -5,11 +5,13 @@ import API from "../../lib/utils"
 import { withPageAuthRequired } from "@auth0/nextjs-auth0"
 import useSWR from "swr"
 import { formatDistance } from "date-fns"
+import { useRouter } from "next/router"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 const DocumentsPage = withPageAuthRequired(({ user }) => {
   const { data: docs, mutate } = useSWR<DocumentData[]>('/api/documents', fetcher) 
+  const router =  useRouter()
 
   if (!docs) return (
     <Layout>
@@ -19,15 +21,23 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
 
   const documentItems = docs.map(({ id, title, lastUpdated }, idx) => {
     return (
-      <div key={id} className={`flex justify-between h-12 ${idx !== docs.length - 1 ? 'border-b' : ''} border-solid border-slate-200`}>
+
+      <div className={`flex justify-between h-12 ${idx !== docs.length - 1 ? 'border-b' : ''} border-solid border-slate-200
+        hover:cursor-pointer hover:bg-sky-100
+      `}
+      onClick={() => {
+        router.push(`/documents/${id}`)
+      }}
+      >
         <div className="grow self-center">
-          <Link href={`/documents/${id}`}>{title}</Link>
+          {title}
         </div>
 
         <div className="w-44 self-center">{formatDistance(new Date(lastUpdated), new Date(), { addSuffix: true })}</div>
 
         <XIcon 
           onClick={async (e) => {
+            e.stopPropagation()
             try {
               await API.delete(`/api/documents/${id}`)
               mutate()
@@ -44,7 +54,11 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
   // document name, last modified
   return (
     <Layout>
-      { documentItems }
+      <div className="flex justify-center h-[calc(100vh_-_64px)] pb-10">
+        <div className={'w-9/12'}> 
+          { documentItems }
+        </div>
+      </div>
     </Layout>
   )
 })

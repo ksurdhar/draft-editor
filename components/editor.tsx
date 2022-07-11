@@ -109,7 +109,6 @@ type EditorProps = {
 const EditorComponent = ({ id, text }: EditorProps) => {
   const [ editor ] = useState(() => withReact(createEditor()))
   const [ isUpdated, setIsUpdated ] = useState(true)
-
   const debouncedSave = useDebouncedCallback(
     async (content: string) => { 
       await API.patch(`/api/documents/${id}`, { // create a wrapper function for better typing, this is a exit point

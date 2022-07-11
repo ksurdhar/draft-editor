@@ -51,8 +51,12 @@ export default function DocumentPage({ id }: InferGetStaticPropsType<typeof getS
 
   return (
    <Layout>
-    <h1 className="mb-2 text-3xl font-bold underline">{document.title}</h1>
-    <Editor id={id} text={JSON.parse(document.content)} />
+    <div className="flex justify-center pb-10">
+        <div className="flex flex-col h-[calc(100vh_-_64px)] pb-10 w-9/12">
+          <h1 className="mb-2 text-3xl font-bold underline">{document.title}</h1>
+          <Editor id={id} text={JSON.parse(document.content)} />
+        </div>
+    </div>
    </Layout> 
   )
 }
