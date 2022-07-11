@@ -7,7 +7,8 @@ import { Menu, Transition } from '@headlessui/react'
 import API from '../lib/utils'
 
 
-// className="hover:text-indigo-500 cursor-pointer h-5 w-5"/>
+{/* <span className='pr-4'>Hi, Kiran</span> */}
+{/* {user && <span>Hi, ${user.name}</span>} */}
 
 const HeaderComponent = () => {
   const router = useRouter()
@@ -17,7 +18,7 @@ const HeaderComponent = () => {
   return (
     <header className="flex flex-row p-5 max-h-16 justify-between">
       <h1><Link href={'/'}>Draft Writer</Link></h1>
-      <div>
+      <div className={'z-10'}>
         <Menu>
           <div className='flex flex-row-reverse'>
             <Menu.Button onClick={() => setMenuOpen(!menuOpen)} className={`hamburger hamburger--spin ${ menuOpen ? 'is-active' : ''}`}>
@@ -25,8 +26,7 @@ const HeaderComponent = () => {
                 <span className="hamburger-inner"></span>
               </span>
             </Menu.Button>
-            {/* <span className='pr-4'>Hi, Kiran</span> */}
-            {/* {user && <span>Hi, ${user.name}</span>} */}
+
           </div>
           <Transition
             enter="transition duration-500 ease-in"
@@ -36,7 +36,7 @@ const HeaderComponent = () => {
             leaveFrom="transform opacity-100"
             leaveTo="transform opacity-0"
           >
-          <Menu.Items>
+          <Menu.Items className={'bg-white p-2'}>
             <Menu.Item>
               {({ active }) => (
                 <div onClick={async () => {
@@ -48,7 +48,7 @@ const HeaderComponent = () => {
                   } catch (e) {
                     console.log(e)
                   }
-                }} className={`${active && 'bg-blue-500'} my-3`}>
+                }} className={'hover:bg-sky-100 cursor-pointer p-2'}>
                   Create Document
                 </div>
                 )}
@@ -58,14 +58,14 @@ const HeaderComponent = () => {
                 <div onClick={() => {
                   router.push('/documents')
                   setMenuOpen(!menuOpen)
-                }} className={`${active && 'bg-blue-500'} my-3`}>
+                }} className={'hover:bg-sky-100 cursor-pointer p-2'}>
                   All Documents
                 </div>
                 )}
             </Menu.Item>
             <Menu.Item>
               {({ active }) => (
-                <div className={`${active && 'bg-blue-500'} my-3`}>
+                <div className={'hover:bg-sky-100 cursor-pointer p-2'}>
                   <Link href='/api/auth/logout'>
                     <a>Sign Out</a>
                   </Link>

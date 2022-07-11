@@ -142,7 +142,7 @@ const EditorComponent = ({ id, text }: EditorProps) => {
           }
         }}>
         <Editable 
-          className='border-solid border-2 border-slate-100 rounded-md w-full h-full p-8'
+          className='border-solid border border-slate-100 rounded-md w-full h-full p-8 static'
           renderElement={renderElement}
           renderLeaf={renderLeaf}
           onKeyDown={event => {
