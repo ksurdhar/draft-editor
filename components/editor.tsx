@@ -1,6 +1,6 @@
 import { useDebouncedCallback } from 'use-debounce'
-import { useCallback, useState } from 'react'
-import { createEditor, BaseEditor, Descendant, Editor, Transforms, Text } from 'slate'
+import { useCallback, useEffect, useState } from 'react'
+import { createEditor, BaseEditor, Descendant, Editor, Transforms, Text, Node } from 'slate'
 import { Slate, Editable, withReact, ReactEditor } from 'slate-react'
 import API from '../lib/utils'
 
@@ -78,18 +78,23 @@ type RenderLeafProps = {
 
 const Leaf = ({ attributes, leaf, children }: RenderLeafProps) => {
   let highlighting = ''
+  let selection = ''
   switch(leaf.highlight) {
     case 'blue':
       highlighting = 'bg-blue-200'
+      // selection = 'selection:bg-blue-200'
       break
     case 'green':
       highlighting = 'bg-green-200'
+      // selection = 'selection:bg-green-200'
       break
     case 'orange':
       highlighting = 'bg-orange-200'
+      // selection = 'selection:bg-orange-200'
       break
     case 'red':
       highlighting = 'bg-red-200'
+      // selection = 'selection:bg-red-200'
       break
   }
   
@@ -106,9 +111,16 @@ type EditorProps = {
   title: string
 }
 
+const countWords = (nodes: Descendant[]) => {
+  console.log('counting!')
+  const wordCount = nodes.map((n) => Node.string(n)).join(' ').match(/[a-zA-Z\d]+/g)
+  return wordCount?.length || 0
+}
+
 const EditorComponent = ({ id, text, title }: EditorProps) => {
   const [ editor ] = useState(() => withReact(createEditor()))
   const [ isUpdated, setIsUpdated ] = useState(true)
+  const [ wordCount, setWordCount ] = useState(countWords(text))
 
   const debouncedSave = useDebouncedCallback(
     async (data: Partial<DocumentData>) => { 
@@ -142,12 +154,14 @@ const EditorComponent = ({ id, text, title }: EditorProps) => {
       </div>
       
       { !isUpdated ? <span>Unsaved Changes</span> : <span>Saved</span>}
+
       <Slate editor={editor} key={id} value={text} 
         onChange={value => {
           const isAstChange = editor.operations.some(
             op => 'set_selection' !== op.type
           )
           if (isAstChange) {
+            setWordCount(countWords(value))
             const content = JSON.stringify(value)
             handleChange({ content })
           }
@@ -217,6 +231,9 @@ const EditorComponent = ({ id, text, title }: EditorProps) => {
           }}
         />
       </Slate>
+      <div className='pr-10 fixed bg-slate-100 bottom-0 right-0'> 
+        words: {wordCount}
+      </div>
     </div>
   )
 }

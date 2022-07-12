@@ -4,6 +4,8 @@ type Props = {
   children?: React.ReactNode
 }
 
+// bg-[#fffaf4] <-- off white color
+
 // instead of importing this everywhere, it can be pulled into _app.tsx to be reused 
 // see: https://nextjs.org/docs/basic-features/layouts for details
 const Layout = ({ children }: Props) => {
