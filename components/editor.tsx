@@ -117,10 +117,25 @@ const countWords = (nodes: Descendant[]) => {
   return wordCount?.length || 0
 }
 
+const getWordCountAtPosition = (nodes: Descendant[], rangeIdx: number, offset: number) => {
+  let currentRowCount = 0
+  const nodesBeforeSelection = nodes.slice(0, rangeIdx)
+  const countExcludingCurrentRow = countWords(nodesBeforeSelection)
+  const currentRow = nodes[rangeIdx]
+
+  if (!!currentRow) {
+    const rowMatch = Node.string(currentRow).slice(0, offset).match(/[a-zA-Z\d]+/g)
+    currentRowCount = rowMatch?.length || 0
+  }
+  
+  return countExcludingCurrentRow + currentRowCount
+}
+
 const EditorComponent = ({ id, text, title }: EditorProps) => {
   const [ editor ] = useState(() => withReact(createEditor()))
   const [ isUpdated, setIsUpdated ] = useState(true)
   const [ wordCount, setWordCount ] = useState(countWords(text))
+  const [ wordCountAtPos, setWordCountAtPos ] = useState(0)
 
   const debouncedSave = useDebouncedCallback(
     async (data: Partial<DocumentData>) => { 
@@ -157,6 +172,10 @@ const EditorComponent = ({ id, text, title }: EditorProps) => {
 
       <Slate editor={editor} key={id} value={text} 
         onChange={value => {
+          const offset = editor.selection?.focus.offset || 0
+          const position = editor.selection?.focus.path[0] || 0
+          setWordCountAtPos(getWordCountAtPosition(text, position, offset))
+
           const isAstChange = editor.operations.some(
             op => 'set_selection' !== op.type
           )
@@ -231,8 +250,8 @@ const EditorComponent = ({ id, text, title }: EditorProps) => {
           }}
         />
       </Slate>
-      <div className='pr-10 fixed bg-slate-100 bottom-0 right-0'> 
-        words: {wordCount}
+      <div className='pr-10 fixed bottom-0 right-0'> 
+         {wordCountAtPos}/{wordCount} - { `${Math.round(wordCountAtPos/wordCount*100)}%` }
       </div>
     </div>
   )
