@@ -103,25 +103,26 @@ const Leaf = ({ attributes, leaf, children }: RenderLeafProps) => {
 type EditorProps = {
   id: string
   text: Descendant[]
+  title: string
 }
 
-
-const EditorComponent = ({ id, text }: EditorProps) => {
+const EditorComponent = ({ id, text, title }: EditorProps) => {
   const [ editor ] = useState(() => withReact(createEditor()))
   const [ isUpdated, setIsUpdated ] = useState(true)
+
   const debouncedSave = useDebouncedCallback(
-    async (content: string) => { 
+    async (data: Partial<DocumentData>) => { 
       await API.patch(`/api/documents/${id}`, { // create a wrapper function for better typing, this is a exit point
-        content,
+        ...data,
         lastUpdated: Date.now()
       }) 
       setIsUpdated(true)
     }, 1000
   )
 
-  const handleChange = useCallback((stringifiedText: string) => {
+  const handleChange = useCallback((props: Partial<DocumentData>) => {
     setIsUpdated(false)
-    debouncedSave(stringifiedText)
+    debouncedSave(props)
   }, [])
 
   const renderLeaf = useCallback((props: any) => {
@@ -130,6 +131,16 @@ const EditorComponent = ({ id, text }: EditorProps) => {
 
   return (
     <div className='flex-grow'>
+      <div>
+        <span contentEditable className="mb-2 text-3xl md:text-4xl uppercase border-b border-transparent focus:outline-none active:outline-none hover:border-dashed hover:border-b hover:border-slate-300" 
+          spellCheck={false} 
+          onKeyUpCapture={(e) => handleChange({ title: `${e.currentTarget.textContent}` })}
+          suppressContentEditableWarning={true}
+        >
+          {title}
+        </span>
+      </div>
+      
       { !isUpdated ? <span>Unsaved Changes</span> : <span>Saved</span>}
       <Slate editor={editor} key={id} value={text} 
         onChange={value => {
@@ -138,7 +149,7 @@ const EditorComponent = ({ id, text }: EditorProps) => {
           )
           if (isAstChange) {
             const content = JSON.stringify(value)
-            handleChange(content)
+            handleChange({ content })
           }
         }}>
         <Editable

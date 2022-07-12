@@ -2,7 +2,7 @@ import { useUser } from "@auth0/nextjs-auth0"
 import { GetStaticPaths, GetStaticProps, InferGetStaticPropsType } from "next"
 import Head from "next/head"
 import Router from "next/router"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import useSWR from "swr"
 import Editor from "../../components/editor"
 import Layout from "../../components/layout"
@@ -59,9 +59,8 @@ export default function DocumentPage({ id }: InferGetStaticPropsType<typeof getS
       </Head>
       <Layout>
         <div className="flex justify-center pb-10 p-[20px] text-black/[.79] font-editor2">
-            <div className="flex flex-col h-[calc(100vh_-_64px)] pb-10 max-w-[740px]">
-              <h1 className="mb-2 text-3xl md:text-4xl uppercase">{document.title}</h1>
-              <Editor id={id} text={JSON.parse(document.content)} />
+            <div className="flex flex-col h-[calc(100vh_-_64px)] pb-10 max-w-[740px] md:w-[740px]">
+              <Editor id={id} text={JSON.parse(document.content)} title={document.title} />
             </div>
         </div>
     </Layout> 

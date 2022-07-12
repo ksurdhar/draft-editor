@@ -10,5 +10,7 @@ module.exports = {
       'editor2': ['Ibarra Real Nova', 'serif'],
     }
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/forms'),
+  ],
 }
