@@ -16,7 +16,7 @@ const HeaderComponent = () => {
   const [ menuOpen, setMenuOpen ] = useState(false)
 
   return (
-    <header className="flex flex-row p-5 max-h-16 justify-between">
+    <header className="flex flex-row p-5 max-h-16 justify-between bg-transparent">
       <h1><Link href={'/'}>Draft Writer</Link></h1>
       <div className={'z-10'}>
         <Menu>

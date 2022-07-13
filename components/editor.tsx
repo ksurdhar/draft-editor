@@ -112,7 +112,6 @@ type EditorProps = {
 }
 
 const countWords = (nodes: Descendant[]) => {
-  console.log('counting!')
   const wordCount = nodes.map((n) => Node.string(n)).join(' ').match(/[a-zA-Z\d]+/g)
   return wordCount?.length || 0
 }
