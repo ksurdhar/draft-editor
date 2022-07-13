@@ -15,7 +15,14 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
 
   if (!docs) return (
     <Layout>
-      <h1>Loading documents...</h1>
+      <div className='gradient absolute top-0 left-0 h-screen w-screen z-[-1]'/>
+      <div className="flex justify-center h-[calc(100vh_-_64px)] pb-10">
+        <div className={'w-11/12 sm:w-9/12 max-w-[740px]'}> 
+          <div className='flex flex-col h-[100%] justify-center mt-[-64px]'>
+           <h1>Loading documents...</h1>
+          </div>
+        </div>
+      </div>
     </Layout>
   )
 
@@ -23,18 +30,18 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
     return (
 
       <div className={`flex justify-between h-[40px] px-[10px] ${idx !== docs.length - 1 ? 'border-b' : 'border-transparent'} border-solid border-black/[.35]
-        hover:cursor-pointer hover:bg-white/[.40] uppercase text-[14px] font-semibold font-index
+        hover:cursor-pointer hover:bg-white/[.30] uppercase text-[14px] font-semibold font-index
       `}
       onClick={() => {
         router.push(`/documents/${id}`)
       }}
       key={id}
       >
-        <div className="grow self-center">
+        <div className="grow self-center whitespace-nowrap overflow-hidden text-ellipsis">
           {title}
         </div>
 
-        <div className="w-44 self-center text-black/[.65]">
+        <div className="min-w-[7rem] w-28 md:w-44 md:min-w-[11rem] self-center text-black/[.65]">
           {format(new Date(lastUpdated), 'PP')}
         </div>
 
@@ -69,7 +76,7 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
     <Layout>
       <div className='gradient absolute top-0 left-0 h-screen w-screen z-[-1]'/>
       <div className="flex justify-center h-[calc(100vh_-_64px)] pb-10">
-        <div className={'w-9/12 max-w-[740px]'}> 
+        <div className={'w-11/12 sm:w-9/12 max-w-[740px]'}> 
           <div className='flex flex-col h-[100%] justify-center mt-[-64px]'>
             { documentItems }
           </div>
