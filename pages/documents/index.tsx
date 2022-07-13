@@ -1,11 +1,11 @@
-import { XIcon } from "@heroicons/react/solid"
-import Link from "next/link"
+import { DotsHorizontalIcon } from "@heroicons/react/solid"
 import Layout from "../../components/layout"
 import API from "../../lib/utils"
 import { withPageAuthRequired } from "@auth0/nextjs-auth0"
 import useSWR from "swr"
-import { formatDistance } from "date-fns"
+import { format } from "date-fns"
 import { useRouter } from "next/router"
+import Head from "next/head"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
@@ -22,8 +22,8 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
   const documentItems = docs.map(({ id, title, lastUpdated }, idx) => {
     return (
 
-      <div className={`flex justify-between h-12 ${idx !== docs.length - 1 ? 'border-b' : ''} border-solid border-slate-200
-        hover:cursor-pointer hover:bg-sky-100
+      <div className={`flex justify-between h-[40px] px-[10px] ${idx !== docs.length - 1 ? 'border-b' : 'border-transparent'} border-solid border-black/[.35]
+        hover:cursor-pointer hover:bg-white/[.40] uppercase text-[14px] font-semibold font-index
       `}
       onClick={() => {
         router.push(`/documents/${id}`)
@@ -34,19 +34,26 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
           {title}
         </div>
 
-        <div className="w-44 self-center">{formatDistance(new Date(lastUpdated), new Date(), { addSuffix: true })}</div>
+        <div className="w-44 self-center text-black/[.65]">
+          {format(new Date(lastUpdated), 'PP')}
+        </div>
 
-        <XIcon 
-          onClick={async (e) => {
-            e.stopPropagation()
-            try {
-              await API.delete(`/api/documents/${id}`)
-              mutate()
-            } catch(e) {
-              console.log(e)
-            }
-          }}
-          className='ml-2.5 h-5 w-5 self-center cursor-pointer hover:text-indigo-500'/>
+      <div className="flex items-center">
+        <div className='rounded-full h-[28px] w-[28px] flex flex-col justify-center hover:bg-black/[.10]'>
+          <DotsHorizontalIcon 
+            onClick={async (e) => {
+              e.stopPropagation()
+              try {
+                await API.delete(`/api/documents/${id}`)
+                mutate()
+              } catch(e) {
+                console.log(e)
+              }
+            }}
+            className='h-[16px] w-[16px] self-center'/>
+        </div>
+      </div>
+        
       </div>
     )
   })
@@ -54,13 +61,22 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
   // some kind of empty state when you have no documents
   // document name, last modified
   return (
+    <>
+    <Head>
+      <title>Whetstone - Documents</title>
+      <link href="https://fonts.googleapis.com/css2?family=Mukta&display=swap" rel="stylesheet" />
+    </Head>
     <Layout>
+      <div className='gradient absolute top-0 left-0 h-screen w-screen z-[-1]'/>
       <div className="flex justify-center h-[calc(100vh_-_64px)] pb-10">
-        <div className={'w-9/12'}> 
-          { documentItems }
+        <div className={'w-9/12 max-w-[740px]'}> 
+          <div className='flex flex-col h-[100%] justify-center mt-[-64px]'>
+            { documentItems }
+          </div>
         </div>
       </div>
     </Layout>
+    </>
   )
 })
 

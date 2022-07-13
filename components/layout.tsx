@@ -11,7 +11,6 @@ type Props = {
 const Layout = ({ children }: Props) => {
   return (
     <div className="h-screen w-screen">
-      <div className='gradient fixed h-screen w-screen z-[-1]'/>
       <HeaderComponent/>
       {/* 64px is the header height */}
       { children }

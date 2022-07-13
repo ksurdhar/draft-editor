@@ -8,6 +8,7 @@ module.exports = {
     fontFamily: {
       'editor': ['EB Garamond', 'serif'],
       'editor2': ['Ibarra Real Nova', 'serif'],
+      'index': ['Mukta', 'sans-serif'],
     }
   },
   plugins: [
