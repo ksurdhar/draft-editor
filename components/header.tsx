@@ -12,7 +12,7 @@ const HeaderComponent = () => {
   const [ menuOpen, setMenuOpen ] = useState(false)
 
   return (
-    <header className="flex flex-row p-5 max-h-16 justify-between bg-transparent">
+    <header className="fixed top-0 w-[100vw] z-10 flex flex-row p-5 max-h-16 justify-between bg-transparent">
       <h1 className='lowercase'><Link href={'/'}>Whetstone</Link></h1>
       <div>
           <div className='flex flex-row-reverse z-20 absolute right-[20px]'>
