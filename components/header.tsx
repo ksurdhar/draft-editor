@@ -15,9 +15,12 @@ const HeaderComponent = () => {
   const { user } = useUser()
   const [ menuOpen, setMenuOpen ] = useState(false)
 
+
+  // 52% opacity on whetstone
+
   return (
-    <header className="flex flex-row p-5 max-h-16 justify-between bg-transparent">
-      <h1><Link href={'/'}>Draft Writer</Link></h1>
+    <header className="flex flex-row p-5 max-h-16 justify-between bg-transparent fixed w-[100%] top-0">
+      <h1 className='lowercase'><Link href={'/'}>Whetstone</Link></h1>
       <div className={'z-10'}>
         <Menu>
           <div className='flex flex-row-reverse'>
@@ -36,7 +39,7 @@ const HeaderComponent = () => {
             leaveFrom="transform opacity-100"
             leaveTo="transform opacity-0"
           >
-          <Menu.Items className={'bg-white p-2'}>
+          <Menu.Items className={'border-1 border-white border-solid p-2 text-[18px] text-white mr-[24px] gradient-color'}>
             <Menu.Item>
               {({ active }) => (
                 <div onClick={async () => {
@@ -48,7 +51,7 @@ const HeaderComponent = () => {
                   } catch (e) {
                     console.log(e)
                   }
-                }} className={'hover:bg-sky-100 cursor-pointer p-2'}>
+                }} className={'hover:bg-white/[.3] cursor-pointer p-2'}>
                   Create Document
                 </div>
                 )}
@@ -58,14 +61,14 @@ const HeaderComponent = () => {
                 <div onClick={() => {
                   router.push('/documents')
                   setMenuOpen(!menuOpen)
-                }} className={'hover:bg-sky-100 cursor-pointer p-2'}>
+                }} className={'hover:bg-white/[.3] cursor-pointer p-2'}>
                   All Documents
                 </div>
                 )}
             </Menu.Item>
             <Menu.Item>
               {({ active }) => (
-                <div className={'hover:bg-sky-100 cursor-pointer p-2'}>
+                <div className={'hover:bg-white/[.3] cursor-pointer p-2'}>
                   <Link href='/api/auth/logout'>
                     <a>Sign Out</a>
                   </Link>

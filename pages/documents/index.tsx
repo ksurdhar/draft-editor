@@ -6,6 +6,7 @@ import useSWR from "swr"
 import { format } from "date-fns"
 import { useRouter } from "next/router"
 import Head from "next/head"
+import Link from "next/link"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
@@ -28,9 +29,8 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
 
   const documentItems = docs.map(({ id, title, lastUpdated }, idx) => {
     return (
-
       <div className={`flex justify-between h-[40px] px-[10px] ${idx !== docs.length - 1 ? 'border-b' : 'border-transparent'} border-solid border-black/[.35]
-        hover:cursor-pointer hover:bg-white/[.30] uppercase text-[14px] font-semibold font-index
+        hover:cursor-pointer hover:bg-white/[.30] uppercase text-[14px] font-semibold
       `}
       onClick={() => {
         router.push(`/documents/${id}`)
@@ -38,7 +38,7 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
       key={id}
       >
         <div className="grow self-center whitespace-nowrap overflow-hidden text-ellipsis">
-          {title}
+          <Link href={`/documents/${id}`}>{title}</Link>
         </div>
 
         <div className="min-w-[7rem] w-28 md:w-44 md:min-w-[11rem] self-center text-black/[.65]">

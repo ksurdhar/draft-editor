@@ -16,9 +16,17 @@ a {
 }
 
 .gradient {
-  background: linear-gradient(to bottom right, rgba(255, 253, 128, 0.30), rgba(233, 176, 158, 0.75)),
-  url(https://grainy-gradients.vercel.app/noise.svg);
+  /* background: linear-gradient(to bottom right, rgba(255, 253, 128, 0.30), rgba(233, 176, 158, 0.75)),
+  url(https://grainy-gradients.vercel.app/noise.svg); */
+  background-image: linear-gradient(to bottom right, rgba(255, 253, 128, 0.30), rgba(233, 176, 158, 0.75)), 
+    url(https://grainy-gradients.vercel.app/noise.svg);
   filter: contrast(120%);
+}
+
+.gradient-editor {
+  background-image: linear-gradient(to bottom right, rgba(255, 253, 128, 0.30), rgba(233, 176, 158, 0.75)), 
+    url(https://grainy-gradients.vercel.app/noise.svg);
+  filter: brightness(146%);
 }
 
 @tailwind base;

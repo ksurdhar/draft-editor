@@ -10,7 +10,7 @@ type Props = {
 // see: https://nextjs.org/docs/basic-features/layouts for details
 const Layout = ({ children }: Props) => {
   return (
-    <div className="h-screen w-screen">
+    <div className="h-screen w-screen font-index uppercase">
       <HeaderComponent/>
       {/* 64px is the header height */}
       { children }

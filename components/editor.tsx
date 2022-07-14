@@ -156,7 +156,7 @@ const EditorComponent = ({ id, text, title }: EditorProps) => {
   }, [])
 
   return (
-    <div className='flex-grow'>
+    <div className='flex-grow normal-case'>
       <div>
         <span contentEditable className="mb-2 text-3xl md:text-4xl uppercase border-b border-transparent focus:outline-none active:outline-none hover:border-dashed hover:border-b hover:border-slate-300" 
           spellCheck={false} 
