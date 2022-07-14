@@ -173,7 +173,7 @@ const EditorComponent = ({ id, text, title }: EditorProps) => {
         onChange={value => {
           const offset = editor.selection?.focus.offset || 0
           const position = editor.selection?.focus.path[0] || 0
-          setWordCountAtPos(getWordCountAtPosition(text, position, offset))
+          setWordCountAtPos(getWordCountAtPosition(value, position, offset))
 
           const isAstChange = editor.operations.some(
             op => 'set_selection' !== op.type
