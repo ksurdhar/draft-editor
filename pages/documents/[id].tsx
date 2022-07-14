@@ -67,7 +67,7 @@ export default function DocumentPage({ id }: InferGetStaticPropsType<typeof getS
       <div className={`transition-opacity ease-in-out duration-[1800ms] gradient ${editorColor ? 'opacity-0' : 'opacity-100' }  fixed top-0 left-0 h-screen w-screen z-[-1]`}/>
       <div className={`transition-opacity ease-in-out duration-[1800ms] gradient-editor ${editorColor ? 'opacity-100' : 'opacity-0' }  fixed top-0 left-0 h-screen w-screen z-[-1]`}/>
       <div className="flex justify-center pb-10 p-[20px] mt-[64px] text-black/[.79] font-editor2">
-        <div className="flex flex-col h-[calc(100vh_-_64px)] pb-10 max-w-[740px] md:w-[740px]">
+        <div className="flex flex-col h-[calc(100vh_-_64px)] pb-10 min-w-[calc(100vw_-_40px)] md:min-w-[0px] max-w-[740px] md:w-[740px]">
           <Editor id={id} text={JSON.parse(document.content)} title={document.title} />
         </div>
       </div>
