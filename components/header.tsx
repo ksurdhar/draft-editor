@@ -15,21 +15,17 @@ const HeaderComponent = () => {
   const { user } = useUser()
   const [ menuOpen, setMenuOpen ] = useState(false)
 
-
-  // 52% opacity on whetstone
-
   return (
-    <header className="flex flex-row p-5 max-h-16 justify-between bg-transparent fixed w-[100%] top-0">
+    <header className="flex flex-row p-5 max-h-16 justify-between bg-transparent">
       <h1 className='lowercase'><Link href={'/'}>Whetstone</Link></h1>
-      <div className={'z-10'}>
+      <div>
         <Menu>
-          <div className='flex flex-row-reverse'>
+          <div className='flex flex-row-reverse z-10 absolute right-[20px]'>
             <Menu.Button onClick={() => setMenuOpen(!menuOpen)} className={`hamburger hamburger--spin ${ menuOpen ? 'is-active' : ''}`}>
               <span className="hamburger-box">
                 <span className="hamburger-inner"></span>
               </span>
             </Menu.Button>
-
           </div>
           <Transition
             enter="transition duration-500 ease-in"
@@ -38,8 +34,9 @@ const HeaderComponent = () => {
             leave="transition duration-500 ease-out"
             leaveFrom="transform opacity-100"
             leaveTo="transform opacity-0"
+            className={'absolute top-0 right-0'}
           >
-          <Menu.Items className={'border-1 border-white border-solid p-2 text-[18px] text-white mr-[24px] gradient-color'}>
+          <Menu.Items static className={'h-[100vh] w-[30vw] min-w-[300px] menu-gradient p-[10px] pt-[48px] text-[20px] text-white'}>
             <Menu.Item>
               {({ active }) => (
                 <div onClick={async () => {
@@ -51,7 +48,7 @@ const HeaderComponent = () => {
                   } catch (e) {
                     console.log(e)
                   }
-                }} className={'hover:bg-white/[.3] cursor-pointer p-2'}>
+                }} className={'hover:bg-white/[.3] cursor-pointer p-2 px-[10px]'}>
                   Create Document
                 </div>
                 )}
@@ -61,14 +58,14 @@ const HeaderComponent = () => {
                 <div onClick={() => {
                   router.push('/documents')
                   setMenuOpen(!menuOpen)
-                }} className={'hover:bg-white/[.3] cursor-pointer p-2'}>
+                }} className={'hover:bg-white/[.3] cursor-pointer p-2 px-[10px]'}>
                   All Documents
                 </div>
                 )}
             </Menu.Item>
             <Menu.Item>
               {({ active }) => (
-                <div className={'hover:bg-white/[.3] cursor-pointer p-2'}>
+                <div className={'hover:bg-white/[.3] cursor-pointer p-2 px-[10px]'}>
                   <Link href='/api/auth/logout'>
                     <a>Sign Out</a>
                   </Link>
