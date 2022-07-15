@@ -1,24 +1,41 @@
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { useUser } from '@auth0/nextjs-auth0'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import API from '../lib/utils'
 
 
 type HeaderProps = {
-  mouseMoved: boolean
+  isMouseStill: boolean
 }
 
-const HeaderComponent = ({ mouseMoved }: HeaderProps) => {
+const useScrollPosition = () => {
+  const [scrollPosition, setScrollPosition] = useState(0)
+
+  useEffect(() => {
+    const updatePosition = () => {
+      setScrollPosition(window.pageYOffset)
+    }
+    window.addEventListener('scroll', updatePosition)
+    updatePosition()
+    return () => window.removeEventListener('scroll', updatePosition)
+  }, [])
+
+  return scrollPosition
+}
+
+const HeaderComponent = ({ isMouseStill }: HeaderProps) => {
   const router = useRouter()
   const { user } = useUser()
   const [ menuOpen, setMenuOpen ] = useState(false)
+  const scrollPosition = useScrollPosition()
 
   const editorActive = router.pathname.includes('/documents/')
+  const hideHeader = editorActive && isMouseStill && scrollPosition > 20
 
   return (
-    <header className={`${editorActive ? 'header-gradient' : ''} transition-opacity duration-500 hover:opacity-100  ${editorActive && !mouseMoved ? 'opacity-0' : 'opacity-100' } fixed top-0 w-[100vw] z-10 flex flex-row p-5 max-h-16 justify-between bg-transparent`}>
+    <header className={`${editorActive ? 'header-gradient' : ''} transition-opacity duration-500 hover:opacity-100 ${hideHeader ? 'opacity-0' : 'opacity-100' } fixed top-0 w-[100vw] z-10 flex flex-row p-5 max-h-16 justify-between bg-transparent`}>
       <h1 className='lowercase'><Link href={'/'}>Whetstone</Link></h1>
       <div>
           <div className='flex flex-row-reverse z-20 absolute right-[20px]'>

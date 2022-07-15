@@ -24,7 +24,7 @@ const Layout = ({ children }: Props) => {
     <div className="h-screen w-screen font-index uppercase" onMouseMove={() => {
       setMouseMoved(true)
     }}>
-      <HeaderComponent mouseMoved={mouseMoved} />
+      <HeaderComponent isMouseStill={!mouseMoved} />
       {/* 64px is the header height */}
       { children }
     </div>
