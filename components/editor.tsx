@@ -1,8 +1,10 @@
 import { useDebouncedCallback } from 'use-debounce'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { createEditor, BaseEditor, Descendant, Editor, Transforms, Text, Node } from 'slate'
 import { Slate, Editable, withReact, ReactEditor } from 'slate-react'
 import API from '../lib/utils'
+import { useEditorFades } from './header'
+import { useMouse } from '../pages/_app'
 
 type HighlightType = 'none' | 'red' | 'orange' | 'green' | 'blue' 
 
@@ -136,6 +138,9 @@ const EditorComponent = ({ id, text, title }: EditorProps) => {
   const [ wordCount, setWordCount ] = useState(countWords(text))
   const [ wordCountAtPos, setWordCountAtPos ] = useState(0)
 
+  const { mouseMoved } = useMouse()
+  const [ initFadeIn, fadeOut ] = useEditorFades(!mouseMoved)
+
   const debouncedSave = useDebouncedCallback(
     async (data: Partial<DocumentData>) => { 
       await API.patch(`/api/documents/${id}`, { // create a wrapper function for better typing, this is a exit point
@@ -249,8 +254,12 @@ const EditorComponent = ({ id, text, title }: EditorProps) => {
           }}
         />
       </Slate>
-      <div className='pr-10 fixed bottom-0 right-0'> 
-         {wordCountAtPos}/{wordCount} - { `${Math.round(wordCountAtPos/wordCount*100)}%` }
+      
+      {/* footer */}
+      <div className={`fixed ${initFadeIn ? 'footer-gradient' : 'bg-transparent'} ${fadeOut ? 'opacity-0' : 'opacity-100' }  transition-opacity duration-700 hover:opacity-100 w-[100vw] h-[50px] bottom-0 left-0 z-10`}>
+        <div className='font-index pr-[20px] fixed bottom-0 right-0'> 
+          {wordCountAtPos}/{wordCount} - { `${Math.round(wordCountAtPos/wordCount*100)}%` }
+        </div>
       </div>
     </div>
   )

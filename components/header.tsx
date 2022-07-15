@@ -4,11 +4,7 @@ import { useUser } from '@auth0/nextjs-auth0'
 import { useEffect, useState } from 'react'
 
 import API from '../lib/utils'
-
-
-type HeaderProps = {
-  isMouseStill: boolean
-}
+import { useMouse } from '../pages/_app'
 
 const useScrollPosition = () => {
   const [scrollPosition, setScrollPosition] = useState(0)
@@ -25,10 +21,8 @@ const useScrollPosition = () => {
   return scrollPosition
 }
 
-const HeaderComponent = ({ isMouseStill }: HeaderProps) => {
+export const useEditorFades = (isMouseStill: boolean) => {
   const router = useRouter()
-  const { user } = useUser()
-  const [ menuOpen, setMenuOpen ] = useState(false)
   const scrollPosition = useScrollPosition()
   const editorActive = router.pathname.includes('/documents/')
   const [ fadeHeader, setFadeHeader ] = useState(false)
@@ -41,12 +35,23 @@ const HeaderComponent = ({ isMouseStill }: HeaderProps) => {
     }
   }, [])
   
+  const initFadeIn = editorActive && fadeHeader
+  const fadeOut = editorActive && isMouseStill && scrollPosition > 20
 
-  const hideHeader = editorActive && isMouseStill && scrollPosition > 20 // or if mouse position is over the header
+  return [initFadeIn, fadeOut]
+}
 
+const HeaderComponent = () => {
+  const { user } = useUser()
+  const router = useRouter()
+  const [ menuOpen, setMenuOpen ] = useState(false)
+
+  const { mouseMoved } = useMouse()
+  const [ initFadeIn, fadeOut ] = useEditorFades(!mouseMoved)
+  
   return (
     <>
-      <header className={`${editorActive && fadeHeader ? 'header-gradient' : 'bg-transparent'} ${hideHeader ? 'opacity-0' : 'opacity-100' } transition-opacity duration-700 hover:opacity-100 fixed top-0 w-[100vw] z-10 flex flex-row p-5 pb-[30px] justify-between`}>
+      <header className={`${initFadeIn ? 'header-gradient' : 'bg-transparent'} ${fadeOut ? 'opacity-0' : 'opacity-100' } transition-opacity duration-700 hover:opacity-100 fixed top-0 w-[100vw] z-10 flex flex-row p-5 pb-[30px] justify-between`}>
         <h1 className='lowercase'><Link href={'/'}>Whetstone</Link></h1>
         <div>
             {/* menu button  */}
