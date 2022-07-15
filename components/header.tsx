@@ -6,13 +6,19 @@ import { useState } from 'react'
 import API from '../lib/utils'
 
 
-const HeaderComponent = () => {
+type HeaderProps = {
+  mouseMoved: boolean
+}
+
+const HeaderComponent = ({ mouseMoved }: HeaderProps) => {
   const router = useRouter()
   const { user } = useUser()
   const [ menuOpen, setMenuOpen ] = useState(false)
 
+  const editorActive = router.pathname.includes('/documents/')
+
   return (
-    <header className="fixed top-0 w-[100vw] z-10 flex flex-row p-5 max-h-16 justify-between bg-transparent">
+    <header className={`${editorActive ? 'header-gradient' : ''} transition-opacity duration-500 hover:opacity-100  ${editorActive && !mouseMoved ? 'opacity-0' : 'opacity-100' } fixed top-0 w-[100vw] z-10 flex flex-row p-5 max-h-16 justify-between bg-transparent`}>
       <h1 className='lowercase'><Link href={'/'}>Whetstone</Link></h1>
       <div>
           <div className='flex flex-row-reverse z-20 absolute right-[20px]'>

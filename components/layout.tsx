@@ -1,17 +1,30 @@
+import { useEffect, useState } from 'react'
 import HeaderComponent from './header'
 
 type Props = {
   children?: React.ReactNode
 }
 
-// bg-[#fffaf4] <-- off white color
+const useDebouncedEffect = (effect: () => void, deps: any[], delay: number) => {
+  useEffect(() => {
+    const handler = setTimeout(() => effect(), delay)
 
-// instead of importing this everywhere, it can be pulled into _app.tsx to be reused 
-// see: https://nextjs.org/docs/basic-features/layouts for details
+    return () => clearTimeout(handler)
+  }, [...deps || [], delay])
+}
+
 const Layout = ({ children }: Props) => {
+  const [mouseMoved, setMouseMoved] = useState(false)
+
+  useDebouncedEffect(() => {
+    setMouseMoved(false)
+  }, [mouseMoved], 6000)
+
   return (
-    <div className="h-screen w-screen font-index uppercase">
-      <HeaderComponent/>
+    <div className="h-screen w-screen font-index uppercase" onMouseMove={() => {
+      setMouseMoved(true)
+    }}>
+      <HeaderComponent mouseMoved={mouseMoved} />
       {/* 64px is the header height */}
       { children }
     </div>
