@@ -18,7 +18,7 @@ const Layout = ({ children }: Props) => {
 
   useDebouncedEffect(() => {
     setMouseMoved(false)
-  }, [mouseMoved], 6000)
+  }, [mouseMoved], 5000)
 
   return (
     <div className="h-screen w-screen font-index uppercase" onMouseMove={() => {

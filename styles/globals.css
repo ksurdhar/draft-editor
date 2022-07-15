@@ -16,7 +16,7 @@ a {
 }
 
 .header-gradient {
-  background-image: linear-gradient(to bottom, rgba(256,252,244), rgba(256,252,244,0.00));
+  background-image: linear-gradient(to bottom, rgba(256,252,244) 60%, rgba(256,252,244,0.00));
 }
 
 .bg-menu {
