@@ -136,13 +136,15 @@ const EditorComponent = ({ id, text, title }: EditorProps) => {
   const [ editor ] = useState(() => withReact(createEditor()))
   const [ isUpdated, setIsUpdated ] = useState(true)
   const [ wordCount, setWordCount ] = useState(countWords(text))
-  const [ toggleCounter, setToggleCounter ] = useState(true)
   const [ wordCountAtPos, setWordCountAtPos ] = useState(0)
+  const [ counterMode, setCounterMode ] = useState(0)
 
-  const counterText = toggleCounter 
-    ? `${wordCountAtPos}/${wordCount} words`
-    : `${Math.round(wordCountAtPos/wordCount*100)}%`
-
+  const counterTexts = [
+    `${wordCountAtPos}/${wordCount} words`,
+    `page ${Math.ceil(wordCountAtPos/500)}/${Math.ceil(wordCount/500)}`,
+    `${Math.round(wordCountAtPos/wordCount*100)}%`
+  ]
+    
   const { mouseMoved } = useMouse()
   const [ initFadeIn, fadeOut ] = useEditorFades(!mouseMoved)
 
@@ -262,8 +264,14 @@ const EditorComponent = ({ id, text, title }: EditorProps) => {
       
       {/* footer */}
       <div className={`fixed ${initFadeIn ? 'footer-gradient' : 'bg-transparent'} ${fadeOut ? 'opacity-0' : 'opacity-100' }  transition-opacity duration-700 hover:opacity-100 w-[100vw] h-[50px] bottom-0 left-0 z-10`}>
-        <div onClick={() => setToggleCounter(!toggleCounter)} className='font-index text-sm md:text-base pr-[20px] cursor-pointer fixed bottom-0 right-0'> 
-          { counterText }
+        <div className='font-index text-sm md:text-base pr-[20px] cursor-pointer fixed bottom-0 right-0' onClick={() => {
+          if (counterMode < 2) {
+            setCounterMode(counterMode + 1)
+          } else {
+            setCounterMode(0)
+          }
+        }}> 
+          { counterTexts[counterMode] }
         </div>
       </div>
     </div>

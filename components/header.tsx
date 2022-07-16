@@ -51,11 +51,11 @@ const HeaderComponent = () => {
   
   return (
     <>
-      <header className={`${initFadeIn ? 'header-gradient' : 'bg-transparent'} ${fadeOut ? 'opacity-0' : 'opacity-100' } transition-opacity duration-700 hover:opacity-100 fixed top-0 w-[100vw] z-10 flex flex-row p-5 pb-[30px] justify-between`}>
+      <header className={`${initFadeIn ? 'header-gradient' : 'bg-transparent'} ${fadeOut ? 'opacity-0' : 'opacity-100' } transition-opacity duration-700 hover:opacity-100 fixed top-0 w-[100vw] z-20 flex flex-row p-5 pb-[30px] justify-between`}>
         <h1 className='lowercase'><Link href={'/'}>Whetstone</Link></h1>
         <div>
             {/* menu button  */}
-            <div className='flex flex-row-reverse z-20 absolute right-[20px]'>
+            <div className='flex flex-row-reverse z-30 absolute right-[20px]'>
               <div onClick={() => setMenuOpen(!menuOpen)} className={`hamburger hamburger--spin ${ menuOpen ? 'is-active' : ''}`}>
                 <span className="hamburger-box">
                   <span className="hamburger-inner"></span>
@@ -64,7 +64,7 @@ const HeaderComponent = () => {
             </div>
             {/* drawer menu */}
             <div className={`${router.pathname === '/documents' ? 'bg-menu' : 'bg-menu-dark'} transition-[right] ease-in-out duration-500 absolute top-0 ${menuOpen ? 'right-0' : 'right-[-500px]'} h-[100vh] min-w-[300px] 
-              p-[10px] pt-[48px] text-[20px] text-white z-10`}>
+              p-[10px] pt-[48px] text-[20px] text-white z-20`}>
               <div className={'hover:bg-white/[.3] cursor-pointer p-2 px-[20px] pl-[26px]'}
                 onClick={async () => {
                   setMenuOpen(!menuOpen)
