@@ -7,11 +7,13 @@ import { createContext, ReactNode, useContext, useEffect, useState } from 'react
 
 
 type mouseContextType = {
+  hoveringOverMenu: boolean
   mouseMoved: boolean
-  onMouseMove: () => void
+  onMouseMove: (clientY: number) => void
 }
 
 const mouseContextDefaultValue: mouseContextType = {
+  hoveringOverMenu: false,
   mouseMoved: false,
   onMouseMove: () => {}
 }
@@ -35,18 +37,27 @@ const useDebouncedEffect = (effect: () => void, deps: any[], delay: number) => {
 
 export function MouseProvider({ children }: Props) {
   const [mouseMoved, setMouseMoved] = useState(false)
+  const [hoveringOverMenu, setHoveringOverMenu] = useState(false)
 
   useDebouncedEffect(() => {
     setMouseMoved(false)
   }, [mouseMoved], 5000)
 
-  const onMouseMove = () => {
+  
+  const onMouseMove = (clientY: number) => {
     setMouseMoved(true)
+    if (clientY < 45 && !hoveringOverMenu) {
+      setHoveringOverMenu(true)
+    } 
+    if (clientY >= 45 && hoveringOverMenu) {
+      setHoveringOverMenu(false)
+    } 
   }
 
   const value = {
     mouseMoved, 
-    onMouseMove
+    onMouseMove,
+    hoveringOverMenu
   }
 
   return (

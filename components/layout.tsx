@@ -9,7 +9,7 @@ const Layout = ({ children }: Props) => {
   const { onMouseMove } = useMouse()
 
   return (
-    <div className="h-screen w-screen font-index uppercase" onMouseMove={() => onMouseMove()}>
+    <div className="h-screen w-screen font-index uppercase" onMouseMove={(e) => onMouseMove(e.clientY)}>
       <HeaderComponent />
       { children }
     </div>
