@@ -14,6 +14,7 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
   const { data: docs, mutate } = useSWR<DocumentData[]>('/api/documents', fetcher) 
   const router =  useRouter()
 
+  // good gravy, extract this code and dry it up dude
   if (!docs) return (
     <Layout>
       <div className='gradient absolute top-0 left-0 h-screen w-screen z-[-1]'/>
@@ -29,13 +30,14 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
 
   const documentItems = docs.map(({ id, title, lastUpdated }, idx) => {
     return (
-      <div className={`flex justify-between h-[40px] px-[10px] ${idx !== docs.length - 1 ? 'border-b' : 'border-transparent'} border-solid border-black/[.35]
-        hover:cursor-pointer hover:bg-white/[.30] uppercase text-[14px] font-semibold
-      `}
-      onClick={() => {
-        router.push(`/documents/${id}`)
-      }}
-      key={id}
+      <div className={`flex justify-between min-h-[40px] px-[10px]
+          hover:cursor-pointer hover:bg-white/[.30] uppercase text-[14px] font-semibold
+          ${idx !== docs.length - 1 ? 'border-b' : 'border-transparent'} border-solid border-black/[.35]`
+        }
+        onClick={() => {
+          router.push(`/documents/${id}`)
+        }}
+        key={id}
       >
         <div className="grow self-center whitespace-nowrap overflow-hidden text-ellipsis">
           <Link href={`/documents/${id}`}>{title}</Link>
@@ -50,12 +52,13 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
           <DotsHorizontalIcon 
             onClick={async (e) => {
               e.stopPropagation()
-              try {
-                await API.delete(`/api/documents/${id}`)
-                mutate()
-              } catch(e) {
-                console.log(e)
-              }
+              console.log('clicked', title)
+              // try {
+              //   await API.delete(`/api/documents/${id}`)
+              //   mutate()
+              // } catch(e) {
+              //   console.log(e)
+              // }
             }}
             className='h-[16px] w-[16px] self-center'/>
         </div>
@@ -75,9 +78,9 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
     </Head>
     <Layout>
       <div className='gradient absolute top-0 left-0 h-screen w-screen z-[-1]'/>
-      <div className="flex justify-center h-[calc(100vh_-_64px)] pb-10">
-        <div className={'w-11/12 sm:w-9/12 max-w-[740px]'}> 
-          <div className='flex flex-col h-[100%] justify-center mt-[-64px]'>
+      <div className="relative top-[64px] flex justify-center h-[calc(100vh_-_64px)] pb-10">
+        <div className={'overflow-y-scroll flex flex-col justify-center w-11/12 sm:w-9/12 max-w-[740px]'}> 
+          <div className='flex flex-col overflow-y-scroll max-h-[280px] justify-center mt-[-64px]'>
             { documentItems }
           </div>
         </div>
