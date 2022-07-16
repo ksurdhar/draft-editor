@@ -132,6 +132,18 @@ const getWordCountAtPosition = (nodes: Descendant[], rangeIdx: number, offset: n
   return countExcludingCurrentRow + currentRowCount
 }
 
+const getCounterTexts = (wordCountAtPos: number, wordCount: number) => {
+  const formattedPosPage = wordCountAtPos === 0 ? 1 : Math.ceil(wordCountAtPos/500)
+  const formattedPage = wordCount === 0 ? 1 : Math.ceil(wordCount/500)
+  const formattedPercentage = wordCount === 0 ? 0 : Math.round(wordCountAtPos/wordCount*100)
+
+  return [
+    `${wordCountAtPos}/${wordCount} words`,
+    `page ${formattedPosPage}/${formattedPage}`, 
+    `${formattedPercentage}%`
+  ]
+}
+
 const EditorComponent = ({ id, text, title }: EditorProps) => {
   const [ editor ] = useState(() => withReact(createEditor()))
   const [ isUpdated, setIsUpdated ] = useState(true)
@@ -139,11 +151,7 @@ const EditorComponent = ({ id, text, title }: EditorProps) => {
   const [ wordCountAtPos, setWordCountAtPos ] = useState(0)
   const [ counterMode, setCounterMode ] = useState(0)
 
-  const counterTexts = [
-    `${wordCountAtPos}/${wordCount} words`,
-    `page ${Math.ceil(wordCountAtPos/500)}/${Math.ceil(wordCount/500)}`,
-    `${Math.round(wordCountAtPos/wordCount*100)}%`
-  ]
+  const counterTexts = getCounterTexts(wordCountAtPos, wordCount)
     
   const { mouseMoved } = useMouse()
   const [ initFadeIn, fadeOut ] = useEditorFades(!mouseMoved)
