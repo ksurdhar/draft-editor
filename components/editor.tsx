@@ -136,14 +136,19 @@ const EditorComponent = ({ id, text, title }: EditorProps) => {
   const [ editor ] = useState(() => withReact(createEditor()))
   const [ isUpdated, setIsUpdated ] = useState(true)
   const [ wordCount, setWordCount ] = useState(countWords(text))
+  const [ toggleCounter, setToggleCounter ] = useState(true)
   const [ wordCountAtPos, setWordCountAtPos ] = useState(0)
+
+  const counterText = toggleCounter 
+    ? `${wordCountAtPos}/${wordCount} words`
+    : `${Math.round(wordCountAtPos/wordCount*100)}%`
 
   const { mouseMoved } = useMouse()
   const [ initFadeIn, fadeOut ] = useEditorFades(!mouseMoved)
 
   const debouncedSave = useDebouncedCallback(
     async (data: Partial<DocumentData>) => { 
-      await API.patch(`/api/documents/${id}`, { // create a wrapper function for better typing, this is a exit point
+      await API.patch(`/api/documents/${id}`, { // create a wrapper function for better typing
         ...data,
         lastUpdated: Date.now()
       }) 
@@ -257,12 +262,11 @@ const EditorComponent = ({ id, text, title }: EditorProps) => {
       
       {/* footer */}
       <div className={`fixed ${initFadeIn ? 'footer-gradient' : 'bg-transparent'} ${fadeOut ? 'opacity-0' : 'opacity-100' }  transition-opacity duration-700 hover:opacity-100 w-[100vw] h-[50px] bottom-0 left-0 z-10`}>
-        <div className='font-index pr-[20px] fixed bottom-0 right-0'> 
-          {wordCountAtPos}/{wordCount} - { `${Math.round(wordCountAtPos/wordCount*100)}%` }
+        <div onClick={() => setToggleCounter(!toggleCounter)} className='font-index text-sm md:text-base pr-[20px] cursor-pointer fixed bottom-0 right-0'> 
+          { counterText }
         </div>
       </div>
     </div>
   )
 }
-
 export default EditorComponent
