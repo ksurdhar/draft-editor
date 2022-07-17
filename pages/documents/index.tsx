@@ -53,12 +53,12 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
             onClick={async (e) => {
               e.stopPropagation()
               console.log('clicked', title)
-              // try {
-              //   await API.delete(`/api/documents/${id}`)
-              //   mutate()
-              // } catch(e) {
-              //   console.log(e)
-              // }
+              try {
+                await API.delete(`/api/documents/${id}`)
+                mutate()
+              } catch(e) {
+                console.log(e)
+              }
             }}
             className='h-[16px] w-[16px] self-center'/>
         </div>
@@ -68,8 +68,6 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
     )
   })
 
-  // some kind of empty state when you have no documents
-  // document name, last modified
   return (
     <>
     <Head>
@@ -82,6 +80,10 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
         <div className={'overflow-y-scroll flex flex-col justify-center w-11/12 sm:w-9/12 max-w-[740px]'}> 
           <div className='flex flex-col overflow-y-scroll max-h-[280px] justify-center mt-[-64px]'>
             { documentItems }
+          </div>
+          <div className={`flex justify-evenly mt-[48px]`}>
+            <button className="file-button hover:bg-white/[.20]" role="button">rename</button>
+            <button className="file-button file-button-red hover:bg-white/[.20]" role="button">delete</button>
           </div>
         </div>
       </div>
