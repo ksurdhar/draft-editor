@@ -54,7 +54,6 @@ export default function DocumentPage({ id }: InferGetStaticPropsType<typeof getS
         <title>Draft Editor</title>
         <link href="https://fonts.googleapis.com/css2?family=Mukta&display=swap" rel="stylesheet" />
         <link href="https://fonts.googleapis.com/css2?family=Ibarra+Real+Nova&display=swap" rel="stylesheet" />
-        <link href="https://fonts.googleapis.com/css2?family=EB+Garamond&display=swap" rel="stylesheet"/>
       </Head>
       <Layout>
 

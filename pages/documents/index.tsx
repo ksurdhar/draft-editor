@@ -13,7 +13,10 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 const DocumentsPage = withPageAuthRequired(({ user }) => {
   const { data: docs, mutate } = useSWR<DocumentData[]>('/api/documents', fetcher) 
-  const [ selectedDoc , setSelectedDoc ] = useState<string | null>(null)
+  const [ selectedDocId , setSelectedDoc ] = useState<string | null>(null)
+  const [ renameActive , setRenameActive ] = useState(false)
+  const [ newName, setNewName ] = useState('')
+
   const router =  useRouter()
 
   // good gravy, extract this code and dry it up dude
@@ -34,14 +37,15 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
     return (
       <div className={`
           transition duration-[250ms]
-          ${id === selectedDoc ? 'bg-white/[.30] border-black/[.14]' : ''}
-          ${ selectedDoc && id !== selectedDoc ? 'opacity-40 pointer-events-none' : ''} 
+          ${id === selectedDocId ? 'bg-white/[.30] border-black/[.14]' : ''}
+          ${ selectedDocId && id !== selectedDocId ? 'opacity-40 pointer-events-none' : ''} 
           flex justify-between min-h-[40px] px-[10px]
-          hover:cursor-pointer hover:bg-white/[.30] uppercase text-[14px] font-semibold
+          hover:cursor-pointer hover:bg-white/[.30] 
+          uppercase text-[14px] font-semibold
           ${idx !== docs.length - 1 ? 'border-b' : 'border-transparent'} border-solid border-black/[.35]`
         }
         onClick={() => {
-          if (!selectedDoc) {
+          if (!selectedDocId) {
             router.push(`/documents/${id}`)
           }
         }}
@@ -60,18 +64,13 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
           <DotsHorizontalIcon 
             onClick={async (e) => {
               e.stopPropagation()
-              if (selectedDoc === id) {
+              if (selectedDocId === id) {
                 setSelectedDoc(null)
               } else {
                 setSelectedDoc(id)
               }
               
-              // try {
-              //   await API.delete(`/api/documents/${id}`)
-              //   mutate()
-              // } catch(e) {
-              //   console.log(e)
-              // }
+
             }}
             className='h-[16px] w-[16px] self-center'/>
         </div>
@@ -86,13 +85,15 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
     <Head>
       <title>Whetstone - Documents</title>
       <link href="https://fonts.googleapis.com/css2?family=Mukta&display=swap" rel="stylesheet" />
+      <link href="https://fonts.googleapis.com/css2?family=Ibarra+Real+Nova&display=swap" rel="stylesheet" />
     </Head>
     <Layout>
       <div className='gradient absolute top-0 left-0 h-screen w-screen z-[-1]'/>
       <div className="relative top-[64px] flex justify-center h-[calc(100vh_-_64px)] pb-10"
         onClick={() => {
-          if (selectedDoc) {
+          if (selectedDocId || renameActive) {
             setSelectedDoc(null)
+            setTimeout(() => setRenameActive(false), 251) // bit of a hack to prevent animations
           }          
         }}
       >
@@ -100,9 +101,45 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
           <div className='overflow-y-scroll max-h-[280px]'>
             { documentItems }
           </div>
-          <div className={`${selectedDoc ? 'opacity-100' : 'opacity-0 pointer-events-none'} transition-opacity duration-[250ms] flex justify-evenly mt-[48px]`}>
-            <button className="file-button hover:bg-white/[.15]" role="button">rename</button>
-            <button className="file-button file-button-red hover:bg-white/[.15]" role="button">delete</button>
+          <div className={`${selectedDocId ? 'opacity-100' : 'opacity-0 pointer-events-none'} transition-opacity duration-[250ms] h-[40px] flex justify-evenly mt-[48px]`}>
+            {
+              !renameActive && 
+              <>
+                <button onClick={(e) => {
+                  e.stopPropagation()
+                  setRenameActive(true)
+                }} className="file-button hover:bg-white/[.15]" role="button">rename</button>
+                <button onClick={async (e) => {
+                  e.stopPropagation()
+                  try {
+                    await API.delete(`/api/documents/${selectedDocId}`)
+                    mutate()
+                  } catch(e) {
+                    console.log(e)
+                  }
+                  setSelectedDoc(null)
+                }}
+                  className="file-button file-button-red hover:bg-white/[.15]" role="button">delete</button>
+              </>
+            }
+             {
+              renameActive && 
+              <form className={'w-[70%]'} onSubmit={async (e) => {
+                e.preventDefault()
+                await API.patch(`/api/documents/${selectedDocId}`, {
+                  title: newName,
+                  lastUpdated: Date.now()
+                }) 
+                setRenameActive(false)
+                setSelectedDoc(null)
+                mutate()
+              }}>
+                <input onChange={(e) => setNewName(e.currentTarget.value)} onClick={(e) => e.stopPropagation()} type='text' spellCheck='false' autoFocus placeholder={`New Title`} className={
+                  `w-[100%] bg-transparent border-x-0 border-t-0 border-b-[1px] focus:border-black/[.2] focus:ring-transparent ring-transparent 
+                  uppercase text-[18px] font-editor2 text-black/[.70] text-center placeholder:text-black/[.25]`} 
+                />
+             </form>
+            }
           </div>
         </div>
       </div>

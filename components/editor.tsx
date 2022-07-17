@@ -71,7 +71,6 @@ const renderElement = (props: RenderElementProps) => {
   }
 }
 
-
 type RenderLeafProps = {
   attributes: Object
   leaf: DefaultText
@@ -84,19 +83,15 @@ const Leaf = ({ attributes, leaf, children }: RenderLeafProps) => {
   switch(leaf.highlight) {
     case 'blue':
       highlighting = 'bg-blue-200'
-      // selection = 'selection:bg-blue-200'
       break
     case 'green':
       highlighting = 'bg-green-200'
-      // selection = 'selection:bg-green-200'
       break
     case 'orange':
       highlighting = 'bg-orange-200'
-      // selection = 'selection:bg-orange-200'
       break
     case 'red':
       highlighting = 'bg-red-200'
-      // selection = 'selection:bg-red-200'
       break
   }
   
