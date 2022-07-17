@@ -7,11 +7,13 @@ import { format } from "date-fns"
 import { useRouter } from "next/router"
 import Head from "next/head"
 import Link from "next/link"
+import { useState } from "react"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 const DocumentsPage = withPageAuthRequired(({ user }) => {
   const { data: docs, mutate } = useSWR<DocumentData[]>('/api/documents', fetcher) 
+  const [ selectedDoc , setSelectedDoc ] = useState<string | null>(null)
   const router =  useRouter()
 
   // good gravy, extract this code and dry it up dude
@@ -30,12 +32,18 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
 
   const documentItems = docs.map(({ id, title, lastUpdated }, idx) => {
     return (
-      <div className={`flex justify-between min-h-[40px] px-[10px]
+      <div className={`
+          transition duration-[250ms]
+          ${id === selectedDoc ? 'bg-white/[.30] border-black/[.14]' : ''}
+          ${ selectedDoc && id !== selectedDoc ? 'opacity-40 pointer-events-none' : ''} 
+          flex justify-between min-h-[40px] px-[10px]
           hover:cursor-pointer hover:bg-white/[.30] uppercase text-[14px] font-semibold
           ${idx !== docs.length - 1 ? 'border-b' : 'border-transparent'} border-solid border-black/[.35]`
         }
         onClick={() => {
-          router.push(`/documents/${id}`)
+          if (!selectedDoc) {
+            router.push(`/documents/${id}`)
+          }
         }}
         key={id}
       >
@@ -52,13 +60,18 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
           <DotsHorizontalIcon 
             onClick={async (e) => {
               e.stopPropagation()
-              console.log('clicked', title)
-              try {
-                await API.delete(`/api/documents/${id}`)
-                mutate()
-              } catch(e) {
-                console.log(e)
+              if (selectedDoc === id) {
+                setSelectedDoc(null)
+              } else {
+                setSelectedDoc(id)
               }
+              
+              // try {
+              //   await API.delete(`/api/documents/${id}`)
+              //   mutate()
+              // } catch(e) {
+              //   console.log(e)
+              // }
             }}
             className='h-[16px] w-[16px] self-center'/>
         </div>
@@ -76,14 +89,20 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
     </Head>
     <Layout>
       <div className='gradient absolute top-0 left-0 h-screen w-screen z-[-1]'/>
-      <div className="relative top-[64px] flex justify-center h-[calc(100vh_-_64px)] pb-10">
-        <div className={'overflow-y-scroll flex flex-col justify-center w-11/12 sm:w-9/12 max-w-[740px]'}> 
-          <div className='flex flex-col overflow-y-scroll max-h-[280px] justify-center mt-[-64px]'>
+      <div className="relative top-[64px] flex justify-center h-[calc(100vh_-_64px)] pb-10"
+        onClick={() => {
+          if (selectedDoc) {
+            setSelectedDoc(null)
+          }          
+        }}
+      >
+        <div className={'flex flex-col justify-center w-11/12 sm:w-9/12 max-w-[740px]'}> 
+          <div className='overflow-y-scroll max-h-[280px]'>
             { documentItems }
           </div>
-          <div className={`flex justify-evenly mt-[48px]`}>
-            <button className="file-button hover:bg-white/[.20]" role="button">rename</button>
-            <button className="file-button file-button-red hover:bg-white/[.20]" role="button">delete</button>
+          <div className={`${selectedDoc ? 'opacity-100' : 'opacity-0 pointer-events-none'} transition-opacity duration-[250ms] flex justify-evenly mt-[48px]`}>
+            <button className="file-button hover:bg-white/[.15]" role="button">rename</button>
+            <button className="file-button file-button-red hover:bg-white/[.15]" role="button">delete</button>
           </div>
         </div>
       </div>
