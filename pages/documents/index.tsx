@@ -13,7 +13,7 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 const DocumentsPage = withPageAuthRequired(() => {
   const { data: docs, mutate } = useSWR<DocumentData[]>('/api/documents', fetcher) 
-  const { mutate: mutateDoc } = useSWRConfig()
+  const { cache } = useSWRConfig()
   const [ selectedDocId , setSelectedDoc ] = useState<string | null>(null)
   const [ renameActive , setRenameActive ] = useState(false)
   const [ newName, setNewName ] = useState('')
@@ -132,7 +132,7 @@ const DocumentsPage = withPageAuthRequired(() => {
                 setRenameActive(false)
                 setSelectedDoc(null)
                 mutate()
-                mutateDoc(`api/documents/${selectedDocId}`)
+                cache.delete(`/api/documents/${selectedDocId}`)
               }}>
                 <input onChange={(e) => setNewName(e.currentTarget.value)} onClick={(e) => e.stopPropagation()} type='text' spellCheck='false' autoFocus placeholder={`New Title`} className={
                   `w-[100%] bg-transparent border-x-0 border-t-0 border-b-[1px] focus:border-black/[.2] focus:ring-transparent ring-transparent 

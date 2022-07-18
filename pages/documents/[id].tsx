@@ -4,7 +4,7 @@ import { GetServerSideProps, InferGetServerSidePropsType } from "next"
 import Head from "next/head"
 import Router from "next/router"
 import { useEffect, useState } from "react"
-import useSWR from "swr"
+import useSWR, { useSWRConfig } from "swr"
 import Editor from "../../components/editor"
 import Layout from "../../components/layout"
 
@@ -22,6 +22,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
   const { user, isLoading } = useUser()
   const [ editorColor, setEditorColor ] = useState(false)
   const [ recentlySaved, setRecentlySaved ] = useState(false)
+  const { mutate } = useSWRConfig()
 
   useEffect(() => {
     setTimeout(() => setRecentlySaved(false), 2010)
@@ -36,7 +37,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
     }, 250)
   }, [isLoading])
 
-  const { data: document } = useSWR<DocumentData>(`/api/documents/${id}`, fetcher,  { refreshInterval: 1000 }) 
+  const { data: document } = useSWR<DocumentData>(`/api/documents/${id}`, fetcher) 
 
   return (
     <>
@@ -56,7 +57,12 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
       )}
       <div className="flex justify-center pb-10 p-[20px] mt-[64px] text-black/[.79] font-editor2">
         <div className="flex flex-col h-[calc(100vh_-_64px)] pb-10 min-w-[calc(100vw_-_40px)] md:min-w-[0px] max-w-[740px] md:w-[740px]">
-          { document && <Editor id={id} text={JSON.parse(document.content)} title={document.title} onUpdate={() => setRecentlySaved(true)} /> }
+          { document && <Editor id={id} text={JSON.parse(document.content)} title={document.title} 
+            onUpdate={() => {
+              setRecentlySaved(true)
+              mutate(`/api/documents/${id}`)
+            }} 
+          /> }
           { !document && 'rendering' }
         </div>
       </div>

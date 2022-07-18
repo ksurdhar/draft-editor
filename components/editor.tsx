@@ -148,7 +148,6 @@ const EditorComponent = ({ id, text, title, onUpdate }: EditorProps) => {
   const counterTexts = getCounterTexts(wordCountAtPos, wordCount)
   const titleState = useRef(title)
   const titleRef = useRef<HTMLDivElement>(null)
-  console.log('title', title) // data is stale when we rename from the index page
 
   const { mouseMoved } = useMouse()
   const [ initFadeIn, fadeOut ] = useEditorFades(!mouseMoved)
