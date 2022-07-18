@@ -59,7 +59,7 @@ const HeaderComponent = () => {
             onClick={async () => {
               setMenuOpen(!menuOpen)
               try {
-                const res = await API.post(`/api/documents`, { title: 'Document with my Id', userId: user?.sub })
+                const res = await API.post(`/api/documents`, { userId: user?.sub })
                 const documentId = res.data.id
                 router.push(`/documents/${documentId}`)
               } catch (e) {

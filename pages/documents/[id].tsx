@@ -1,30 +1,14 @@
 import { useUser } from "@auth0/nextjs-auth0"
 import { CloudIcon } from "@heroicons/react/solid"
-import { GetStaticPaths, GetStaticProps, InferGetStaticPropsType } from "next"
+import { GetServerSideProps, InferGetServerSidePropsType } from "next"
 import Head from "next/head"
 import Router from "next/router"
 import { useEffect, useState } from "react"
 import useSWR from "swr"
 import Editor from "../../components/editor"
 import Layout from "../../components/layout"
-import { getEverybodysDocuments } from "../../lib/apiUtils"
 
-export const getStaticPaths: GetStaticPaths = async () => {
-  const documents = await getEverybodysDocuments()
-
-  const paths = documents.map((document) => ({
-    params: {
-      id: `${document.id}`,
-    },
-  }))
-
-  return { 
-    paths: paths, 
-    fallback: false 
-  }
-}
-
-export const getStaticProps: GetStaticProps = async ({ params }) => {
+export const getServerSideProps: GetServerSideProps = async ({ params }) => {
   return {
     props: {
       id: params && params.id
@@ -34,7 +18,7 @@ export const getStaticProps: GetStaticProps = async ({ params }) => {
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
-export default function DocumentPage({ id }: InferGetStaticPropsType<typeof getStaticProps>) {
+export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof getServerSideProps>) {
   const { user, isLoading } = useUser()
   const [ editorColor, setEditorColor ] = useState(false)
   const [ recentlySaved, setRecentlySaved ] = useState(false)

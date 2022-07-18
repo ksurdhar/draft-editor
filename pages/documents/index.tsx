@@ -2,7 +2,7 @@ import { DotsHorizontalIcon } from "@heroicons/react/solid"
 import Layout from "../../components/layout"
 import API from "../../lib/utils"
 import { withPageAuthRequired } from "@auth0/nextjs-auth0"
-import useSWR from "swr"
+import useSWR, { useSWRConfig } from "swr"
 import { format } from "date-fns"
 import { useRouter } from "next/router"
 import Head from "next/head"
@@ -11,8 +11,9 @@ import { useState } from "react"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
-const DocumentsPage = withPageAuthRequired(({ user }) => {
+const DocumentsPage = withPageAuthRequired(() => {
   const { data: docs, mutate } = useSWR<DocumentData[]>('/api/documents', fetcher) 
+  const { mutate: mutateDoc } = useSWRConfig()
   const [ selectedDocId , setSelectedDoc ] = useState<string | null>(null)
   const [ renameActive , setRenameActive ] = useState(false)
   const [ newName, setNewName ] = useState('')
@@ -131,6 +132,7 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
                 setRenameActive(false)
                 setSelectedDoc(null)
                 mutate()
+                mutateDoc(`api/documents/${selectedDocId}`)
               }}>
                 <input onChange={(e) => setNewName(e.currentTarget.value)} onClick={(e) => e.stopPropagation()} type='text' spellCheck='false' autoFocus placeholder={`New Title`} className={
                   `w-[100%] bg-transparent border-x-0 border-t-0 border-b-[1px] focus:border-black/[.2] focus:ring-transparent ring-transparent 
