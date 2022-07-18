@@ -1,9 +1,7 @@
 import axios from 'axios'
 
-// Configured to speak to localhost. 
-// Update when express server is deployed
 const API = axios.create({
-  baseURL: 'http://localhost:3000/',
+  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}/`,
   responseType: 'json'
 })
 
