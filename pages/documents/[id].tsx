@@ -66,7 +66,7 @@ export default function DocumentPage({ id }: InferGetStaticPropsType<typeof getS
       <div className={`transition-opacity ease-in-out duration-[3000ms] gradient ${editorColor ? 'opacity-0' : 'opacity-100' }  fixed top-0 left-0 h-screen w-screen z-[-1]`}/>
       <div className={`transition-opacity ease-in-out duration-[3000ms] gradient-editor ${editorColor ? 'opacity-100' : 'opacity-0' }  fixed top-0 left-0 h-screen w-screen z-[-1]`}/>
       { recentlySaved && (
-        <div className={`fixed top-0 right-0 p-[20px]`}>
+        <div className={`fixed top-0 right-[30px] z-[40] p-[20px]`}>
           <CloudIcon className=' animate-bounce fill-black/[.10]  md:fill-black/[.15] h-[20px] w-[20px] md:h-[24px] md:w-[24px] self-center'/>
         </div>
       )}

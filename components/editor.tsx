@@ -1,5 +1,5 @@
 import { useDebouncedCallback } from 'use-debounce'
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { createEditor, BaseEditor, Descendant, Editor, Transforms, Text, Node } from 'slate'
 import { Slate, Editable, withReact, ReactEditor } from 'slate-react'
 import API from '../lib/utils'
@@ -145,6 +145,7 @@ const EditorComponent = ({ id, text, title, onUpdate }: EditorProps) => {
   const [ wordCount, setWordCount ] = useState(countWords(text))
   const [ wordCountAtPos, setWordCountAtPos ] = useState(0)
   const [ counterMode, setCounterMode ] = useState(0)
+  const titleState = useRef(title)
 
   const counterTexts = getCounterTexts(wordCountAtPos, wordCount)
     
@@ -174,11 +175,13 @@ const EditorComponent = ({ id, text, title, onUpdate }: EditorProps) => {
       <div className='mb-[20px]'>
         <span contentEditable className="mb-2 text-3xl md:text-4xl uppercase border-b border-transparent focus:outline-none active:outline-none hover:border-dashed hover:border-b hover:border-slate-300" 
           spellCheck={false} 
-          onKeyUpCapture={(e) => handleChange({ title: `${e.currentTarget.textContent}` })}
+          onInput={(e) => {
+            e.preventDefault()
+            handleChange({ title: `${e.currentTarget.textContent}` })
+          }}
           suppressContentEditableWarning={true}
-        >
-          {title}
-        </span>
+          dangerouslySetInnerHTML={{__html: titleState.current}}
+        />
       </div>
       
       <Slate editor={editor} key={id} value={text} 
