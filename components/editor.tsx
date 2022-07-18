@@ -106,6 +106,7 @@ type EditorProps = {
   id: string
   text: Descendant[]
   title: string
+  onUpdate: () => void
 }
 
 const countWords = (nodes: Descendant[]) => {
@@ -139,9 +140,8 @@ const getCounterTexts = (wordCountAtPos: number, wordCount: number) => {
   ]
 }
 
-const EditorComponent = ({ id, text, title }: EditorProps) => {
+const EditorComponent = ({ id, text, title, onUpdate }: EditorProps) => {
   const [ editor ] = useState(() => withReact(createEditor()))
-  const [ isUpdated, setIsUpdated ] = useState(true)
   const [ wordCount, setWordCount ] = useState(countWords(text))
   const [ wordCountAtPos, setWordCountAtPos ] = useState(0)
   const [ counterMode, setCounterMode ] = useState(0)
@@ -157,12 +157,11 @@ const EditorComponent = ({ id, text, title }: EditorProps) => {
         ...data,
         lastUpdated: Date.now()
       }) 
-      setIsUpdated(true)
+      onUpdate()  
     }, 1000
   )
 
   const handleChange = useCallback((props: Partial<DocumentData>) => {
-    setIsUpdated(false)
     debouncedSave(props)
   }, [])
 
@@ -172,7 +171,7 @@ const EditorComponent = ({ id, text, title }: EditorProps) => {
 
   return (
     <div className='flex-grow normal-case'>
-      <div>
+      <div className='mb-[20px]'>
         <span contentEditable className="mb-2 text-3xl md:text-4xl uppercase border-b border-transparent focus:outline-none active:outline-none hover:border-dashed hover:border-b hover:border-slate-300" 
           spellCheck={false} 
           onKeyUpCapture={(e) => handleChange({ title: `${e.currentTarget.textContent}` })}
@@ -182,8 +181,6 @@ const EditorComponent = ({ id, text, title }: EditorProps) => {
         </span>
       </div>
       
-      { !isUpdated ? <span>Unsaved Changes</span> : <span>Saved</span>}
-
       <Slate editor={editor} key={id} value={text} 
         onChange={value => {
           const offset = editor.selection?.focus.offset || 0

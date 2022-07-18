@@ -60,19 +60,17 @@ const DocumentsPage = withPageAuthRequired(({ user }) => {
         </div>
 
       <div className="flex items-center">
-        <div className='rounded-full h-[28px] w-[28px] flex flex-col justify-center hover:bg-black/[.10]'>
-          <DotsHorizontalIcon 
-            onClick={async (e) => {
-              e.stopPropagation()
-              if (selectedDocId === id) {
-                setSelectedDoc(null)
-              } else {
-                setSelectedDoc(id)
-              }
-              
-
-            }}
-            className='h-[16px] w-[16px] self-center'/>
+        <div className='rounded-full h-[28px] w-[28px] flex flex-col justify-center hover:bg-black/[.10]'
+          onClick={async (e) => {
+            e.stopPropagation()
+            if (selectedDocId === id) {
+              setSelectedDoc(null)
+            } else {
+              setSelectedDoc(id)
+            }
+          }}
+        >
+          <DotsHorizontalIcon className='h-[16px] w-[16px] self-center'/>
         </div>
       </div>
         
