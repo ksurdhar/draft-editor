@@ -42,7 +42,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
   return (
     <>
       <Head>
-        <title>{`whetstone${document?.title}`}</title>
+        <title>{`whetstone - ${document?.title}`}</title>
       </Head>
       <Layout>
 

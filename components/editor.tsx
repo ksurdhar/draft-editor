@@ -148,6 +148,7 @@ const EditorComponent = ({ id, text, title, onUpdate }: EditorProps) => {
   const counterTexts = getCounterTexts(wordCountAtPos, wordCount)
   const titleState = useRef(title)
   const titleRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const { mouseMoved } = useMouse()
   const [ initFadeIn, fadeOut ] = useEditorFades(!mouseMoved)
@@ -182,6 +183,14 @@ const EditorComponent = ({ id, text, title, onUpdate }: EditorProps) => {
         <div contentEditable={true} placeholder='New Title' ref={titleRef}
           className="editable mb-2 text-3xl md:text-4xl uppercase border-b border-transparent focus:outline-none active:outline-none" 
           spellCheck={false} 
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              const containerNode = containerRef.current
+              const documentNode = containerNode?.querySelector<HTMLTextAreaElement>(`[data-slate-editor="true"]`)
+              documentNode?.focus()
+            }
+          }}
           onInput={(e) => {
             e.preventDefault()
             handleChange({ title: `${e.currentTarget.textContent}` })
@@ -190,7 +199,7 @@ const EditorComponent = ({ id, text, title, onUpdate }: EditorProps) => {
           dangerouslySetInnerHTML={{__html: titleState.current }}
         />
       </div>
-      
+      <div ref={containerRef}>
       <Slate editor={editor} key={id} value={text} 
         onChange={value => {
           const offset = editor.selection?.focus.offset || 0
@@ -271,6 +280,7 @@ const EditorComponent = ({ id, text, title, onUpdate }: EditorProps) => {
           }}
         />
       </Slate>
+      </div>
       
       {/* footer */}
       <div className={`fixed ${initFadeIn ? 'footer-gradient' : 'bg-transparent'} ${fadeOut ? 'opacity-0' : 'opacity-100' }  transition-opacity duration-700 hover:opacity-100 w-[100vw] h-[50px] bottom-0 left-0 z-10`}>
