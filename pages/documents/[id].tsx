@@ -42,9 +42,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
   return (
     <>
       <Head>
-        <title>Draft Editor</title>
-        <link href="https://fonts.googleapis.com/css2?family=Mukta&display=swap" rel="stylesheet" />
-        <link href="https://fonts.googleapis.com/css2?family=Ibarra+Real+Nova&display=swap" rel="stylesheet" />
+        <title>{`whetstone${document?.title}`}</title>
       </Head>
       <Layout>
 

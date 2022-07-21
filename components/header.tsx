@@ -75,11 +75,11 @@ const HeaderComponent = () => {
             }}>
             All Documents
           </div>
-          <div className={'hover:bg-white/[.3] cursor-pointer p-2 px-[20px] pl-[26px]'}>
-            <Link href='/api/auth/logout'>
-              <a>Sign Out</a>
-            </Link>
-          </div>
+          <Link href='/api/auth/logout'>
+            <div className={'hover:bg-white/[.3] cursor-pointer p-2 px-[20px] pl-[26px]'}>
+              Sign Out
+            </div>
+          </Link>
         </div>
       </div>
 

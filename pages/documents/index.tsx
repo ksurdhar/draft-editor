@@ -82,9 +82,7 @@ const DocumentsPage = withPageAuthRequired(() => {
   return (
     <>
     <Head>
-      <title>Whetstone - Documents</title>
-      <link href="https://fonts.googleapis.com/css2?family=Mukta&display=swap" rel="stylesheet" />
-      <link href="https://fonts.googleapis.com/css2?family=Ibarra+Real+Nova&display=swap" rel="stylesheet" />
+      <title>whetstone</title>
     </Head>
     <Layout>
       <div className='gradient absolute top-0 left-0 h-screen w-screen z-[-1]'/>
