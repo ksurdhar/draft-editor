@@ -79,6 +79,10 @@ const DocumentsPage = withPageAuthRequired(() => {
     )
   })
 
+  const emptyMessage = (
+    <div className={'uppercase text-[14px] font-semibold text-center text-black/[.5]'}>Empty / Go create something of worth </div>
+  )
+
   return (
     <>
     <Head>
@@ -97,7 +101,10 @@ const DocumentsPage = withPageAuthRequired(() => {
         <div className={'flex flex-col justify-center w-11/12 sm:w-9/12 max-w-[740px]'}> 
           <div className='overflow-y-scroll max-h-[280px]'>
             { documentItems }
+            { documentItems.length < 1 && emptyMessage }
           </div>
+
+          {/* the item select 'menu' area  */}
           <div className={`${selectedDocId ? 'opacity-100' : 'opacity-0 pointer-events-none'} transition-opacity duration-[250ms] h-[40px] flex justify-evenly mt-[48px]`}>
             {
               !renameActive && 
