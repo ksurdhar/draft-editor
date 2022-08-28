@@ -7,43 +7,39 @@ import { format } from "date-fns"
 import { useRouter } from "next/router"
 import Head from "next/head"
 import Link from "next/link"
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { Loader } from "../../components/loader"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 const DocumentsPage = withPageAuthRequired(() => {
-  const { data: docs, mutate } = useSWR<DocumentData[]>('/api/documents', fetcher) 
+  const [ allowSpinner, setAllowSpinner ] = useState(false)
+  useEffect(() => {
+    setTimeout(() => {
+      setAllowSpinner(true)
+    }, 250)
+  }, [allowSpinner])
+
+  const { data: docs, mutate } = useSWR<DocumentData[]>('/api/documents', fetcher, { })
+  const safeDocs = docs ? docs : []
+
   const { cache } = useSWRConfig()
   const [ selectedDocId , setSelectedDoc ] = useState<string | null>(null)
   const [ renameActive , setRenameActive ] = useState(false)
   const [ newName, setNewName ] = useState('')
-
   const router =  useRouter()
 
-  // good gravy, extract this code and dry it up dude
-  if (!docs) return (
-    <Layout>
-      <div className='gradient absolute top-0 left-0 h-screen w-screen z-[-1]'/>
-      <div className="flex justify-center h-[calc(100vh_-_64px)] pb-10">
-        <div className={'w-11/12 sm:w-9/12 max-w-[740px]'}> 
-          <div className='flex flex-col h-[100%] justify-center mt-[-64px]'>
-           <h1>Loading documents...</h1>
-          </div>
-        </div>
-      </div>
-    </Layout>
-  )
-
-  const documentItems = docs.map(({ id, title, lastUpdated }, idx) => {
+  const documentItems = safeDocs.map(({ id, title, lastUpdated }, idx) => {
     return (
       <div className={`
+          animate-fadein
           transition duration-[250ms]
           ${id === selectedDocId ? 'bg-white/[.30] border-black/[.14]' : ''}
           ${ selectedDocId && id !== selectedDocId ? 'opacity-40 pointer-events-none' : ''} 
           flex justify-between min-h-[40px] px-[10px]
           hover:cursor-pointer hover:bg-white/[.30] 
           uppercase text-[14px] font-semibold
-          ${idx !== docs.length - 1 ? 'border-b' : 'border-transparent'} border-solid border-black/[.35]`
+          ${idx !== safeDocs.length - 1 ? 'border-b' : 'border-transparent'} border-solid border-black/[.35]`
         }
         onClick={() => {
           if (!selectedDocId) {
@@ -80,7 +76,9 @@ const DocumentsPage = withPageAuthRequired(() => {
   })
 
   const emptyMessage = (
-    <div className={'uppercase text-[14px] font-semibold text-center text-black/[.5]'}>Empty / Go create something of worth </div>
+    <div className={'uppercase text-[14px] font-semibold text-center text-black/[.5]'}>
+      Empty / Go create something of worth 
+    </div>
   )
 
   return (
@@ -100,11 +98,16 @@ const DocumentsPage = withPageAuthRequired(() => {
       >
         <div className={'flex flex-col justify-center w-11/12 sm:w-9/12 max-w-[740px]'}> 
           <div className='overflow-y-scroll max-h-[280px]'>
+            { !docs && allowSpinner && 
+              <div className='flex flex-row justify-center'>
+                { allowSpinner && <Loader/>}
+              </div>
+            }
             { documentItems }
-            { documentItems.length < 1 && emptyMessage }
+            { docs && documentItems.length < 1 && emptyMessage }
           </div>
 
-          {/* the item select 'menu' area  */}
+          {/* the selected item's 'menu' area  */}
           <div className={`${selectedDocId ? 'opacity-100' : 'opacity-0 pointer-events-none'} transition-opacity duration-[250ms] h-[40px] flex justify-evenly mt-[48px]`}>
             {
               !renameActive && 

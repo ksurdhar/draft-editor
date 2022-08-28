@@ -1,4 +1,5 @@
 import '../styles/globals.css'
+import '../styles/loading-indicator.css'
 import '../styles/hamburgers/hamburgers.scss'
 
 import type { AppProps } from 'next/app'
