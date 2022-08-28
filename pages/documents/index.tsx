@@ -7,27 +7,21 @@ import { format } from "date-fns"
 import { useRouter } from "next/router"
 import Head from "next/head"
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Loader } from "../../components/loader"
+import { useSpinner } from "../../lib/hooks"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 const DocumentsPage = withPageAuthRequired(() => {
-  const [ allowSpinner, setAllowSpinner ] = useState(false)
-  useEffect(() => {
-    setTimeout(() => {
-      setAllowSpinner(true)
-    }, 250)
-  }, [allowSpinner])
-
   const { data: docs, mutate } = useSWR<DocumentData[]>('/api/documents', fetcher, { })
   const safeDocs = docs ? docs : []
-
   const { cache } = useSWRConfig()
   const [ selectedDocId , setSelectedDoc ] = useState<string | null>(null)
   const [ renameActive , setRenameActive ] = useState(false)
   const [ newName, setNewName ] = useState('')
   const router =  useRouter()
+  const allowSpinner = useSpinner()
 
   const documentItems = safeDocs.map(({ id, title, lastUpdated }, idx) => {
     return (
@@ -100,7 +94,7 @@ const DocumentsPage = withPageAuthRequired(() => {
           <div className='overflow-y-scroll max-h-[280px]'>
             { !docs && allowSpinner && 
               <div className='flex flex-row justify-center'>
-                { allowSpinner && <Loader/>}
+                <Loader/>
               </div>
             }
             { documentItems }
