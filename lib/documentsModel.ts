@@ -1,5 +1,15 @@
 import Mongoose, { Document, Model } from 'mongoose'
 
+// Mongo Init Code
+if (!global.db) {
+  Mongoose.connect(`mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_CLUSTER}.mongodb.net/${process.env.DB_NAME}?retryWrites=true&w=majority`)
+  global.db = Mongoose.connection
+}
+global.db.on('error', console.error.bind(console, 'connection error: '))
+global.db.once('open', () => {
+  console.log('Connected successfully')  
+})
+
 const DocumentSchema = new Mongoose.Schema({
   title: {
     type: Mongoose.Schema.Types.String,
