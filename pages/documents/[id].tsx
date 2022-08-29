@@ -42,7 +42,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
   const { data: databaseDoc, mutate } = useSWR<DocumentData>(`/api/documents/${id}`, fetcher) 
   const [ hybridDoc, setHybridDoc ] = useState<DocumentData | null>()
   useSyncHybridDoc(id, databaseDoc, setHybridDoc)
-
+  
   const { user, isLoading } = useUser()
   const [ editorColor, setEditorColor ] = useState(false)
   const [ recentlySaved, setRecentlySaved ] = useState(false)

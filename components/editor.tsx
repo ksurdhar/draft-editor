@@ -161,10 +161,18 @@ const EditorComponent = ({ id, text, title, onUpdate }: EditorProps) => {
 
   const debouncedSave = useDebouncedCallback(
     async (data: Partial<DocumentData>) => { 
-      await API.patch(`/api/documents/${id}`, { // create a wrapper function for better typing
+      const updatedData = {
         ...data,
         lastUpdated: Date.now()
-      }) 
+      }
+
+      const cachedDoc = JSON.parse(sessionStorage.getItem(id) || '{}')
+      const documentCached = Object.keys(cachedDoc).length > 0
+      if (documentCached) {
+        sessionStorage.setItem(id, JSON.stringify({...cachedDoc, ...updatedData})) 
+      }
+      
+      await API.patch(`/api/documents/${id}`, updatedData)
       onUpdate()  
     }, 1000
   )
