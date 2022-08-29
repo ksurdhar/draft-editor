@@ -2,8 +2,6 @@ import { getSession, withApiAuthRequired } from '@auth0/nextjs-auth0'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { createDocument, getDocuments } from "../../lib/apiUtils"
 
-
-// possible to type ApiResponse?
 export default withApiAuthRequired(async function documentsHandler(req: NextApiRequest, res: NextApiResponse) {
   const { method } = req
   const session = getSession(req, res)

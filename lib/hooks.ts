@@ -5,7 +5,7 @@ export const useSpinner = () => {
   useEffect(() => {
     setTimeout(() => {
       setAllowSpinner(true)
-    }, 250)
+    }, 333)
   }, [allowSpinner])
   return allowSpinner
 }

@@ -3,7 +3,7 @@ import { CloudIcon } from "@heroicons/react/solid"
 import { GetServerSideProps, InferGetServerSidePropsType } from "next"
 import Head from "next/head"
 import Router from "next/router"
-import { useEffect, useState } from "react"
+import { Dispatch, SetStateAction, useEffect, useState } from "react"
 import useSWR, { useSWRConfig } from "swr"
 import Editor from "../../components/editor"
 import Layout from "../../components/layout"
@@ -20,14 +20,34 @@ export const getServerSideProps: GetServerSideProps = async ({ params }) => {
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
+const useSyncHybridDoc = (id: string, databaseDoc: DocumentData | undefined, setHybridDoc: Dispatch<SetStateAction<DocumentData | null | undefined>>) => {
+  useEffect(() => {
+    let cachedDoc: DocumentData | {} = {}
+    if (typeof window !== 'undefined') {
+      cachedDoc = JSON.parse(sessionStorage.getItem(id) || '{}') as DocumentData
+    }
+    const documentNotCached = Object.keys(cachedDoc).length === 0
+
+    if (documentNotCached) {
+      console.log('document not cached, applying DB doc')
+      setHybridDoc(databaseDoc)
+    } else {
+      console.log('document cached, using session storage doc')
+      setHybridDoc(cachedDoc as DocumentData)
+    }
+  }, [databaseDoc, setHybridDoc])
+}
+
 export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof getServerSideProps>) {
+  const { data: databaseDoc, mutate } = useSWR<DocumentData>(`/api/documents/${id}`, fetcher) 
+  const [ hybridDoc, setHybridDoc ] = useState<DocumentData | null>()
+  useSyncHybridDoc(id, databaseDoc, setHybridDoc)
+
   const { user, isLoading } = useUser()
   const [ editorColor, setEditorColor ] = useState(false)
   const [ recentlySaved, setRecentlySaved ] = useState(false)
-  const { mutate } = useSWRConfig()
-  const { data: document } = useSWR<DocumentData>(`/api/documents/${id}`, fetcher) 
   const allowSpinner = useSpinner()
-  const showSpinner = !document && allowSpinner
+  const showSpinner = !hybridDoc && allowSpinner
 
   useEffect(() => {
     setTimeout(() => setRecentlySaved(false), 2010)
@@ -41,13 +61,11 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
       setEditorColor(true)
     }, 250)
   }, [isLoading])
-
  
-
   return (
     <>
       <Head>
-        <title>{`whetstone - ${document?.title}`}</title>
+        <title>{`whetstone - ${hybridDoc?.title}`}</title>
       </Head>
       <Layout>
         <div className={`transition-opacity ease-in-out duration-[3000ms] gradient ${editorColor ? 'opacity-0' : 'opacity-100' }  fixed top-0 left-0 h-screen w-screen z-[-1]`}/>
@@ -64,10 +82,10 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
                 <Loader/>
               </div>
             }
-            { document && <div className={'animate-fadein'}><Editor id={id} text={JSON.parse(document.content)} title={document.title} 
+            { hybridDoc && <div className={'animate-fadein'}><Editor id={id} text={JSON.parse(hybridDoc.content)} title={hybridDoc.title} 
               onUpdate={() => {
                 setRecentlySaved(true)
-                mutate(`/api/documents/${id}`)
+                mutate()
               }} 
             /></div>}
  
