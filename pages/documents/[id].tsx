@@ -24,7 +24,7 @@ const useSyncHybridDoc = (id: string, databaseDoc: DocumentData | undefined, set
   useEffect(() => {
     let cachedDoc: DocumentData | {} = {}
     if (typeof window !== 'undefined') {
-      cachedDoc = JSON.parse(sessionStorage.getItem(id) || '{}') as DocumentData
+      cachedDoc = JSON.parse(sessionStorage.getItem(id) || '{}')
     }
     const documentNotCached = Object.keys(cachedDoc).length === 0
 

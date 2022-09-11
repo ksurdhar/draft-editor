@@ -1,10 +1,12 @@
 import { useDebouncedCallback } from 'use-debounce'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createEditor, BaseEditor, Descendant, Editor, Transforms, Text, Node } from 'slate'
+import { withHistory } from 'slate-history'
 import { Slate, Editable, withReact, ReactEditor } from 'slate-react'
 import API from '../lib/utils'
 import { useEditorFades } from './header'
 import { useMouse } from '../pages/_app'
+
 
 type HighlightType = 'none' | 'red' | 'orange' | 'green' | 'blue' 
 
@@ -141,7 +143,7 @@ const getCounterTexts = (wordCountAtPos: number, wordCount: number) => {
 }
 
 const EditorComponent = ({ id, text, title, onUpdate }: EditorProps) => {
-  const [ editor ] = useState(() => withReact(createEditor()))
+  const [ editor ] = useState(() => withReact(withHistory(createEditor())))
   const [ wordCount, setWordCount ] = useState(countWords(text))
   const [ wordCountAtPos, setWordCountAtPos ] = useState(0)
   const [ counterMode, setCounterMode ] = useState(0)
@@ -179,7 +181,7 @@ const EditorComponent = ({ id, text, title, onUpdate }: EditorProps) => {
 
   const handleChange = useCallback((props: Partial<DocumentData>) => {
     debouncedSave(props)
-  }, [])
+  }, [debouncedSave])
 
   const renderLeaf = useCallback((props: any) => {
     return <Leaf {...props} />
