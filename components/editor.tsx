@@ -6,16 +6,14 @@ import { Slate, Editable, withReact, ReactEditor } from 'slate-react'
 import API from '../lib/utils'
 import { useEditorFades } from './header'
 import { useMouse } from '../pages/_app'
-
+import Footer from './footer'
 
 type HighlightType = 'none' | 'red' | 'orange' | 'green' | 'blue' 
 
 type DefaultText = { text: string, highlight: HighlightType }
 type DefaultElement = { type: 'default'; children: DefaultText[] }
 type Group1Element = { type: 'group1'; children: DefaultText[] }
-type Group2Element = { type: 'group2'; children: DefaultText[] }
-type Group3Element = { type: 'group3'; children: DefaultText[] }
-type CustomElement = DefaultElement | Group1Element | Group2Element | Group3Element
+type CustomElement = DefaultElement | Group1Element 
 
 declare module 'slate' {
   interface CustomTypes {
@@ -45,29 +43,11 @@ const Group1Element = ({ attributes, children} : RenderElementProps) => {
     </div>
   )
 }
-const Group2Element = ({ attributes, children} : RenderElementProps) => {
-  return (
-    <div {...attributes}>
-      <div className={`transition`}>{children}</div>
-    </div>
-  )
-}
-const Group3Element = ({ attributes, children} : RenderElementProps)  => {
-  return (
-    <div {...attributes}>
-      <div className={`transition`}>{children}</div>
-    </div>
-  )
-}
 
 const renderElement = (props: RenderElementProps) => {
   switch (props.element.type) {
     case 'group1':
       return <Group1Element {...props} />
-    case 'group2':
-      return <Group2Element {...props} />
-    case 'group3':
-      return <Group3Element {...props} />
     default:
       return <BodyElement {...props} />
   }
@@ -81,7 +61,6 @@ type RenderLeafProps = {
 
 const Leaf = ({ attributes, leaf, children }: RenderLeafProps) => {
   let highlighting = ''
-  let selection = ''
   switch(leaf.highlight) {
     case 'blue':
       highlighting = 'bg-blue-200'
@@ -130,24 +109,10 @@ const getWordCountAtPosition = (nodes: Descendant[], rangeIdx: number, offset: n
   return countExcludingCurrentRow + currentRowCount
 }
 
-const getCounterTexts = (wordCountAtPos: number, wordCount: number) => {
-  const formattedPosPage = wordCountAtPos === 0 ? 1 : Math.ceil(wordCountAtPos/500)
-  const formattedPage = wordCount === 0 ? 1 : Math.ceil(wordCount/500)
-  const formattedPercentage = wordCount === 0 ? 0 : Math.round(wordCountAtPos/wordCount*100)
-
-  return [
-    `${wordCountAtPos}/${wordCount} words`,
-    `page ${formattedPosPage}/${formattedPage}`, 
-    `${formattedPercentage}%`
-  ]
-}
-
 const EditorComponent = ({ id, text, title, onUpdate }: EditorProps) => {
   const [ editor ] = useState(() => withReact(withHistory(createEditor())))
   const [ wordCount, setWordCount ] = useState(countWords(text))
   const [ wordCountAtPos, setWordCountAtPos ] = useState(0)
-  const [ counterMode, setCounterMode ] = useState(0)
-  const counterTexts = getCounterTexts(wordCountAtPos, wordCount)
   const titleState = useRef(title)
   const titleRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -210,100 +175,93 @@ const EditorComponent = ({ id, text, title, onUpdate }: EditorProps) => {
         />
       </div>
       <div ref={containerRef}>
-      <Slate editor={editor} key={id} value={text} 
-        onChange={value => {
-          const offset = editor.selection?.focus.offset || 0
-          const position = editor.selection?.focus.path[0] || 0
-          setWordCountAtPos(getWordCountAtPosition(value, position, offset))
+        <Slate editor={editor} key={id} value={text} 
+          onChange={value => {
+            const offset = editor.selection?.focus.offset || 0
+            const position = editor.selection?.focus.path[0] || 0
+            setWordCountAtPos(getWordCountAtPosition(value, position, offset))
 
-          const isAstChange = editor.operations.some(
-            op => 'set_selection' !== op.type
-          )
-          if (isAstChange) {
-            setWordCount(countWords(value))
-            const content = JSON.stringify(value)
-            handleChange({ content })
-          }
-        }}>
-        <Editable
-          spellCheck='false'
-          className='rounded-md w-full h-full static text-[19px] md:text-[22px]'
-          renderElement={renderElement}
-          renderLeaf={renderLeaf}
-          onKeyDown={event => {
-            if (event.metaKey) {
-              switch (event.key) {
-                case '1': {
-                  event.preventDefault()
-                  const [match] = Editor.nodes(editor, {
-                    match: n => Text.isText(n) && n.highlight === 'red',
-                    universal: true,
-                  })
-                  Transforms.setNodes(
-                    editor,
-                    { highlight: !!match ? 'none' : 'red' },
-                    { match: n => Text.isText(n), split: true }
-                  )
-                  break
-                }
-                case '2': {
-                  event.preventDefault()
-                  const [match] = Editor.nodes(editor, {
-                    match: n => Text.isText(n) && n.highlight === 'orange',
-                    universal: true,
-                  })
-                  Transforms.setNodes(
-                    editor,
-                    { highlight: !!match ? 'none' : 'orange' },
-                    { match: n => Text.isText(n), split: true }
-                  )
-                  break
-                }
-                case '3': {
-                  event.preventDefault()
-                  const [match] = Editor.nodes(editor, {
-                    match: n => Text.isText(n) && n.highlight === 'green',
-                    universal: true,
-                  })
-                  Transforms.setNodes(
-                    editor,
-                    { highlight: !!match ? 'none' : 'green' },
-                    { match: n => Text.isText(n), split: true }
-                  )
-                  break
-                }
-                case '4': {
-                  event.preventDefault()
-                  const [match] = Editor.nodes(editor, {
-                    match: n => Text.isText(n) && n.highlight === 'blue',
-                    universal: true,
-                  })
-                  Transforms.setNodes(
-                    editor,
-                    { highlight: !!match ? 'none' : 'blue' },
-                    { match: n => Text.isText(n), split: true }
-                  )
-                  break
+            const isAstChange = editor.operations.some(
+              op => 'set_selection' !== op.type
+            )
+            if (isAstChange) {
+              setWordCount(countWords(value))
+              const content = JSON.stringify(value)
+              handleChange({ content })
+            }
+          }}>
+          <Editable
+            spellCheck='false'
+            className='rounded-md w-full h-full static text-[19px] md:text-[22px]'
+            renderElement={renderElement}
+            renderLeaf={renderLeaf}
+            onKeyDown={event => {
+              if (event.metaKey) {
+                switch (event.key) {
+                  case '1': {
+                    event.preventDefault()
+                    const [match] = Editor.nodes(editor, {
+                      match: n => Text.isText(n) && n.highlight === 'red',
+                      universal: true,
+                    })
+                    Transforms.setNodes(
+                      editor,
+                      { highlight: !!match ? 'none' : 'red' },
+                      { match: n => Text.isText(n), split: true }
+                    )
+                    break
+                  }
+                  case '2': {
+                    event.preventDefault()
+                    const [match] = Editor.nodes(editor, {
+                      match: n => Text.isText(n) && n.highlight === 'orange',
+                      universal: true,
+                    })
+                    Transforms.setNodes(
+                      editor,
+                      { highlight: !!match ? 'none' : 'orange' },
+                      { match: n => Text.isText(n), split: true }
+                    )
+                    break
+                  }
+                  case '3': {
+                    event.preventDefault()
+                    const [match] = Editor.nodes(editor, {
+                      match: n => Text.isText(n) && n.highlight === 'green',
+                      universal: true,
+                    })
+                    Transforms.setNodes(
+                      editor,
+                      { highlight: !!match ? 'none' : 'green' },
+                      { match: n => Text.isText(n), split: true }
+                    )
+                    break
+                  }
+                  case '4': {
+                    event.preventDefault()
+                    const [match] = Editor.nodes(editor, {
+                      match: n => Text.isText(n) && n.highlight === 'blue',
+                      universal: true,
+                    })
+                    Transforms.setNodes(
+                      editor,
+                      { highlight: !!match ? 'none' : 'blue' },
+                      { match: n => Text.isText(n), split: true }
+                    )
+                    break
+                  }
                 }
               }
-            }
-          }}
-        />
-      </Slate>
+            }}
+          />
+        </Slate>
       </div>
-      
-      {/* footer */}
-      <div className={`fixed ${initFadeIn ? 'footer-gradient' : 'bg-transparent'} ${fadeOut ? 'opacity-0' : 'opacity-100' }  transition-opacity duration-700 hover:opacity-100 w-[100vw] h-[50px] bottom-0 left-0 z-10`}>
-        <div className='font-index text-sm md:text-base pr-[20px] cursor-pointer fixed bottom-0 right-0' onClick={() => {
-          if (counterMode < 2) {
-            setCounterMode(counterMode + 1)
-          } else {
-            setCounterMode(0)
-          }
-        }}> 
-          { counterTexts[counterMode] }
-        </div>
-      </div>
+      <Footer 
+        initFadeIn={initFadeIn} 
+        fadeOut={fadeOut} 
+        wordCount={wordCount} 
+        wordCountAtPos={wordCountAtPos} 
+      />
     </div>
   )
 }
