@@ -1,7 +1,7 @@
 import { useDebouncedCallback } from 'use-debounce'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createEditor, BaseEditor, Descendant, Editor, Transforms, Text, Node } from 'slate'
-import { withHistory } from 'slate-history'
+import { HistoryEditor, withHistory } from 'slate-history'
 import { Slate, Editable, withReact, ReactEditor } from 'slate-react'
 import API from '../lib/utils'
 import { useEditorFades } from './header'
@@ -109,6 +109,18 @@ const getWordCountAtPosition = (nodes: Descendant[], rangeIdx: number, offset: n
   return countExcludingCurrentRow + currentRowCount
 }
 
+const setHighlight = (editor: BaseEditor & ReactEditor & HistoryEditor, color: HighlightType) => {
+  const [match] = Editor.nodes(editor, {
+    match: n => Text.isText(n) && n.highlight === color,
+    universal: true,
+  })
+  Transforms.setNodes(
+    editor,
+    { highlight: !!match ? 'none' : color },
+    { match: n => Text.isText(n), split: true }
+  )
+}
+
 const EditorComponent = ({ id, text, title, onUpdate }: EditorProps) => {
   const [ editor ] = useState(() => withReact(withHistory(createEditor())))
   const [ wordCount, setWordCount ] = useState(countWords(text))
@@ -200,54 +212,26 @@ const EditorComponent = ({ id, text, title, onUpdate }: EditorProps) => {
                 switch (event.key) {
                   case '1': {
                     event.preventDefault()
-                    const [match] = Editor.nodes(editor, {
-                      match: n => Text.isText(n) && n.highlight === 'red',
-                      universal: true,
-                    })
-                    Transforms.setNodes(
-                      editor,
-                      { highlight: !!match ? 'none' : 'red' },
-                      { match: n => Text.isText(n), split: true }
-                    )
+                    setHighlight(editor, 'blue')
+                    // add comment entry point here
+                    if (event.shiftKey) {
+                      console.log('open comment')
+                    }
                     break
                   }
                   case '2': {
                     event.preventDefault()
-                    const [match] = Editor.nodes(editor, {
-                      match: n => Text.isText(n) && n.highlight === 'orange',
-                      universal: true,
-                    })
-                    Transforms.setNodes(
-                      editor,
-                      { highlight: !!match ? 'none' : 'orange' },
-                      { match: n => Text.isText(n), split: true }
-                    )
+                    setHighlight(editor, 'green')
                     break
                   }
                   case '3': {
                     event.preventDefault()
-                    const [match] = Editor.nodes(editor, {
-                      match: n => Text.isText(n) && n.highlight === 'green',
-                      universal: true,
-                    })
-                    Transforms.setNodes(
-                      editor,
-                      { highlight: !!match ? 'none' : 'green' },
-                      { match: n => Text.isText(n), split: true }
-                    )
+                    setHighlight(editor, 'orange')
                     break
                   }
                   case '4': {
                     event.preventDefault()
-                    const [match] = Editor.nodes(editor, {
-                      match: n => Text.isText(n) && n.highlight === 'blue',
-                      universal: true,
-                    })
-                    Transforms.setNodes(
-                      editor,
-                      { highlight: !!match ? 'none' : 'blue' },
-                      { match: n => Text.isText(n), split: true }
-                    )
+                    setHighlight(editor, 'red')
                     break
                   }
                 }
