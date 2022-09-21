@@ -52,12 +52,18 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
   const { user, isLoading } = useUser()
   const [ initAnimate, setInitAnimate ] = useState(false)
   const [ recentlySaved, setRecentlySaved ] = useState(false)
-  const [ commentActive, setCommentActive ] = useState(false)
+  const [ commentActive, setCommentActive ] = useState<AnimationState>('Inactive')
   const showSpinner = useSpinner(!hybridDoc)
 
   useEffect(() => {
     setTimeout(() => setRecentlySaved(false), 2010)
   }, [recentlySaved])
+
+  useEffect(() => {
+    if (commentActive === 'Active') {
+      setTimeout(() => setCommentActive('Complete'), 500)
+    }
+  }, [commentActive, setCommentActive])
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -66,7 +72,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
     setTimeout(() => {
       setInitAnimate(true)
     }, 250)
-  }, [isLoading])
+  }, [isLoading, setInitAnimate])
 
   return (
     <>
@@ -82,13 +88,13 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
           </div>
         )}
         <div className={`flex pb-10 p-[20px] mt-[64px] text-black/[.79] font-editor2`}>
-          <div className={`duration-1000 transition-flex ${commentActive ? 'flex-[0]' : 'flex-1'}`}/>
+          <div className={`duration-500 transition-flex ${commentActive !== 'Inactive' ? 'flex-[0]' : 'flex-1'}`}/>
           <div className={`flex ease-in ease-out ${showSpinner ? 'justify-center flex-col mt-[-36px]' : ''}
             h-[calc(100vh_-_64px)] relative max-w-[740px] min-w-[calc(100vw_-_40px)] md:min-w-[0px] pb-10`}>
             { showSpinner && <Loader/> }
             { hybridDoc && 
               <Editor id={id} text={JSON.parse(hybridDoc.content)}
-                commentActive={commentActive}
+                commentActive={commentActive !== 'Inactive'}
                 setCommentActive={setCommentActive}
                 title={hybridDoc.title} 
                 onUpdate={() => {
@@ -98,12 +104,10 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
               />
             }
           </div>
-          <div className={`duration-1000 transition-flex ${commentActive ? 'flex-[0]' : 'flex-1'}`}/>
-         { commentActive && <CommentEditor commentActive={commentActive}/>}
+          <div className={`duration-500 transition-flex ${commentActive !== 'Inactive' ? 'flex-[0]' : 'flex-1'}`}/>
+         { commentActive === 'Complete' && <CommentEditor/>}
         </div>
       </Layout> 
     </>
   )
 }
-// ${commentActive? 'right-[calc(20vw_-_28px)]' : 'right-0'}
-// ${commentActive ? 'max-w-[53%]' : 'max-w-[740px]' }

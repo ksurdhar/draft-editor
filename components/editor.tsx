@@ -88,7 +88,7 @@ type EditorProps = {
   text: Descendant[]
   title: string
   commentActive: boolean
-  setCommentActive: Dispatch<SetStateAction<boolean>>
+  setCommentActive: Dispatch<SetStateAction<AnimationState>>
   onUpdate: () => void
 }
 
@@ -219,7 +219,8 @@ const EditorComponent = ({ id, text, title, onUpdate, setCommentActive, commentA
                     // add comment entry point here
                     if (event.shiftKey) {
                       console.log('open comment')
-                      setCommentActive(!commentActive)
+                      const newCommentState: AnimationState = commentActive ? 'Inactive' : 'Active'
+                      setCommentActive(newCommentState)
                     }
                     break
                   }

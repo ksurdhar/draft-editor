@@ -4,3 +4,5 @@ type DocumentData = {
   content: string
   lastUpdated: number
 }
+
+type AnimationState = 'Active' | 'Complete' | 'Inactive'
