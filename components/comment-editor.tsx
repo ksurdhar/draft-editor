@@ -7,10 +7,17 @@ import { Slate, Editable, withReact, ReactEditor } from 'slate-react'
 // }
 
 const CommentEditor = () => {
-  // add editor and slate
+  // initial component is just a flex spacer
+  // add an absolutely positioned 
   return (
-    <div className={`flex flex-1 bg-slate-400 h-[100vh] m-[10px]`}>
-      hello world
+    <div className={`flex flex-1 flex-col h-[80vh] justify-center m-[10px]`}>
+      <div className={`fixed`}>
+        hello world
+        hello worldhello worldhello worldhello worldhello worldhello worldhello worldhello worldhello worldhello world
+        hello worldhello worldhello worldhello world
+        hello worldhello worldhello worldhello world
+        hello worldhello worldhello world
+      </div>
     </div>
   )
 }
