@@ -4,7 +4,8 @@ import { GetServerSideProps, InferGetServerSidePropsType } from "next"
 import Head from "next/head"
 import Router from "next/router"
 import { Dispatch, SetStateAction, useEffect, useState } from "react"
-import useSWR, { useSWRConfig } from "swr"
+import useSWR from "swr"
+import CommentEditor from "../../components/comment-editor"
 import Editor from "../../components/editor"
 import Layout from "../../components/layout"
 import { Loader } from "../../components/loader"
@@ -17,6 +18,11 @@ export const getServerSideProps: GetServerSideProps = async ({ params }) => {
     },
   }
 }
+
+const backdropStyles = `
+  fixed top-0 left-0 h-screen w-screen z-[-1]
+  transition-opacity ease-in-out duration-[3000ms]
+`
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
@@ -44,10 +50,10 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
   useSyncHybridDoc(id, databaseDoc, setHybridDoc)
   
   const { user, isLoading } = useUser()
-  const [ editorColor, setEditorColor ] = useState(false)
+  const [ initAnimate, setInitAnimate ] = useState(false)
   const [ recentlySaved, setRecentlySaved ] = useState(false)
-  const allowSpinner = useSpinner()
-  const showSpinner = !hybridDoc && allowSpinner
+  const [ commentActive, setCommentActive ] = useState(false)
+  const showSpinner = useSpinner(!hybridDoc)
 
   useEffect(() => {
     setTimeout(() => setRecentlySaved(false), 2010)
@@ -58,40 +64,46 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
       Router.push('/')
     }
     setTimeout(() => {
-      setEditorColor(true)
+      setInitAnimate(true)
     }, 250)
   }, [isLoading])
- 
+
   return (
     <>
       <Head>
         <title>{`whetstone - ${hybridDoc?.title}`}</title>
       </Head>
       <Layout>
-        <div className={`transition-opacity ease-in-out duration-[3000ms] gradient ${editorColor ? 'opacity-0' : 'opacity-100' }  fixed top-0 left-0 h-screen w-screen z-[-1]`}/>
-        <div className={`transition-opacity ease-in-out duration-[3000ms] gradient-editor ${editorColor ? 'opacity-100' : 'opacity-0' }  fixed top-0 left-0 h-screen w-screen z-[-1]`}/>
+        <div className={`gradient ${initAnimate ? 'opacity-0' : 'opacity-100' } ${backdropStyles}`}/>
+        <div className={`gradient-editor ${initAnimate ? 'opacity-100' : 'opacity-0' } ${backdropStyles}`}/>
         { recentlySaved && (
           <div className={`fixed top-0 right-[30px] z-[40] p-[20px]`}>
-            <CloudIcon className=' animate-bounce fill-black/[.10]  md:fill-black/[.15] h-[20px] w-[20px] md:h-[24px] md:w-[24px] self-center'/>
+            <CloudIcon className='animate-bounce fill-black/[.10] md:fill-black/[.15] h-[20px] w-[20px] md:h-[24px] md:w-[24px] self-center'/>
           </div>
         )}
-        <div className="flex justify-center pb-10 p-[20px] mt-[64px] text-black/[.79] font-editor2">
-          <div className={`flex flex-col ${showSpinner ? 'justify-center mt-[-36px]' : ''} h-[calc(100vh_-_64px)] pb-10 min-w-[calc(100vw_-_40px)] md:min-w-[0px] max-w-[740px] md:w-[740px]`}>
-            { showSpinner &&
-              <div className='flex flex-row justify-center'>
-                <Loader/>
-              </div>
+        <div className={`flex pb-10 p-[20px] mt-[64px] text-black/[.79] font-editor2`}>
+          <div className={`duration-1000 transition-flex ${commentActive ? 'flex-[0]' : 'flex-1'}`}/>
+          <div className={`flex ease-in ease-out ${showSpinner ? 'justify-center flex-col mt-[-36px]' : ''}
+            h-[calc(100vh_-_64px)] relative max-w-[740px] min-w-[calc(100vw_-_40px)] md:min-w-[0px] pb-10`}>
+            { showSpinner && <Loader/> }
+            { hybridDoc && 
+              <Editor id={id} text={JSON.parse(hybridDoc.content)}
+                commentActive={commentActive}
+                setCommentActive={setCommentActive}
+                title={hybridDoc.title} 
+                onUpdate={() => {
+                  setRecentlySaved(true)
+                  mutate()
+                }}
+              />
             }
-            { hybridDoc && <div className={'animate-fadein'}><Editor id={id} text={JSON.parse(hybridDoc.content)} title={hybridDoc.title} 
-              onUpdate={() => {
-                setRecentlySaved(true)
-                mutate()
-              }} 
-            /></div>}
- 
           </div>
+          <div className={`duration-1000 transition-flex ${commentActive ? 'flex-[0]' : 'flex-1'}`}/>
+         { commentActive && <CommentEditor commentActive={commentActive}/>}
         </div>
       </Layout> 
     </>
   )
 }
+// ${commentActive? 'right-[calc(20vw_-_28px)]' : 'right-0'}
+// ${commentActive ? 'max-w-[53%]' : 'max-w-[740px]' }

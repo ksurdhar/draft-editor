@@ -33,7 +33,7 @@ const DocumentsPage = withPageAuthRequired(() => {
   const [ renameActive , setRenameActive ] = useState(false)
   const [ newName, setNewName ] = useState('')
   const router =  useRouter()
-  const allowSpinner = useSpinner()
+  const showSpinner = useSpinner(!docs)
 
   const documentItems = safeDocs.map(({ id, title, lastUpdated }, idx) => {
     return (
@@ -104,11 +104,7 @@ const DocumentsPage = withPageAuthRequired(() => {
       >
         <div className={'flex flex-col justify-center w-11/12 sm:w-9/12 max-w-[740px]'}> 
           <div className='overflow-y-scroll max-h-[280px]'>
-            { !docs && allowSpinner && 
-              <div className='flex flex-row justify-center'>
-                <Loader/>
-              </div>
-            }
+            { showSpinner && <Loader/> }
             { documentItems }
             { docs && documentItems.length < 1 && emptyMessage }
           </div>

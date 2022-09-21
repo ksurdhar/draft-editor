@@ -1,5 +1,5 @@
 import { useDebouncedCallback } from 'use-debounce'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Dispatch, SetStateAction, useCallback, useEffect, useRef, useState } from 'react'
 import { createEditor, BaseEditor, Descendant, Editor, Transforms, Text, Node } from 'slate'
 import { HistoryEditor, withHistory } from 'slate-history'
 import { Slate, Editable, withReact, ReactEditor } from 'slate-react'
@@ -8,7 +8,8 @@ import { useEditorFades } from './header'
 import { useMouse } from '../pages/_app'
 import Footer from './footer'
 
-type HighlightType = 'none' | 'red' | 'orange' | 'green' | 'blue' 
+type HighlightColor = 'red' | 'orange' | 'green' | 'blue' 
+type HighlightType = 'none' | HighlightColor
 
 type DefaultText = { text: string, highlight: HighlightType }
 type DefaultElement = { type: 'default'; children: DefaultText[] }
@@ -59,25 +60,24 @@ type RenderLeafProps = {
   children: React.ReactNode
 }
 
+type ColorMap = Record<HighlightColor, string>
+
 const Leaf = ({ attributes, leaf, children }: RenderLeafProps) => {
-  let highlighting = ''
-  switch(leaf.highlight) {
-    case 'blue':
-      highlighting = 'bg-blue-200'
-      break
-    case 'green':
-      highlighting = 'bg-green-200'
-      break
-    case 'orange':
-      highlighting = 'bg-orange-200'
-      break
-    case 'red':
-      highlighting = 'bg-red-200'
-      break
+  let highlight = ''
+
+  const colorMap: ColorMap = {
+    blue: 'bg-blue-200',
+    green: 'bg-green-200',
+    orange: 'bg-orange-200',
+    red: 'bg-red-200'
+  }
+
+  if (leaf.highlight !== 'none') {
+    highlight = colorMap[leaf.highlight]
   }
   
   return (
-    <span {...attributes} className={`transition duration-500 ${highlighting}`}>
+    <span {...attributes} className={`transition duration-500 ${highlight}`}>
       {children}
     </span>
   )
@@ -87,9 +87,12 @@ type EditorProps = {
   id: string
   text: Descendant[]
   title: string
+  commentActive: boolean
+  setCommentActive: Dispatch<SetStateAction<boolean>>
   onUpdate: () => void
 }
 
+// needs to be reworked to be more accurate
 const countWords = (nodes: Descendant[]) => {
   const wordCount = nodes.map((n) => Node.string(n)).join(' ').match(/[a-zA-Z\d]+/g)
   return wordCount?.length || 0
@@ -121,7 +124,7 @@ const setHighlight = (editor: BaseEditor & ReactEditor & HistoryEditor, color: H
   )
 }
 
-const EditorComponent = ({ id, text, title, onUpdate }: EditorProps) => {
+const EditorComponent = ({ id, text, title, onUpdate, setCommentActive, commentActive }: EditorProps) => {
   const [ editor ] = useState(() => withReact(withHistory(createEditor())))
   const [ wordCount, setWordCount ] = useState(countWords(text))
   const [ wordCountAtPos, setWordCountAtPos ] = useState(0)
@@ -165,7 +168,7 @@ const EditorComponent = ({ id, text, title, onUpdate }: EditorProps) => {
   }, [])
 
   return (
-    <div className='flex-grow normal-case'>
+    <div className='flex-grow normal-case animate-fadein'>
       <div className='mb-[20px]'>
         <div contentEditable={true} placeholder='New Title' ref={titleRef}
           className="editable mb-2 text-3xl md:text-4xl uppercase border-b border-transparent focus:outline-none active:outline-none" 
@@ -216,6 +219,7 @@ const EditorComponent = ({ id, text, title, onUpdate }: EditorProps) => {
                     // add comment entry point here
                     if (event.shiftKey) {
                       console.log('open comment')
+                      setCommentActive(!commentActive)
                     }
                     break
                   }

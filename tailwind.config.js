@@ -19,6 +19,9 @@ module.exports = {
       },
       animation: {
         fadein: 'fadein .33s ease-in-out'
+      },
+      transitionProperty: {
+        flex: 'flex'
       }
     }
   },
