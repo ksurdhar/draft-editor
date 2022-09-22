@@ -10,11 +10,9 @@ import Footer from './footer'
 
 type HighlightColor = 'red' | 'orange' | 'green' | 'blue' 
 type HighlightType = 'none' | HighlightColor
-
-type DefaultText = { text: string, highlight: HighlightType }
+type DefaultText = { text: string, highlight: HighlightType, comment?: string }
 type DefaultElement = { type: 'default'; children: DefaultText[] }
-type Group1Element = { type: 'group1'; children: DefaultText[] }
-type CustomElement = DefaultElement | Group1Element 
+type CustomElement = DefaultElement 
 
 declare module 'slate' {
   interface CustomTypes {
@@ -37,18 +35,10 @@ const BodyElement = ({ attributes, children} : RenderElementProps) => {
     </div>
   )
 }
-const Group1Element = ({ attributes, children} : RenderElementProps) => {
-  return (
-    <div {...attributes}>
-      <div className={`transition`}>{children}</div>
-    </div>
-  )
-}
 
-const renderElement = (props: RenderElementProps) => {
+// this is where additional element types can be rendered
+export const renderElement = (props: RenderElementProps) => {
   switch (props.element.type) {
-    case 'group1':
-      return <Group1Element {...props} />
     default:
       return <BodyElement {...props} />
   }
@@ -81,6 +71,10 @@ const Leaf = ({ attributes, leaf, children }: RenderLeafProps) => {
       {children}
     </span>
   )
+}
+
+export const renderLeaf = (props: any) => {
+  return <Leaf {...props} />
 }
 
 type EditorProps = {
@@ -162,10 +156,6 @@ const EditorComponent = ({ id, text, title, onUpdate, setCommentActive, commentA
   const handleChange = useCallback((props: Partial<DocumentData>) => {
     debouncedSave(props)
   }, [debouncedSave])
-
-  const renderLeaf = useCallback((props: any) => {
-    return <Leaf {...props} />
-  }, [])
 
   return (
     <div className='flex-grow normal-case animate-fadein'>

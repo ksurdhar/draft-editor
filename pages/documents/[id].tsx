@@ -106,7 +106,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
           </div>
           <div className={`duration-500 transition-flex ${commentActive !== 'Inactive' ? 'flex-[0]' : 'flex-1'}`}/>
          { commentActive === 'Complete' && <CommentEditor/>}
-        </div>
+        </div> 
       </Layout> 
     </>
   )
