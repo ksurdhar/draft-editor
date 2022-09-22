@@ -3,7 +3,11 @@ import { createEditor, Descendant } from 'slate'
 import { Slate, Editable, withReact } from 'slate-react'
 import { renderElement, renderLeaf } from './editor'
 
-const CommentEditor = () => {
+interface CommentEditorProps {
+  onSubmit: (text: string) => void
+}
+
+const CommentEditor = ({ onSubmit }: CommentEditorProps) => {
   const [ editor ] = useState(() => withReact(createEditor()))
   const [ text, setText ] = useState<Descendant[]>([{ type: 'default', children: [{text: '', highlight: 'none'}]}])
   const containerRef = useRef<HTMLDivElement>(null)
@@ -24,9 +28,7 @@ const CommentEditor = () => {
           onChange={value => {
             const isAstChange = editor.operations.some(op => 'set_selection' !== op.type)
             if (isAstChange) {
-              // const content = JSON.stringify(value)
-              // handleChange({ content })
-              console.log('onchange', value)
+              setText(value)
             }
           }}>
           <Editable
@@ -34,12 +36,12 @@ const CommentEditor = () => {
             className='rounded-md w-full h-full static text-[19px] md:text-[22px]'
             renderElement={renderElement}
             renderLeaf={renderLeaf}
-            onKeyDown={event => {
-              // console.log('onkeydown', event.currentTarget)
-            }}
           />
         </Slate>
       </div>
+      <button onClick={() => {
+        onSubmit(JSON.stringify(text))
+      }}>submit</button>
     </div>
   )
 }

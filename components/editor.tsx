@@ -1,12 +1,12 @@
 import { useDebouncedCallback } from 'use-debounce'
-import { Dispatch, SetStateAction, useCallback, useEffect, useRef, useState } from 'react'
-import { createEditor, BaseEditor, Descendant, Editor, Transforms, Text, Node } from 'slate'
-import { HistoryEditor, withHistory } from 'slate-history'
-import { Slate, Editable, withReact, ReactEditor } from 'slate-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { BaseEditor, Descendant, Editor, Transforms, Text, Node } from 'slate'
+import { Slate, Editable, ReactEditor } from 'slate-react'
 import API from '../lib/utils'
 import { useEditorFades } from './header'
 import { useMouse } from '../pages/_app'
 import Footer from './footer'
+import { AnimationState, DocumentData, WhetstoneEditor } from '../types/globals'
 
 type HighlightColor = 'red' | 'orange' | 'green' | 'blue' 
 type HighlightType = 'none' | HighlightColor
@@ -81,8 +81,9 @@ type EditorProps = {
   id: string
   text: Descendant[]
   title: string
+  editor: WhetstoneEditor
   commentActive: boolean
-  setCommentActive: Dispatch<SetStateAction<AnimationState>>
+  openComment: (state: AnimationState) => void
   onUpdate: () => void
 }
 
@@ -106,7 +107,7 @@ const getWordCountAtPosition = (nodes: Descendant[], rangeIdx: number, offset: n
   return countExcludingCurrentRow + currentRowCount
 }
 
-const setHighlight = (editor: BaseEditor & ReactEditor & HistoryEditor, color: HighlightType) => {
+const setHighlight = (editor: WhetstoneEditor, color: HighlightType) => {
   const [match] = Editor.nodes(editor, {
     match: n => Text.isText(n) && n.highlight === color,
     universal: true,
@@ -118,8 +119,7 @@ const setHighlight = (editor: BaseEditor & ReactEditor & HistoryEditor, color: H
   )
 }
 
-const EditorComponent = ({ id, text, title, onUpdate, setCommentActive, commentActive }: EditorProps) => {
-  const [ editor ] = useState(() => withReact(withHistory(createEditor())))
+const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, commentActive }: EditorProps) => {
   const [ wordCount, setWordCount ] = useState(countWords(text))
   const [ wordCountAtPos, setWordCountAtPos ] = useState(0)
   const titleState = useRef(title)
@@ -210,7 +210,8 @@ const EditorComponent = ({ id, text, title, onUpdate, setCommentActive, commentA
                     if (event.shiftKey) {
                       console.log('open comment')
                       const newCommentState: AnimationState = commentActive ? 'Inactive' : 'Active'
-                      setCommentActive(newCommentState)
+                      // now can we check for the comment to load?
+                      openComment(newCommentState)
                     }
                     break
                   }

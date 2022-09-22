@@ -4,12 +4,16 @@ import { GetServerSideProps, InferGetServerSidePropsType } from "next"
 import Head from "next/head"
 import Router from "next/router"
 import { Dispatch, SetStateAction, useEffect, useState } from "react"
+import { BaseSelection, createEditor, Transforms } from "slate"
+import { withHistory } from "slate-history"
+import { withReact } from "slate-react"
 import useSWR from "swr"
 import CommentEditor from "../../components/comment-editor"
 import Editor from "../../components/editor"
 import Layout from "../../components/layout"
 import { Loader } from "../../components/loader"
 import { useSpinner } from "../../lib/hooks"
+import { AnimationState, DocumentData, WhetstoneEditor } from "../../types/globals"
 
 export const getServerSideProps: GetServerSideProps = async ({ params }) => {
   return {
@@ -44,16 +48,31 @@ const useSyncHybridDoc = (id: string, databaseDoc: DocumentData | undefined, set
   }, [databaseDoc, setHybridDoc])
 }
 
-export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof getServerSideProps>) {
+// maybe rework to have an onclick handler so that this doesn't need to know so much
+const setCommentToLeaf = (editor: WhetstoneEditor, commentText: string, location: BaseSelection) => {
+  if (location !== null) {
+    Transforms.setNodes(
+      editor,
+      { comment: commentText },
+      { at: location }
+    )
+  }
+}
+
+export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof getServerSideProps>) {  
+  const [ editor ] = useState(() => withReact(withHistory(createEditor())))
+  
   const { data: databaseDoc, mutate } = useSWR<DocumentData>(`/api/documents/${id}`, fetcher) 
   const [ hybridDoc, setHybridDoc ] = useState<DocumentData | null>()
   useSyncHybridDoc(id, databaseDoc, setHybridDoc)
+  const showSpinner = useSpinner(!hybridDoc)
   
   const { user, isLoading } = useUser()
   const [ initAnimate, setInitAnimate ] = useState(false)
   const [ recentlySaved, setRecentlySaved ] = useState(false)
+
   const [ commentActive, setCommentActive ] = useState<AnimationState>('Inactive')
-  const showSpinner = useSpinner(!hybridDoc)
+  const [ commentLocation, setCommentLocation ] = useState<BaseSelection>(null)
 
   useEffect(() => {
     setTimeout(() => setRecentlySaved(false), 2010)
@@ -94,8 +113,12 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
             { showSpinner && <Loader/> }
             { hybridDoc && 
               <Editor id={id} text={JSON.parse(hybridDoc.content)}
+                editor={editor}
                 commentActive={commentActive !== 'Inactive'}
-                setCommentActive={setCommentActive}
+                openComment={(state) => {
+                  setCommentActive(state)
+                  setCommentLocation(editor.selection)
+                }}
                 title={hybridDoc.title} 
                 onUpdate={() => {
                   setRecentlySaved(true)
@@ -105,7 +128,11 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
             }
           </div>
           <div className={`duration-500 transition-flex ${commentActive !== 'Inactive' ? 'flex-[0]' : 'flex-1'}`}/>
-         { commentActive === 'Complete' && <CommentEditor/>}
+         { commentActive === 'Complete' && <CommentEditor onSubmit={(text) => {
+            setCommentToLeaf(editor, text, commentLocation)
+            console.log('hybrid doc after comment:', hybridDoc?.content)
+            setCommentActive('Inactive')
+         }}/>}
         </div> 
       </Layout> 
     </>
