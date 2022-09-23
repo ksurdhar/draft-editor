@@ -137,6 +137,11 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
           <CommentEditor onSubmit={(text) => {
             setCommentToLeaf(editor, text, commentLocation)
             setCommentActive('Inactive')
+            setCommentText([])
+          }}
+          onCancel={() => {
+            setCommentActive('Inactive')
+            setCommentText([])
           }}
           comment={commentText}
           />

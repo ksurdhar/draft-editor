@@ -5,10 +5,11 @@ import { renderElement, renderLeaf } from './editor'
 
 interface CommentEditorProps {
   onSubmit: (text: string) => void
+  onCancel: () => void
   comment: Descendant[]
 }
 
-const CommentEditor = ({ onSubmit, comment }: CommentEditorProps) => {
+const CommentEditor = ({ onSubmit, onCancel, comment }: CommentEditorProps) => {
   const [ editor ] = useState(() => withReact(createEditor()))
   const [ text, setText ] = useState<Descendant[]>(comment)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -23,7 +24,7 @@ const CommentEditor = ({ onSubmit, comment }: CommentEditorProps) => {
 
   return (
     <div className={`flex flex-1 flex-col h-[75vh] justify-center m-[10px]`}>
-      <div className={`fixed p-10 bg-slate-400 min-w-[100px]`} ref={containerRef}>
+      <div className={`fixed p-10 min-w-[100px]`} ref={containerRef}>
         <Slate editor={editor} value={text} 
           onChange={value => {
             const isAstChange = editor.operations.some(op => 'set_selection' !== op.type)
@@ -38,10 +39,16 @@ const CommentEditor = ({ onSubmit, comment }: CommentEditorProps) => {
             renderLeaf={renderLeaf}
           />
         </Slate>
+        <div className={'mt-8 flex justify-evenly w-[calc(100vw_-_850px)]'}>
+        <button className={'file-button'} onClick={() => onSubmit(JSON.stringify(text))}>
+          submit
+        </button>
+        <button className={'file-button file-button-red'} onClick={() => onCancel()}>
+          cancel
+        </button>
+        </div>
+        
       </div>
-      <button onClick={() => {
-        onSubmit(JSON.stringify(text))
-      }}>submit</button>
     </div>
   )
 }
