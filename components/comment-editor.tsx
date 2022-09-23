@@ -5,16 +5,16 @@ import { renderElement, renderLeaf } from './editor'
 
 interface CommentEditorProps {
   onSubmit: (text: string) => void
+  comment: Descendant[]
 }
 
-const CommentEditor = ({ onSubmit }: CommentEditorProps) => {
+const CommentEditor = ({ onSubmit, comment }: CommentEditorProps) => {
   const [ editor ] = useState(() => withReact(createEditor()))
-  const [ text, setText ] = useState<Descendant[]>([{ type: 'default', children: [{text: '', highlight: 'none'}]}])
+  const [ text, setText ] = useState<Descendant[]>(comment)
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setTimeout(() => {
-      console.log(containerRef.current)
       const containerNode = containerRef.current
       const documentNode = containerNode?.querySelector<HTMLTextAreaElement>(`[data-slate-editor="true"]`)
       documentNode?.focus()

@@ -9,9 +9,8 @@ import Footer from './footer'
 import { AnimationState, DocumentData, WhetstoneEditor } from '../types/globals'
 
 type HighlightColor = 'red' | 'orange' | 'green' | 'blue' 
-type HighlightType = 'none' | HighlightColor
-type DefaultText = { text: string, highlight: HighlightType, comment?: string }
-type DefaultElement = { type: 'default'; children: DefaultText[] }
+type DefaultText = { text: string, highlight?: HighlightColor, comment?: string }
+type DefaultElement = { type: 'default'; children: DefaultText[], comment?: string }
 type CustomElement = DefaultElement 
 
 declare module 'slate' {
@@ -62,7 +61,7 @@ const Leaf = ({ attributes, leaf, children }: RenderLeafProps) => {
     red: 'bg-red-200'
   }
 
-  if (leaf.highlight !== 'none') {
+  if (leaf.highlight) {
     highlight = colorMap[leaf.highlight]
   }
   
@@ -83,7 +82,7 @@ type EditorProps = {
   title: string
   editor: WhetstoneEditor
   commentActive: boolean
-  openComment: (state: AnimationState) => void
+  openComment: (state: AnimationState, text: Descendant[]) => void
   onUpdate: () => void
 }
 
@@ -107,14 +106,14 @@ const getWordCountAtPosition = (nodes: Descendant[], rangeIdx: number, offset: n
   return countExcludingCurrentRow + currentRowCount
 }
 
-const setHighlight = (editor: WhetstoneEditor, color: HighlightType) => {
+const setHighlight = (editor: WhetstoneEditor, color: HighlightColor) => {
   const [match] = Editor.nodes(editor, {
     match: n => Text.isText(n) && n.highlight === color,
     universal: true,
   })
   Transforms.setNodes(
     editor,
-    { highlight: !!match ? 'none' : color },
+    { highlight: !!match ? undefined : color },
     { match: n => Text.isText(n), split: true }
   )
 }
@@ -208,10 +207,17 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, comme
                     setHighlight(editor, 'blue')
                     // add comment entry point here
                     if (event.shiftKey) {
-                      console.log('open comment')
                       const newCommentState: AnimationState = commentActive ? 'Inactive' : 'Active'
-                      // now can we check for the comment to load?
-                      openComment(newCommentState)
+                      let commentText: Descendant[] = [{ type: 'default', children: [{text: ''}]}] // default value
+                      if (editor.selection) {
+                        const descendants = Editor.fragment(editor, editor.selection)
+                        descendants.forEach((descendant) => {
+                          if (descendant.comment){
+                            commentText = JSON.parse(descendant.comment)
+                          }
+                        })
+                      }
+                      openComment(newCommentState, commentText)
                     }
                     break
                   }

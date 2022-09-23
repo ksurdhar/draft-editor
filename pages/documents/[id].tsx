@@ -4,7 +4,7 @@ import { GetServerSideProps, InferGetServerSidePropsType } from "next"
 import Head from "next/head"
 import Router from "next/router"
 import { Dispatch, SetStateAction, useEffect, useState } from "react"
-import { BaseSelection, createEditor, Transforms } from "slate"
+import { BaseSelection, createEditor, Descendant, Transforms } from "slate"
 import { withHistory } from "slate-history"
 import { withReact } from "slate-react"
 import useSWR from "swr"
@@ -39,10 +39,10 @@ const useSyncHybridDoc = (id: string, databaseDoc: DocumentData | undefined, set
     const documentNotCached = Object.keys(cachedDoc).length === 0
 
     if (documentNotCached) {
-      console.log('document not cached, applying DB doc')
+      // console.log('document not cached, applying DB doc')
       setHybridDoc(databaseDoc)
     } else {
-      console.log('document cached, using session storage doc')
+      // console.log('document cached, using session storage doc')
       setHybridDoc(cachedDoc as DocumentData)
     }
   }, [databaseDoc, setHybridDoc])
@@ -54,7 +54,7 @@ const setCommentToLeaf = (editor: WhetstoneEditor, commentText: string, location
     Transforms.setNodes(
       editor,
       { comment: commentText },
-      { at: location }
+      { at: location, split: true }
     )
   }
 }
@@ -73,6 +73,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
 
   const [ commentActive, setCommentActive ] = useState<AnimationState>('Inactive')
   const [ commentLocation, setCommentLocation ] = useState<BaseSelection>(null)
+  const [ commentText, setCommentText ] = useState<Descendant[]>([])
 
   useEffect(() => {
     setTimeout(() => setRecentlySaved(false), 2010)
@@ -115,9 +116,10 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
               <Editor id={id} text={JSON.parse(hybridDoc.content)}
                 editor={editor}
                 commentActive={commentActive !== 'Inactive'}
-                openComment={(state) => {
+                openComment={(state, text) => {
                   setCommentActive(state)
                   setCommentLocation(editor.selection)
+                  setCommentText(text)
                 }}
                 title={hybridDoc.title} 
                 onUpdate={() => {
@@ -128,11 +130,15 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
             }
           </div>
           <div className={`duration-500 transition-flex ${commentActive !== 'Inactive' ? 'flex-[0]' : 'flex-1'}`}/>
-         { commentActive === 'Complete' && <CommentEditor onSubmit={(text) => {
+         { commentActive === 'Complete' && 
+          <CommentEditor onSubmit={(text) => {
             setCommentToLeaf(editor, text, commentLocation)
             console.log('hybrid doc after comment:', hybridDoc?.content)
             setCommentActive('Inactive')
-         }}/>}
+          }}
+          comment={commentText}
+          />
+         }
         </div> 
       </Layout> 
     </>
