@@ -4,7 +4,7 @@ import { GetServerSideProps, InferGetServerSidePropsType } from "next"
 import Head from "next/head"
 import Router from "next/router"
 import { Dispatch, SetStateAction, useEffect, useState } from "react"
-import { BaseSelection, createEditor, Descendant, Transforms } from "slate"
+import { BaseSelection, createEditor, Descendant, Text, Transforms, Editor as SlateEditor } from "slate"
 import { withHistory } from "slate-history"
 import { withReact } from "slate-react"
 import useSWR from "swr"
@@ -48,13 +48,16 @@ const useSyncHybridDoc = (id: string, databaseDoc: DocumentData | undefined, set
   }, [databaseDoc, setHybridDoc])
 }
 
-// maybe rework to have an onclick handler so that this doesn't need to know so much
 const setCommentToLeaf = (editor: WhetstoneEditor, commentText: string, location: BaseSelection) => {
   if (location !== null) {
+    const [node] = SlateEditor.nodes(editor, {
+      at: location, universal: true, mode: "lowest"
+    }) 
+
     Transforms.setNodes(
       editor,
       { comment: commentText },
-      { at: location, split: true }
+      { match: n => n === node[0], split: true }
     )
   }
 }
@@ -133,7 +136,6 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
          { commentActive === 'Complete' && 
           <CommentEditor onSubmit={(text) => {
             setCommentToLeaf(editor, text, commentLocation)
-            console.log('hybrid doc after comment:', hybridDoc?.content)
             setCommentActive('Inactive')
           }}
           comment={commentText}

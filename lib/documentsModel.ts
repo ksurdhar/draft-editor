@@ -19,6 +19,10 @@ const DocumentSchema = new Mongoose.Schema({
     type: Mongoose.Schema.Types.String,
     default: '',
   },
+  comments: {
+    type: [Mongoose.Schema.Types.String],
+    default: []
+  },
   userId: {
     type: Mongoose.Schema.Types.String,
     required: true
@@ -39,6 +43,7 @@ DocumentSchema.set('toJSON', {
 export interface IDoc {
   title: string
   content: string
+  comments: string[]
   userId: string
   lastUpdated: number
 }

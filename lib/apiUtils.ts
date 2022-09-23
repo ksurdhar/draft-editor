@@ -11,6 +11,7 @@ type DocumentAttributes = {
   title?: string
   content?: string
   userId?: string
+  comments?: string[]
   lastUpdated?: number
 }
 
@@ -26,7 +27,7 @@ export const getEverybodysDocuments = async () => {
 
 export const createDocument = async (body: DocumentAttributes) => {
   const defaultContent = JSON.stringify([{ type: 'default', children: [{ text: '', highlight: 'none' }],}])
-  const document = await Document.create({ title: body.title, content: defaultContent, userId: body.userId }) // see if default value in model applies
+  const document = await Document.create({ title: body.title, content: defaultContent, userId: body.userId, comments: [] })
   await document.save()
   return document.toJSON()
 }
