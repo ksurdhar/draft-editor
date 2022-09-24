@@ -119,10 +119,36 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
   const [ initAnimate, setInitAnimate ] = useState(false)
   const [ recentlySaved, setRecentlySaved ] = useState(false)
 
+  const [ commentText, setCommentText ] = useState<Descendant[]>([])
   const [ commentActive, setCommentActive ] = useState<AnimationState>('Inactive')
   const [ pendingCommentRef, setPendingCommentRef ] = useState<NodeEntry<Node> | null>(null)
-  const [ commentText, setCommentText ] = useState<Descendant[]>([])
   const [ existingCommentId, setExistingCommentId ] = useState<string | null>(null)
+
+  const addNewComment = useCallback(async (content: string) => {
+    const timestamp = Date.now()
+    const commentId = timestamp.toString()
+    const comment: CommentData = {
+      id: commentId,
+      content,
+      timestamp
+    }
+    const comments = hybridDoc?.comments.concat(comment)
+    await save({ comments }, id, setRecentlySaved)
+    await mutate()
+    if (pendingCommentRef) commitComment(editor, pendingCommentRef[1], commentId)
+  }, [hybridDoc, pendingCommentRef])
+
+  const updateComment = useCallback(async (content: string, commentId: string) => {
+    const comments = hybridDoc?.comments.map((comment) => {
+      if (comment.id === commentId) {
+        return { ...comment, content}
+      }
+      return comment
+    })
+    await save({ comments }, id, setRecentlySaved)
+    await mutate()
+    if (pendingCommentRef) commitComment(editor, pendingCommentRef[1], commentId)
+  }, [hybridDoc, pendingCommentRef])
 
   const cleanCommentState = useCallback(() => {
     setExistingCommentId(null)
@@ -175,21 +201,20 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
               <Editor id={id} text={JSON.parse(hybridDoc.content)}
                 editor={editor}
                 commentActive={commentActive !== 'Inactive'}
-                openComment={(state) => {
-                  let commentText: Descendant[] = [{ type: 'default', children: [{text: ''}]}] 
+                openComment={() => {
                   const commentId = checkForComment(editor)
-                  if (!!commentId) {
-                    const comment = hybridDoc.comments.find((c) => c.id === commentId)
-                    if (comment && comment.content) {
-                      commentText = JSON.parse(comment.content)
-                      setExistingCommentId(commentId) 
-                    }
-                  } 
+                  const comment = hybridDoc.comments.find((c) => c.id === commentId)
+                  
+                  if (commentId && comment && comment.content) {
+                    setExistingCommentId(commentId)
+                    setCommentText(JSON.parse(comment.content)) 
+                    setCommentActive('Active')
+                  }
                   else {
                     captureCommentRef(editor, setPendingCommentRef)
+                    setCommentText([{ type: 'default', children: [{text: ''}]}])
+                    setCommentActive('Active')
                   }
-                  setCommentActive(state)
-                  setCommentText(commentText)
                 }}
                 title={hybridDoc.title} 
                 onUpdate={(data) => {
@@ -201,31 +226,8 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
           </div>
           <div className={`duration-500 transition-flex ${commentActive !== 'Inactive' ? 'flex-[0]' : 'flex-1'}`}/>
          { commentActive === 'Complete' && 
-          <CommentEditor onSubmit={async (text) => {
-            if (existingCommentId) {
-              const comments = hybridDoc?.comments.map((comment) => {
-                if (comment.id === existingCommentId) {
-                  return { ...comment, content: text}
-                }
-                return comment
-              })
-              await save({ comments }, id, setRecentlySaved)
-              await mutate()
-              if (pendingCommentRef) commitComment(editor, pendingCommentRef[1], existingCommentId)
-            } 
-            else {
-              const timestamp = Date.now()
-              const commentId = timestamp.toString()
-              const comment: CommentData = {
-                id: commentId,
-                content: text,
-                timestamp
-              }
-              const comments = hybridDoc?.comments.concat(comment)
-              await save({ comments }, id, setRecentlySaved)
-              await mutate()
-              if (pendingCommentRef) commitComment(editor, pendingCommentRef[1], commentId)
-            }
+          <CommentEditor onSubmit={(text) => {
+            existingCommentId ? updateComment(text, existingCommentId) : addNewComment(text)            
             cleanCommentState()
           }}
           onCancel={() => {

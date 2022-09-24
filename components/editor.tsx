@@ -82,7 +82,7 @@ type EditorProps = {
   title: string
   editor: WhetstoneEditor
   commentActive: boolean
-  openComment: (state: AnimationState) => void
+  openComment: () => void
   onUpdate: (data: Partial<DocumentData>) => void
 }
 
@@ -183,7 +183,7 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, comme
                 switch (event.key) {
                   case '1': {
                     event.preventDefault()
-                    openComment('Active')
+                    openComment()
                     break
                   }
                   case '2': {
