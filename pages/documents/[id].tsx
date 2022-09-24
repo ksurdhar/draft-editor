@@ -3,7 +3,7 @@ import { CloudIcon } from "@heroicons/react/solid"
 import { GetServerSideProps, InferGetServerSidePropsType } from "next"
 import Head from "next/head"
 import Router from "next/router"
-import { Dispatch, SetStateAction, useCallback, useEffect, useState } from "react"
+import { Dispatch, SetStateAction, useEffect, useState } from "react"
 import { createEditor, Descendant, Text, Transforms, Editor as SlateEditor, Element, Node, NodeEntry, Location } from "slate"
 import { withHistory } from "slate-history"
 import { withReact } from "slate-react"
@@ -15,7 +15,7 @@ import Layout from "../../components/layout"
 import { Loader } from "../../components/loader"
 import { useSpinner } from "../../lib/hooks"
 import API from "../../lib/utils"
-import { AnimationState, DocumentData, WhetstoneEditor } from "../../types/globals"
+import { AnimationState, CommentData, DocumentData, WhetstoneEditor } from "../../types/globals"
 
 export const getServerSideProps: GetServerSideProps = async ({ params }) => {
   return {
@@ -50,19 +50,46 @@ const useSyncHybridDoc = (id: string, databaseDoc: DocumentData | undefined, set
   }, [databaseDoc, setHybridDoc])
 }
 
+const captureCommentRef = (editor: WhetstoneEditor, setPendingCommentRef: Dispatch<SetStateAction<NodeEntry<Node> | null>>) => {
+  Transforms.setNodes(
+    editor,
+    { highlight: 'pending' },
+    { match: n => Text.isText(n), split: true }
+  )
+
+  const [match] = SlateEditor.nodes(editor, {
+    match: n => Element.isElement(n),
+    universal: true,
+  })
+  setPendingCommentRef(match)
+}
+
+// if comment there
+// then get Id
+// if not -- proceed
+
+const checkForComment = (editor: WhetstoneEditor) => {
+  const [match] = SlateEditor.nodes(editor, {
+    match: n => Text.isText(n) && n.highlight === 'comment',
+    universal: true,
+  })
+  if (!!match) {
+    // search through for the ID and return it, otherwise return null
+  }
+}
+
 const cancelComment = (editor: WhetstoneEditor, location: Location) => {
   Transforms.setNodes(
     editor,
-    { highlight: undefined }, // also remove commentId here once added
+    { highlight: undefined }, // "removeComment" will be a different method than cancel comment
     { match: n => Text.isText(n) && n.highlight === 'pending', at: location }
   )
 }
 
-// needs to accept the id of the comment as a param
-const commitComment = (editor: WhetstoneEditor, location: Location) => {
+const commitComment = (editor: WhetstoneEditor, location: Location, commentId: string) => {
   Transforms.setNodes(
     editor,
-    { highlight: 'comment' },
+    { highlight: 'comment', commentId },
     { match: n => Text.isText(n) && n.highlight === 'pending', at: location}
   )
 }
@@ -80,8 +107,9 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
   const [ recentlySaved, setRecentlySaved ] = useState(false)
 
   const [ commentActive, setCommentActive ] = useState<AnimationState>('Inactive')
-  const [ commentText, setCommentText ] = useState<Descendant[]>([])
   const [ pendingCommentRef, setPendingCommentRef ] = useState<NodeEntry<Node> | null>(null)
+  const [ commentText, setCommentText ] = useState<Descendant[]>([])
+  const [ existingCommentId, setExistingCommentId ] = useState<string>()
 
   const saveDocument = useDebouncedCallback(
     async (data: Partial<DocumentData>) => { 
@@ -100,20 +128,6 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
       setRecentlySaved(true)
     }, 1000
   )
-
-  const captureCommentRef = (editor: WhetstoneEditor) => {
-    Transforms.setNodes(
-      editor,
-      { highlight: 'pending' },
-      { match: n => Text.isText(n), split: true }
-    )
-
-    const [match] = SlateEditor.nodes(editor, {
-      match: n => Element.isElement(n),
-      universal: true,
-    })
-    setPendingCommentRef(match)
-  }
 
   useEffect(() => {
     setTimeout(() => setRecentlySaved(false), 2010)
@@ -157,9 +171,10 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
                 editor={editor}
                 commentActive={commentActive !== 'Inactive'}
                 openComment={(state, text) => {
+                  // this will be where we will need to look up comment id / comment
                   setCommentActive(state)
                   setCommentText(text)
-                  captureCommentRef(editor)
+                  captureCommentRef(editor, setPendingCommentRef)
                 }}
                 title={hybridDoc.title} 
                 onUpdate={(data) => {
@@ -174,7 +189,29 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
           <CommentEditor onSubmit={(text) => {
             setCommentActive('Inactive')
             setCommentText([])
-            if (pendingCommentRef) commitComment(editor, pendingCommentRef[1])
+            if (existingCommentId) {
+              const newComments = hybridDoc?.comments.map((comment) => {
+                if (comment.id === existingCommentId) {
+                  return { ...comment, content: text}
+                }
+                return comment
+              })
+              saveDocument({
+                comments: newComments
+              })
+              if (pendingCommentRef) commitComment(editor, pendingCommentRef[1], existingCommentId)
+            } else {
+              const timestamp = Date.now()
+              const commentId = timestamp.toString()
+              const comment: CommentData = {
+                id: commentId,
+                content: text,
+                timestamp
+              }
+              saveDocument({ comments: hybridDoc?.comments.concat(comment) })
+              if (pendingCommentRef) commitComment(editor, pendingCommentRef[1], commentId)
+            }
+            
           }}
           onCancel={() => {
             setCommentActive('Inactive')

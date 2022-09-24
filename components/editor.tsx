@@ -1,8 +1,6 @@
-import { useDebouncedCallback } from 'use-debounce'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { BaseEditor, Descendant, Editor, Transforms, Text, Node } from 'slate'
 import { Slate, Editable, ReactEditor } from 'slate-react'
-import API from '../lib/utils'
 import { useEditorFades } from './header'
 import { useMouse } from '../pages/_app'
 import Footer from './footer'
@@ -185,9 +183,6 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, comme
                 switch (event.key) {
                   case '1': {
                     event.preventDefault()
-                    // generate an id, place it somewhere in a store -- Date.now()
-                    // here's where we would check for an existing id on a node, retrieve that from the document
-
                     let commentText: Descendant[] = [{ type: 'default', children: [{text: ''}]}] 
                     openComment('Active', commentText)
                     break
