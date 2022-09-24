@@ -7,7 +7,7 @@ import Footer from './footer'
 import { AnimationState, DocumentData, WhetstoneEditor } from '../types/globals'
 
 type HighlightColor = 'red' | 'orange' | 'green' | 'blue' | 'pending' | 'comment'
-type DefaultText = { text: string, highlight?: HighlightColor, commentId?: string }
+export type DefaultText = { text: string, highlight?: HighlightColor, commentId?: string }
 type DefaultElement = { type: 'default'; children: DefaultText[] }
 type CustomElement = DefaultElement 
 
@@ -82,7 +82,7 @@ type EditorProps = {
   title: string
   editor: WhetstoneEditor
   commentActive: boolean
-  openComment: (state: AnimationState, text: Descendant[]) => void
+  openComment: (state: AnimationState) => void
   onUpdate: (data: Partial<DocumentData>) => void
 }
 
@@ -183,8 +183,7 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, comme
                 switch (event.key) {
                   case '1': {
                     event.preventDefault()
-                    let commentText: Descendant[] = [{ type: 'default', children: [{text: ''}]}] 
-                    openComment('Active', commentText)
+                    openComment('Active')
                     break
                   }
                   case '2': {
