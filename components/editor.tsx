@@ -9,7 +9,7 @@ import Footer from './footer'
 import { AnimationState, DocumentData, WhetstoneEditor } from '../types/globals'
 
 type HighlightColor = 'red' | 'orange' | 'green' | 'blue' | 'pending' | 'comment'
-type DefaultText = { text: string, highlight?: HighlightColor }
+type DefaultText = { text: string, highlight?: HighlightColor, commentId?: string }
 type DefaultElement = { type: 'default'; children: DefaultText[] }
 type CustomElement = DefaultElement 
 
@@ -85,7 +85,7 @@ type EditorProps = {
   editor: WhetstoneEditor
   commentActive: boolean
   openComment: (state: AnimationState, text: Descendant[]) => void
-  onUpdate: () => void
+  onUpdate: (data: Partial<DocumentData>) => void
 }
 
 // needs to be reworked to be more accurate
@@ -136,28 +136,6 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, comme
     }
   }, [titleRef])
 
-  const debouncedSave = useDebouncedCallback(
-    async (data: Partial<DocumentData>) => { 
-      const updatedData = {
-        ...data,
-        lastUpdated: Date.now()
-      }
-
-      const cachedDoc = JSON.parse(sessionStorage.getItem(id) || '{}')
-      const documentCached = Object.keys(cachedDoc).length > 0
-      if (documentCached) {
-        sessionStorage.setItem(id, JSON.stringify({...cachedDoc, ...updatedData})) 
-      }
-      
-      await API.patch(`/api/documents/${id}`, updatedData)
-      onUpdate()  
-    }, 1000
-  )
-
-  const handleChange = useCallback((props: Partial<DocumentData>) => {
-    debouncedSave(props)
-  }, [debouncedSave])
-
   return (
     <div className='flex-grow normal-case animate-fadein'>
       <div className='mb-[20px]'>
@@ -174,7 +152,7 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, comme
           }}
           onInput={(e) => {
             e.preventDefault()
-            handleChange({ title: `${e.currentTarget.textContent}` })
+            onUpdate({ title: `${e.currentTarget.textContent}` })
           }}
           suppressContentEditableWarning={true}
           dangerouslySetInnerHTML={{__html: titleState.current }}
@@ -193,7 +171,7 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, comme
             if (isAstChange) {
               setWordCount(countWords(value))
               const content = JSON.stringify(value)
-              handleChange({ content })
+              onUpdate({ content })
             }
           }}>
           <Editable

@@ -1,4 +1,5 @@
 import Mongoose from 'mongoose'
+import { CommentData } from '../types/globals'
 import Document from './documentsModel'
 
 declare global {
@@ -11,7 +12,7 @@ type DocumentAttributes = {
   title?: string
   content?: string
   userId?: string
-  comments?: string[]
+  comments?: CommentData[]
   lastUpdated?: number
 }
 

@@ -20,7 +20,10 @@ const DocumentSchema = new Mongoose.Schema({
     default: '',
   },
   comments: {
-    type: [Mongoose.Schema.Types.String],
+    type: [{ 
+      content: Mongoose.Schema.Types.String, 
+      id: Mongoose.Schema.Types.String
+    }],
     default: []
   },
   userId: {

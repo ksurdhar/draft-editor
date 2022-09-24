@@ -6,8 +6,14 @@ type DocumentData = {
   id: string
   title: string
   content: string
-  comments: string[]
+  comments: CommentData[]
   lastUpdated: number
+}
+
+type CommentData = {
+  id: string
+  timestamp: number
+  content: string
 }
 
 type AnimationState = 'Active' | 'Complete' | 'Inactive'
