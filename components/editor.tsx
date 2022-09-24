@@ -8,9 +8,9 @@ import { useMouse } from '../pages/_app'
 import Footer from './footer'
 import { AnimationState, DocumentData, WhetstoneEditor } from '../types/globals'
 
-type HighlightColor = 'red' | 'orange' | 'green' | 'blue' 
-type DefaultText = { text: string, highlight?: HighlightColor, comment?: string }
-type DefaultElement = { type: 'default'; children: DefaultText[], comment?: string }
+type HighlightColor = 'red' | 'orange' | 'green' | 'blue' | 'pending' | 'comment'
+type DefaultText = { text: string, highlight?: HighlightColor }
+type DefaultElement = { type: 'default'; children: DefaultText[] }
 type CustomElement = DefaultElement 
 
 declare module 'slate' {
@@ -58,7 +58,9 @@ const Leaf = ({ attributes, leaf, children }: RenderLeafProps) => {
     blue: 'bg-blue-200',
     green: 'bg-green-200',
     orange: 'bg-orange-200',
-    red: 'bg-red-200'
+    red: 'bg-red-200',
+    pending: 'bg-orange-200',
+    comment: 'bg-slate-200'
   }
 
   if (leaf.highlight) {
@@ -195,6 +197,7 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, comme
             }
           }}>
           <Editable
+            readOnly={commentActive}
             spellCheck='false'
             className='rounded-md w-full h-full static text-[19px] md:text-[22px]'
             renderElement={renderElement}
@@ -204,21 +207,11 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, comme
                 switch (event.key) {
                   case '1': {
                     event.preventDefault()
-                    setHighlight(editor, 'blue')
-                    // add comment entry point here
-                    if (event.shiftKey) {
-                      const newCommentState: AnimationState = commentActive ? 'Inactive' : 'Active'
-                      let commentText: Descendant[] = [{ type: 'default', children: [{text: ''}]}] // default value
-                      if (editor.selection) {
-                        const descendants = Editor.fragment(editor, editor.selection)
-                        descendants.forEach((descendant) => {
-                          if (descendant.comment){
-                            commentText = JSON.parse(descendant.comment)
-                          }
-                        })
-                      }
-                      openComment(newCommentState, commentText)
-                    }
+                    // generate an id, place it somewhere in a store -- Date.now()
+                    // here's where we would check for an existing id on a node, retrieve that from the document
+
+                    let commentText: Descendant[] = [{ type: 'default', children: [{text: ''}]}] 
+                    openComment('Active', commentText)
                     break
                   }
                   case '2': {

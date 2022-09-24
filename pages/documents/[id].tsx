@@ -4,7 +4,7 @@ import { GetServerSideProps, InferGetServerSidePropsType } from "next"
 import Head from "next/head"
 import Router from "next/router"
 import { Dispatch, SetStateAction, useEffect, useState } from "react"
-import { BaseSelection, createEditor, Descendant, Text, Transforms, Editor as SlateEditor } from "slate"
+import { BaseSelection, createEditor, Descendant, Text, Transforms, Editor as SlateEditor, Element, Node, NodeEntry } from "slate"
 import { withHistory } from "slate-history"
 import { withReact } from "slate-react"
 import useSWR from "swr"
@@ -75,8 +75,38 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
   const [ recentlySaved, setRecentlySaved ] = useState(false)
 
   const [ commentActive, setCommentActive ] = useState<AnimationState>('Inactive')
-  const [ commentLocation, setCommentLocation ] = useState<BaseSelection>(null)
   const [ commentText, setCommentText ] = useState<Descendant[]>([])
+  const [ pendingElement, setPendingElement ] = useState<NodeEntry<Node> | null>(null)
+
+  const setPending = (editor: WhetstoneEditor) => {
+    Transforms.setNodes(
+      editor,
+      { highlight: 'pending' },
+      { match: n => Text.isText(n), split: true }
+    )
+
+    const [match] = SlateEditor.nodes(editor, {
+      match: n => Element.isElement(n),
+      universal: true,
+    })
+    setPendingElement(match)
+  }
+
+  const cancelComment = () => {
+    Transforms.setNodes(
+      editor,
+      { highlight: undefined }, // also remove commentId here once added
+      { match: n => Text.isText(n) && n.highlight === 'pending', at: pendingElement?.[1] }
+    )
+  }
+
+  const commitComment = () => {
+    Transforms.setNodes(
+      editor,
+      { highlight: 'comment' },
+      { match: n => Text.isText(n) && n.highlight === 'pending', at: pendingElement?.[1]}
+    )
+  }
 
   useEffect(() => {
     setTimeout(() => setRecentlySaved(false), 2010)
@@ -121,8 +151,8 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
                 commentActive={commentActive !== 'Inactive'}
                 openComment={(state, text) => {
                   setCommentActive(state)
-                  setCommentLocation(editor.selection)
                   setCommentText(text)
+                  setPending(editor)
                 }}
                 title={hybridDoc.title} 
                 onUpdate={() => {
@@ -135,13 +165,14 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
           <div className={`duration-500 transition-flex ${commentActive !== 'Inactive' ? 'flex-[0]' : 'flex-1'}`}/>
          { commentActive === 'Complete' && 
           <CommentEditor onSubmit={(text) => {
-            setCommentToLeaf(editor, text, commentLocation)
             setCommentActive('Inactive')
             setCommentText([])
+            commitComment()
           }}
           onCancel={() => {
             setCommentActive('Inactive')
             setCommentText([])
+            cancelComment()
           }}
           comment={commentText}
           />
