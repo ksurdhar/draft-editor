@@ -3,7 +3,7 @@ import { CloudIcon } from "@heroicons/react/solid"
 import { GetServerSideProps, InferGetServerSidePropsType } from "next"
 import Head from "next/head"
 import Router from "next/router"
-import { Dispatch, SetStateAction, useEffect, useState } from "react"
+import { Dispatch, SetStateAction, useCallback, useEffect, useState } from "react"
 import { createEditor, Descendant, Text, Transforms, Editor as SlateEditor, Element, Node, NodeEntry, Location } from "slate"
 import { withHistory } from "slate-history"
 import { withReact } from "slate-react"
@@ -67,11 +67,9 @@ const captureCommentRef = (editor: WhetstoneEditor, setPendingCommentRef: Dispat
 const checkForComment = (editor: WhetstoneEditor) => {
   const [match] = SlateEditor.nodes(editor, {
     match: n => Text.isText(n) && n.highlight === 'comment',
-    // universal: true,
-
+    at: editor.selection?.focus
   })
   if (!!match) {
-    console.log('matches', match)
     const textNode = match[0] as DefaultText
     return textNode.commentId
   }
@@ -90,7 +88,7 @@ const commitComment = (editor: WhetstoneEditor, location: Location, commentId: s
   Transforms.setNodes(
     editor,
     { highlight: 'comment', commentId },
-    { match: n => Text.isText(n) && n.highlight === 'pending', at: location}
+    { match: n => Text.isText(n) && n.highlight === 'pending', at: location }
   )
 }
 
@@ -124,7 +122,13 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
   const [ commentActive, setCommentActive ] = useState<AnimationState>('Inactive')
   const [ pendingCommentRef, setPendingCommentRef ] = useState<NodeEntry<Node> | null>(null)
   const [ commentText, setCommentText ] = useState<Descendant[]>([])
-  const [ existingCommentId, setExistingCommentId ] = useState<string>()
+  const [ existingCommentId, setExistingCommentId ] = useState<string | null>(null)
+
+  const cleanCommentState = useCallback(() => {
+    setExistingCommentId(null)
+    setCommentActive('Inactive')
+    setCommentText([])
+  }, [setCommentText, setCommentText, setExistingCommentId])
 
   const debouncedSave = useDebouncedCallback((data: Partial<DocumentData>) => {
     save(data, id, setRecentlySaved)
@@ -174,16 +178,14 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
                 openComment={(state) => {
                   let commentText: Descendant[] = [{ type: 'default', children: [{text: ''}]}] 
                   const commentId = checkForComment(editor)
-                  // console.log('check for comment', commentId)
                   if (!!commentId) {
                     const comment = hybridDoc.comments.find((c) => c.id === commentId)
-                    // console.log('comments', hybridDoc.comments)
-                    // console.log('the commment', comment)
                     if (comment && comment.content) {
                       commentText = JSON.parse(comment.content)
                       setExistingCommentId(commentId) 
                     }
-                  } else {
+                  } 
+                  else {
                     captureCommentRef(editor, setPendingCommentRef)
                   }
                   setCommentActive(state)
@@ -191,7 +193,6 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
                 }}
                 title={hybridDoc.title} 
                 onUpdate={(data) => {
-                  console.log('on update got called!')
                   debouncedSave(data)
                   mutate()
                 }}
@@ -201,22 +202,18 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
           <div className={`duration-500 transition-flex ${commentActive !== 'Inactive' ? 'flex-[0]' : 'flex-1'}`}/>
          { commentActive === 'Complete' && 
           <CommentEditor onSubmit={async (text) => {
-            setCommentActive('Inactive')
-            setCommentText([])
             if (existingCommentId) {
-              // existing comment
               const comments = hybridDoc?.comments.map((comment) => {
                 if (comment.id === existingCommentId) {
                   return { ...comment, content: text}
                 }
                 return comment
               })
-              console.log('comments to update', comments)
               await save({ comments }, id, setRecentlySaved)
               await mutate()
               if (pendingCommentRef) commitComment(editor, pendingCommentRef[1], existingCommentId)
-            } else {
-              // new comment 
+            } 
+            else {
               const timestamp = Date.now()
               const commentId = timestamp.toString()
               const comment: CommentData = {
@@ -229,11 +226,10 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
               await mutate()
               if (pendingCommentRef) commitComment(editor, pendingCommentRef[1], commentId)
             }
-            
+            cleanCommentState()
           }}
           onCancel={() => {
-            setCommentActive('Inactive')
-            setCommentText([])
+            cleanCommentState()
             if (pendingCommentRef) cancelComment(editor, pendingCommentRef[1])
           }}
           comment={commentText}
