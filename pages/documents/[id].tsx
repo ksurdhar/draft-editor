@@ -3,7 +3,7 @@ import { CloudIcon } from "@heroicons/react/solid"
 import { GetServerSideProps, InferGetServerSidePropsType } from "next"
 import Head from "next/head"
 import Router from "next/router"
-import { Dispatch, SetStateAction, useCallback, useEffect, useState } from "react"
+import { Dispatch, SetStateAction, useCallback, useEffect, useRef, useState } from "react"
 import { createEditor, Descendant, Text, Transforms, Editor as SlateEditor, Element, Node, NodeEntry, Location } from "slate"
 import { withHistory } from "slate-history"
 import { withReact } from "slate-react"
@@ -76,6 +76,14 @@ const checkForComment = (editor: WhetstoneEditor) => {
   return null
 }
 
+const removePending = (editor: WhetstoneEditor) => {
+  Transforms.setNodes(
+    editor,
+    { highlight: undefined },
+    { match: n => Text.isText(n) && n.highlight === 'pending', at: [] }
+  )
+}
+
 const cancelComment = (editor: WhetstoneEditor, location: Location) => {
   Transforms.setNodes(
     editor,
@@ -105,6 +113,22 @@ const save = async (data: Partial<DocumentData>, id: string, setRecentlySaved: (
   }
   await API.patch(`/api/documents/${id}`, updatedData)
   setRecentlySaved(true)
+}
+
+const useEffectOnlyOnce = (callback: any, dependencies: any, condition: any) => {
+  const calledOnce = useRef(false);
+
+  useEffect(() => {
+    if (calledOnce.current) {
+      return;
+    }
+
+    if (condition(dependencies)) {
+      callback(dependencies)
+
+      calledOnce.current = true
+    }
+  }, [callback, condition, dependencies])
 }
 
 export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof getServerSideProps>) {  
@@ -179,6 +203,14 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
     }, 250)
   }, [isLoading, setInitAnimate])
 
+  useEffectOnlyOnce(
+    () => {
+      console.log('on mount after document is truthy')
+      setTimeout(() => removePending(editor), 0)
+    }, [hybridDoc], 
+    () => hybridDoc !== null
+  )
+
   return (
     <>
       <Head>
@@ -204,7 +236,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
                 openComment={() => {
                   const commentId = checkForComment(editor)
                   const comment = hybridDoc.comments.find((c) => c.id === commentId)
-                  
+
                   if (commentId && comment && comment.content) {
                     setExistingCommentId(commentId)
                     setCommentText(JSON.parse(comment.content)) 
