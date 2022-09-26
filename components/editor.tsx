@@ -4,7 +4,7 @@ import { Slate, Editable, ReactEditor } from 'slate-react'
 import { useEditorFades } from './header'
 import { useMouse } from '../pages/_app'
 import Footer from './footer'
-import { AnimationState, DocumentData, WhetstoneEditor } from '../types/globals'
+import { DocumentData, WhetstoneEditor } from '../types/globals'
 
 type HighlightColor = 'red' | 'orange' | 'green' | 'blue' | 'pending' | 'comment'
 export type DefaultText = { text: string, highlight?: HighlightColor, commentId?: string }
@@ -178,12 +178,16 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, comme
             className='rounded-md w-full h-full static text-[19px] md:text-[22px]'
             renderElement={renderElement}
             renderLeaf={renderLeaf}
+            // onClick={event => {
+            //   console.log('on click!')
+            //   // if comment exists at selection, then call openComment
+            // }}
             onKeyDown={event => {
               if (event.metaKey) {
                 switch (event.key) {
                   case '1': {
                     event.preventDefault()
-                    openComment()
+                    openComment() // rename to createOrOpenComment
                     break
                   }
                   case '2': {
