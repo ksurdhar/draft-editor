@@ -45,11 +45,12 @@ type RenderLeafProps = {
   attributes: Object
   leaf: DefaultText
   children: React.ReactNode
+  activeCommentId: string
 }
 
 type ColorMap = Record<HighlightColor, string>
 
-const Leaf = ({ attributes, leaf, children }: RenderLeafProps) => {
+const Leaf = ({ attributes, leaf, children, activeCommentId }: RenderLeafProps) => {
   let highlight = ''
 
   const colorMap: ColorMap = {
@@ -57,8 +58,8 @@ const Leaf = ({ attributes, leaf, children }: RenderLeafProps) => {
     green: 'bg-green-200',
     orange: 'bg-orange-200',
     red: 'bg-red-200',
-    pending: 'bg-orange-200',
-    comment: 'bg-slate-200'
+    pending: 'bg-slate-200',
+    comment: `${activeCommentId === leaf.commentId ? 'bg-orange-300' : 'bg-orange-200' } hover:bg-orange-300`
   }
 
   if (leaf.highlight) {
@@ -82,7 +83,8 @@ type EditorProps = {
   title: string
   editor: WhetstoneEditor
   commentActive: boolean
-  openComment: () => void
+  activeCommentId: string | null
+  openComment: (allowBlankState: boolean) => void
   onUpdate: (data: Partial<DocumentData>) => void
 }
 
@@ -118,7 +120,7 @@ const setHighlight = (editor: WhetstoneEditor, color: HighlightColor) => {
   )
 }
 
-const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, commentActive }: EditorProps) => {
+const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, commentActive, activeCommentId }: EditorProps) => {
   const [ wordCount, setWordCount ] = useState(countWords(text))
   const [ wordCountAtPos, setWordCountAtPos ] = useState(0)
   const titleState = useRef(title)
@@ -177,17 +179,18 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, comme
             spellCheck='false'
             className='rounded-md w-full h-full static text-[19px] md:text-[22px]'
             renderElement={renderElement}
-            renderLeaf={renderLeaf}
-            // onClick={event => {
-            //   console.log('on click!')
-            //   // if comment exists at selection, then call openComment
-            // }}
+            renderLeaf={(props) => {
+              return renderLeaf({ ...props, activeCommentId})
+            }}
+            onClick={event => {
+              openComment(false)
+            }}
             onKeyDown={event => {
               if (event.metaKey) {
                 switch (event.key) {
                   case '1': {
                     event.preventDefault()
-                    openComment() // rename to createOrOpenComment
+                    openComment(true)
                     break
                   }
                   case '2': {

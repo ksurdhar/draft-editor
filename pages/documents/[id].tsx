@@ -146,7 +146,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
   const [ commentText, setCommentText ] = useState<Descendant[]>([])
   const [ commentActive, setCommentActive ] = useState<AnimationState>('Inactive')
   const [ pendingCommentRef, setPendingCommentRef ] = useState<NodeEntry<Node> | null>(null)
-  const [ existingCommentId, setExistingCommentId ] = useState<string | null>(null)
+  const [ activeCommentId, setActiveCommentId ] = useState<string | null>(null)
 
   const addNewComment = useCallback(async (content: string) => {
     const timestamp = Date.now()
@@ -175,10 +175,27 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
   }, [hybridDoc, pendingCommentRef])
 
   const cleanCommentState = useCallback(() => {
-    setExistingCommentId(null)
+    setActiveCommentId(null)
     setCommentActive('Inactive')
     setCommentText([])
-  }, [setCommentText, setCommentText, setExistingCommentId])
+  }, [setCommentText, setCommentText, setActiveCommentId])
+
+  const openComment = useCallback((allowBlankState: boolean) => {
+    if (!hybridDoc) return 
+
+    const commentId = checkForComment(editor)
+    const comment = hybridDoc.comments.find((c) => c.id === commentId)
+  
+    if (commentId && comment && comment.content) {
+      setActiveCommentId(commentId)
+      setCommentText(JSON.parse(comment.content)) 
+      setCommentActive('Active')
+    } else if (allowBlankState) {
+      captureCommentRef(editor, setPendingCommentRef)
+      setCommentText([{ type: 'default', children: [{text: ''}]}])
+      setCommentActive('Active')
+    }
+  }, [hybridDoc, editor, setCommentText, setCommentActive, captureCommentRef, setPendingCommentRef, setActiveCommentId])
 
   const debouncedSave = useDebouncedCallback((data: Partial<DocumentData>) => {
     save(data, id, setRecentlySaved)
@@ -233,21 +250,8 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
               <Editor id={id} text={JSON.parse(hybridDoc.content)}
                 editor={editor}
                 commentActive={commentActive !== 'Inactive'}
-                openComment={() => {
-                  const commentId = checkForComment(editor)
-                  const comment = hybridDoc.comments.find((c) => c.id === commentId)
-
-                  if (commentId && comment && comment.content) {
-                    setExistingCommentId(commentId)
-                    setCommentText(JSON.parse(comment.content)) 
-                    setCommentActive('Active')
-                  }
-                  else {
-                    captureCommentRef(editor, setPendingCommentRef)
-                    setCommentText([{ type: 'default', children: [{text: ''}]}])
-                    setCommentActive('Active')
-                  }
-                }}
+                activeCommentId={activeCommentId}
+                openComment={openComment}
                 title={hybridDoc.title} 
                 onUpdate={(data) => {
                   debouncedSave(data)
@@ -259,7 +263,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
           <div className={`duration-500 transition-flex ${commentActive !== 'Inactive' ? 'flex-[0]' : 'flex-1'}`}/>
          { commentActive === 'Complete' && 
           <CommentEditor onSubmit={(text) => {
-            existingCommentId ? updateComment(text, existingCommentId) : addNewComment(text)            
+            activeCommentId ? updateComment(text, activeCommentId) : addNewComment(text)            
             cleanCommentState()
           }}
           onCancel={() => {
