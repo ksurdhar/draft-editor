@@ -7,9 +7,10 @@ interface CommentEditorProps {
   onSubmit: (text: string) => void
   onCancel: () => void
   comment: Descendant[]
+  isPending: boolean
 }
 
-const CommentEditor = ({ onSubmit, onCancel, comment }: CommentEditorProps) => {
+const CommentEditor = ({ onSubmit, onCancel, comment, isPending }: CommentEditorProps) => {
   const [ editor ] = useState(() => withReact(createEditor()))
   const [ text, setText ] = useState<Descendant[]>(comment)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -24,30 +25,33 @@ const CommentEditor = ({ onSubmit, onCancel, comment }: CommentEditorProps) => {
 
   return (
     <div className={`flex flex-1 flex-col h-[75vh] justify-center m-[10px]`}>
-      <div className={`fixed p-4 pl-8 w-[calc(100vw_-_770px)]`} ref={containerRef}>
-        <Slate editor={editor} value={text} 
-          onChange={value => {
-            const isAstChange = editor.operations.some(op => 'set_selection' !== op.type)
-            if (isAstChange) {
-              setText(value)
-            }
-          }}>
-          <Editable
-            spellCheck='false'
-            className='rounded-md w-full h-full static text-[19px] md:text-[22px]'
-            renderElement={renderElement}
-            renderLeaf={renderLeaf}
-          />
-        </Slate>
-        <div className={'mt-8 flex justify-evenly'}>
+      <div className={`fixed pl-8 pr-8 w-[calc(100vw_-_770px)] border-l border-l-gray-700 h-[50%] flex flex-col justify-end`} ref={containerRef}>
+        <div className={`flex flex-col justify-center h-[calc(100%_-_56px)]`}>
+          <div className={`h-[fit-content] overflow-y-scroll justify-center`}>
+            <Slate editor={editor} value={text} 
+              onChange={value => {
+                const isAstChange = editor.operations.some(op => 'set_selection' !== op.type)
+                if (isAstChange) {
+                  setText(value)
+                }
+              }}>
+              <Editable
+                spellCheck='false'
+                className='rounded-md w-full h-full static text-[19px] md:text-[22px]'
+                renderElement={renderElement}
+                renderLeaf={renderLeaf}
+              />
+            </Slate>
+          </div>
+        </div>
+        <div className={'mt-4 flex justify-end'}>
           <button className={'file-button'} onClick={() => onSubmit(JSON.stringify(text))}>
-            submit
+            { isPending ? 'submit' : 'save' }
           </button>
           <button className={'file-button file-button-red'} onClick={() => onCancel()}>
             cancel
           </button>
-        </div>
-        
+      </div>
       </div>
     </div>
   )

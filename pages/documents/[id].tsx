@@ -243,7 +243,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
         )}
         <div className={`flex h-[calc(100vh_-_64px)] overflow-y-scroll pb-10 p-[20px] mt-[64px] text-black/[.79] font-editor2`}>
           <div className={`duration-500 transition-flex ${commentActive !== 'Inactive' ? 'flex-[0]' : 'flex-1'}`}/>
-          <div className={`flex ease-in ease-out ${showSpinner ? 'justify-center flex-col mt-[-36px]' : ''}
+          <div className={`flex ease-in ${showSpinner ? 'justify-center flex-col mt-[-36px]' : ''}
              relative max-w-[740px] min-w-[calc(100vw_-_40px)] md:min-w-[0px] pb-10`}>
             { showSpinner && <Loader/> }
             { hybridDoc && 
@@ -262,7 +262,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
           </div>
           <div className={`duration-500 transition-flex ${commentActive !== 'Inactive' ? 'flex-[0]' : 'flex-1'}`}/>
          { commentActive === 'Complete' && 
-          <CommentEditor onSubmit={(text) => {
+          <CommentEditor isPending={!Boolean(activeCommentId)} onSubmit={(text) => {
             activeCommentId ? updateComment(text, activeCommentId) : addNewComment(text)            
             cleanCommentState()
           }}
