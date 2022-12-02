@@ -76,6 +76,15 @@ const checkForComment = (editor: WhetstoneEditor) => {
   return null
 }
 
+const removeComment = (editor: WhetstoneEditor, commentId: string) => {
+  console.log('commentID', commentId)
+  Transforms.setNodes(
+    editor,
+    { highlight: undefined, commentId: undefined },
+    { match: n => Text.isText(n) && n.commentId === commentId, at: [] }
+  )
+}
+
 const removePending = (editor: WhetstoneEditor) => {
   Transforms.setNodes(
     editor,
@@ -161,6 +170,17 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
     await mutate()
     if (pendingCommentRef) commitComment(editor, pendingCommentRef[1], commentId)
   }, [hybridDoc, pendingCommentRef])
+
+  const deleteComment = async () => {
+    if (!activeCommentId) return
+    removeComment(editor, activeCommentId)
+
+    const comments = hybridDoc?.comments.filter((comment) => comment.id !== activeCommentId)
+    await save({ comments }, id, setRecentlySaved)
+    await mutate()
+
+    cleanCommentState()
+  }
 
   const updateComment = useCallback(async (content: string, commentId: string) => {
     const comments = hybridDoc?.comments.map((comment) => {
@@ -262,15 +282,18 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
           </div>
           <div className={`duration-500 transition-flex ${commentActive !== 'Inactive' ? 'flex-[0]' : 'flex-1'}`}/>
          { commentActive === 'Complete' && 
-          <CommentEditor isPending={!Boolean(activeCommentId)} onSubmit={(text) => {
-            activeCommentId ? updateComment(text, activeCommentId) : addNewComment(text)            
-            cleanCommentState()
-          }}
-          onCancel={() => {
-            cleanCommentState()
-            if (pendingCommentRef) cancelComment(editor, pendingCommentRef[1])
-          }}
-          comment={commentText}
+          <CommentEditor 
+            isPending={!Boolean(activeCommentId)} 
+            onSubmit={(text) => {
+              activeCommentId ? updateComment(text, activeCommentId) : addNewComment(text)            
+              cleanCommentState()
+            }}
+            deleteComment={deleteComment}
+            onCancel={() => {
+              cleanCommentState()
+              if (pendingCommentRef) cancelComment(editor, pendingCommentRef[1])
+            }}
+            comment={commentText}
           />
          }
         </div> 

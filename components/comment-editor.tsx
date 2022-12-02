@@ -1,3 +1,4 @@
+import Button from '@mui/material/Button'
 import { useEffect, useRef, useState } from 'react'
 import { createEditor, Descendant } from 'slate'
 import { Slate, Editable, withReact } from 'slate-react'
@@ -8,9 +9,10 @@ interface CommentEditorProps {
   onCancel: () => void
   comment: Descendant[]
   isPending: boolean
+  deleteComment: () => void
 }
 
-const CommentEditor = ({ onSubmit, onCancel, comment, isPending }: CommentEditorProps) => {
+const CommentEditor = ({ onSubmit, onCancel, deleteComment, comment, isPending }: CommentEditorProps) => {
   const [ editor ] = useState(() => withReact(createEditor()))
   const [ text, setText ] = useState<Descendant[]>(comment)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -45,12 +47,18 @@ const CommentEditor = ({ onSubmit, onCancel, comment, isPending }: CommentEditor
           </div>
         </div>
         <div className={'mt-4 flex justify-end'}>
-          <button className={'file-button'} onClick={() => onSubmit(JSON.stringify(text))}>
+          <Button onClick={() => onSubmit(JSON.stringify(text))}>
             { isPending ? 'submit' : 'save' }
-          </button>
-          <button className={'file-button file-button-red'} onClick={() => onCancel()}>
+          </Button>
+          { 
+            !isPending && 
+            <Button onClick={() => deleteComment() }>
+              delete
+            </Button>
+          }
+          <Button onClick={() => onCancel()}>
             cancel
-          </button>
+          </Button>
       </div>
       </div>
     </div>
