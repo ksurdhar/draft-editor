@@ -54,14 +54,25 @@ const captureCommentRef = (editor: WhetstoneEditor, setPendingCommentRef: Dispat
   Transforms.setNodes(
     editor,
     { highlight: 'pending' },
-    { match: n => Text.isText(n), split: true }
+    { match: n => Text.isText(n), split: true } // do we want split here?
   )
 
   const [match] = SlateEditor.nodes(editor, {
-    match: n => Element.isElement(n),
+    match: n => Text.isText(n) && n.highlight === 'pending',
     universal: true,
   })
+  console.log('pending ref', match)
   setPendingCommentRef(match)
+}
+
+const commitComment = (editor: WhetstoneEditor, location: Location, commentId: string) => {
+  console.log('location', location)
+  Transforms.setNodes(
+    editor,
+    { highlight: 'comment', commentId },
+    { match: n => Text.isText(n) && n.highlight === 'pending', at: [] }
+  )
+  removePending(editor) // helps clean up
 }
 
 const checkForComment = (editor: WhetstoneEditor) => {
@@ -77,7 +88,6 @@ const checkForComment = (editor: WhetstoneEditor) => {
 }
 
 const removeComment = (editor: WhetstoneEditor, commentId: string) => {
-  console.log('commentID', commentId)
   Transforms.setNodes(
     editor,
     { highlight: undefined, commentId: undefined },
@@ -96,16 +106,8 @@ const removePending = (editor: WhetstoneEditor) => {
 const cancelComment = (editor: WhetstoneEditor, location: Location) => {
   Transforms.setNodes(
     editor,
-    { highlight: undefined }, // "removeComment" will be a different method than cancel comment
-    { match: n => Text.isText(n) && n.highlight === 'pending', at: location }
-  )
-}
-
-const commitComment = (editor: WhetstoneEditor, location: Location, commentId: string) => {
-  Transforms.setNodes(
-    editor,
-    { highlight: 'comment', commentId },
-    { match: n => Text.isText(n) && n.highlight === 'pending', at: location }
+    { highlight: undefined },
+    { match: n => Text.isText(n) && n.highlight === 'pending', at: [] }
   )
 }
 
@@ -155,9 +157,9 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
   const [ commentText, setCommentText ] = useState<Descendant[]>([])
   const [ commentActive, setCommentActive ] = useState<AnimationState>('Inactive')
   const [ pendingCommentRef, setPendingCommentRef ] = useState<NodeEntry<Node> | null>(null)
-  const [ activeCommentId, setActiveCommentId ] = useState<string | null>(null)
+  const [ openCommentId, setOpenCommentId ] = useState<string | null>(null)
 
-  const addNewComment = useCallback(async (content: string) => {
+  const addComment = useCallback(async (content: string) => {
     const timestamp = Date.now()
     const commentId = timestamp.toString()
     const comment: CommentData = {
@@ -165,6 +167,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
       content,
       timestamp
     }
+    console.log('comment being added', comment)
     const comments = hybridDoc?.comments.concat(comment)
     await save({ comments }, id, setRecentlySaved)
     await mutate()
@@ -172,10 +175,10 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
   }, [hybridDoc, pendingCommentRef])
 
   const deleteComment = async () => {
-    if (!activeCommentId) return
-    removeComment(editor, activeCommentId)
+    if (!openCommentId) return
+    removeComment(editor, openCommentId)
 
-    const comments = hybridDoc?.comments.filter((comment) => comment.id !== activeCommentId)
+    const comments = hybridDoc?.comments.filter((comment) => comment.id !== openCommentId)
     await save({ comments }, id, setRecentlySaved)
     await mutate()
 
@@ -195,27 +198,30 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
   }, [hybridDoc, pendingCommentRef])
 
   const cleanCommentState = useCallback(() => {
-    setActiveCommentId(null)
+    setOpenCommentId(null)
     setCommentActive('Inactive')
     setCommentText([])
-  }, [setCommentText, setCommentText, setActiveCommentId])
+  }, [setCommentText, setCommentText, setOpenCommentId])
 
-  const openComment = useCallback((allowBlankState: boolean) => {
+  const openComment = useCallback((isNewComment: boolean) => {
     if (!hybridDoc) return 
 
     const commentId = checkForComment(editor)
     const comment = hybridDoc.comments.find((c) => c.id === commentId)
+    console.log('comment ID', commentId)
+    console.log('comment', comment)
+    console.log('all comments', hybridDoc.comments)
   
     if (commentId && comment && comment.content) {
-      setActiveCommentId(commentId)
+      setOpenCommentId(commentId)
       setCommentText(JSON.parse(comment.content)) 
       setCommentActive('Active')
-    } else if (allowBlankState) {
+    } else if (isNewComment) {
       captureCommentRef(editor, setPendingCommentRef)
       setCommentText([{ type: 'default', children: [{text: ''}]}])
       setCommentActive('Active')
     }
-  }, [hybridDoc, editor, setCommentText, setCommentActive, captureCommentRef, setPendingCommentRef, setActiveCommentId])
+  }, [hybridDoc, editor, setCommentText, setCommentActive, captureCommentRef, setPendingCommentRef, setOpenCommentId])
 
   const debouncedSave = useDebouncedCallback((data: Partial<DocumentData>) => {
     save(data, id, setRecentlySaved)
@@ -267,10 +273,11 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
              relative max-w-[740px] min-w-[calc(100vw_-_40px)] md:min-w-[0px] pb-10`}>
             { showSpinner && <Loader/> }
             { hybridDoc && 
-              <Editor id={id} text={JSON.parse(hybridDoc.content)}
+              <Editor id={id} 
+                text={JSON.parse(hybridDoc.content)}
                 editor={editor}
                 commentActive={commentActive !== 'Inactive'}
-                activeCommentId={activeCommentId}
+                openCommentId={openCommentId}
                 openComment={openComment}
                 title={hybridDoc.title} 
                 onUpdate={(data) => {
@@ -283,17 +290,17 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
           <div className={`duration-500 transition-flex ${commentActive !== 'Inactive' ? 'flex-[0]' : 'flex-1'}`}/>
          { commentActive === 'Complete' && 
           <CommentEditor 
-            isPending={!Boolean(activeCommentId)} 
+            comment={commentText}
+            isPending={!Boolean(openCommentId)} 
             onSubmit={(text) => {
-              activeCommentId ? updateComment(text, activeCommentId) : addNewComment(text)            
+              openCommentId ? updateComment(text, openCommentId) : addComment(text)            
               cleanCommentState()
             }}
-            deleteComment={deleteComment}
             onCancel={() => {
               cleanCommentState()
               if (pendingCommentRef) cancelComment(editor, pendingCommentRef[1])
             }}
-            comment={commentText}
+            deleteComment={deleteComment}
           />
          }
         </div> 
