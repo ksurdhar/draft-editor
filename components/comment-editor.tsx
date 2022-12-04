@@ -27,7 +27,7 @@ const CommentEditor = ({ onSubmit, onCancel, deleteComment, comment, isPending }
 
   return (
     <div className={`flex flex-1 flex-col h-[75vh] justify-center m-[10px]`}>
-      <div className={`fixed pl-8 pr-8 w-[calc(100vw_-_770px)] border-l border-l-gray-700 h-[50%] flex flex-col justify-end`} ref={containerRef}>
+      <div className={`fixed pl-8 pr-8 w-[-webkit-fill-available] border-l border-l-gray-700 h-[50%] flex flex-col justify-end max-w-[740px]`} ref={containerRef}>
         <div className={`flex flex-col justify-center h-[calc(100%_-_56px)]`}>
           <div className={`h-[fit-content] overflow-y-scroll justify-center`}>
             <Slate editor={editor} value={text} 

@@ -180,10 +180,11 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
             <CloudIcon className='animate-bounce fill-black/[.10] md:fill-black/[.15] h-[20px] w-[20px] md:h-[24px] md:w-[24px] self-center'/>
           </div>
         )}
-        <div className={`flex h-[calc(100vh_-_64px)] overflow-y-scroll pb-10 p-[20px] mt-[64px] text-black/[.79] font-editor2`}>
-          <div className={`duration-500 transition-flex ${commentActive !== 'Inactive' ? 'flex-[0]' : 'flex-1'}`}/>
-          <div className={`flex ease-in ${showSpinner ? 'justify-center flex-col mt-[-36px]' : ''}
-             relative max-w-[740px] min-w-[calc(100vw_-_40px)] md:min-w-[0px] pb-10`}>
+        <div className={`flex justify-center h-[calc(100vh_-_64px)] overflow-y-scroll pb-10 p-[20px] mt-[64px] text-black/[.79] font-editor2`}>
+          <div className={`
+              duration-500 transition-flex
+              flex ease-in ${showSpinner ? 'justify-center flex-col mt-[-36px]' : ''}
+              relative max-w-[740px] min-w-[calc(100vw_-_40px)] md:min-w-[0px] pb-10`}>
             { showSpinner && <Loader/> }
             { hybridDoc && 
               <Editor id={id} 
@@ -201,22 +202,25 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
               />
             }
           </div>
-          <div className={`duration-500 transition-flex ${commentActive !== 'Inactive' ? 'flex-[0]' : 'flex-1'}`}/>
-         { commentActive === 'Complete' && 
-          <CommentEditor 
-            comment={commentText}
-            isPending={!Boolean(openCommentId)} 
-            onSubmit={(text) => {
-              openCommentId ? updateComment(text, openCommentId) : addComment(text)            
-              cleanCommentState()
-            }}
-            onCancel={() => {
-              cleanCommentState()
-              if (pendingCommentRef) cancelComment(editor)
-            }}
-            deleteComment={deleteComment}
-          />
-         }
+          <div className={`
+            duration-500 transition-flex ${commentActive !== 'Inactive' ? 'flex-[1]' : 'flex-0'}
+            max-w-[740px]
+          `}>
+          { commentActive === 'Complete' && 
+            <CommentEditor 
+              comment={commentText}
+              isPending={!Boolean(openCommentId)} 
+              onSubmit={(text) => {
+                openCommentId ? updateComment(text, openCommentId) : addComment(text)            
+                cleanCommentState()
+              }}
+              onCancel={() => {
+                cleanCommentState()
+                if (pendingCommentRef) cancelComment(editor)
+              }}
+              deleteComment={deleteComment}
+            />}
+         </div>
         </div> 
       </Layout> 
     </>
