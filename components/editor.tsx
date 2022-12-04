@@ -5,6 +5,7 @@ import { useEditorFades } from './header'
 import { useMouse } from '../pages/_app'
 import Footer from './footer'
 import { DocumentData, WhetstoneEditor } from '../types/globals'
+import { removePending, useEffectOnlyOnce } from '../pages/documents/utils'
 
 type HighlightColor = 'red' | 'orange' | 'green' | 'blue' | 'pending' | 'comment'
 export type DefaultText = { text: string, highlight?: HighlightColor, commentId?: string }
@@ -65,6 +66,10 @@ const Leaf = ({ attributes, leaf, children, openCommentId }: RenderLeafProps) =>
   if (leaf.highlight) {
     highlight = colorMap[leaf.highlight]
   }
+
+  // onmouseover, send my parent the hoveredCommentID
+  // all leaves check for whether their commentID matches
+  // apply a class to all those nodes... 
   
   return (
     <span {...attributes} className={`transition duration-500 ${highlight}`}>
@@ -131,6 +136,13 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, comme
   const [ initFadeIn, fadeOut ] = useEditorFades(!mouseMoved)
 
   useEffect(() => {
+    setTimeout(() => {
+      const foundPending = removePending(editor)
+      console.log('found pending comments to clean', foundPending)
+    }, 200) // timeout is a hack, doesn't trigger onChange without a wait
+  }, [editor])
+
+  useEffect(() => {
     if (title.length === 0) {
       titleRef?.current?.focus()
     }
@@ -164,7 +176,7 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, comme
             const offset = editor.selection?.focus.offset || 0
             const position = editor.selection?.focus.path[0] || 0
             setWordCountAtPos(getWordCountAtPosition(value, position, offset))
-
+            console.log('something changed!')
             const isAstChange = editor.operations.some(
               op => 'set_selection' !== op.type
             )

@@ -10,6 +10,7 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { Loader } from "../../components/loader"
 import { useSpinner } from "../../lib/hooks"
+import { DocumentData } from "../../types/globals"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 

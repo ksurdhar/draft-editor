@@ -3,8 +3,8 @@ import { CloudIcon } from "@heroicons/react/solid"
 import { GetServerSideProps, InferGetServerSidePropsType } from "next"
 import Head from "next/head"
 import Router from "next/router"
-import { Dispatch, SetStateAction, useCallback, useEffect, useRef, useState } from "react"
-import { createEditor, Descendant, Text, Transforms, Editor as SlateEditor, Element, Node, NodeEntry, Location } from "slate"
+import { Dispatch, SetStateAction, useCallback, useEffect, useState } from "react"
+import { createEditor, Descendant, Node, NodeEntry } from "slate"
 import { withHistory } from "slate-history"
 import { withReact } from "slate-react"
 import useSWR from "swr"
@@ -15,7 +15,8 @@ import Layout from "../../components/layout"
 import { Loader } from "../../components/loader"
 import { useSpinner } from "../../lib/hooks"
 import API from "../../lib/utils"
-import { AnimationState, CommentData, DocumentData, WhetstoneEditor } from "../../types/globals"
+import { AnimationState, CommentData, DocumentData } from "../../types/globals"
+import { cancelComment, captureCommentRef, checkForComment, commitComment, removeComment } from "./utils"
 
 export const getServerSideProps: GetServerSideProps = async ({ params }) => {
   return {
@@ -50,67 +51,6 @@ const useSyncHybridDoc = (id: string, databaseDoc: DocumentData | undefined, set
   }, [databaseDoc, setHybridDoc])
 }
 
-const captureCommentRef = (editor: WhetstoneEditor, setPendingCommentRef: Dispatch<SetStateAction<NodeEntry<Node> | null>>) => {
-  Transforms.setNodes(
-    editor,
-    { highlight: 'pending' },
-    { match: n => Text.isText(n), split: true } // do we want split here?
-  )
-
-  const [match] = SlateEditor.nodes(editor, {
-    match: n => Text.isText(n) && n.highlight === 'pending',
-    universal: true,
-  })
-  console.log('pending ref', match)
-  setPendingCommentRef(match)
-}
-
-const commitComment = (editor: WhetstoneEditor, location: Location, commentId: string) => {
-  console.log('location', location)
-  Transforms.setNodes(
-    editor,
-    { highlight: 'comment', commentId },
-    { match: n => Text.isText(n) && n.highlight === 'pending', at: [] }
-  )
-  removePending(editor) // helps clean up
-}
-
-const checkForComment = (editor: WhetstoneEditor) => {
-  const [match] = SlateEditor.nodes(editor, {
-    match: n => Text.isText(n) && n.highlight === 'comment',
-    at: editor.selection?.focus
-  })
-  if (!!match) {
-    const textNode = match[0] as DefaultText
-    return textNode.commentId
-  }
-  return null
-}
-
-const removeComment = (editor: WhetstoneEditor, commentId: string) => {
-  Transforms.setNodes(
-    editor,
-    { highlight: undefined, commentId: undefined },
-    { match: n => Text.isText(n) && n.commentId === commentId, at: [] }
-  )
-}
-
-const removePending = (editor: WhetstoneEditor) => {
-  Transforms.setNodes(
-    editor,
-    { highlight: undefined },
-    { match: n => Text.isText(n) && n.highlight === 'pending', at: [] }
-  )
-}
-
-const cancelComment = (editor: WhetstoneEditor, location: Location) => {
-  Transforms.setNodes(
-    editor,
-    { highlight: undefined },
-    { match: n => Text.isText(n) && n.highlight === 'pending', at: [] }
-  )
-}
-
 const save = async (data: Partial<DocumentData>, id: string, setRecentlySaved: (bool: boolean) => void) => {
   const updatedData = {
     ...data,
@@ -126,28 +66,13 @@ const save = async (data: Partial<DocumentData>, id: string, setRecentlySaved: (
   setRecentlySaved(true)
 }
 
-const useEffectOnlyOnce = (callback: any, dependencies: any, condition: any) => {
-  const calledOnce = useRef(false);
-
-  useEffect(() => {
-    if (calledOnce.current) {
-      return;
-    }
-
-    if (condition(dependencies)) {
-      callback(dependencies)
-
-      calledOnce.current = true
-    }
-  }, [callback, condition, dependencies])
-}
-
 export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof getServerSideProps>) {  
   const [ editor ] = useState(() => withReact(withHistory(createEditor())))
   
   const { data: databaseDoc, mutate } = useSWR<DocumentData>(`/api/documents/${id}`, fetcher) 
   const [ hybridDoc, setHybridDoc ] = useState<DocumentData | null>()
   useSyncHybridDoc(id, databaseDoc, setHybridDoc)
+
   const showSpinner = useSpinner(!hybridDoc)
   
   const { user, isLoading } = useUser()
@@ -167,7 +92,6 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
       content,
       timestamp
     }
-    console.log('comment being added', comment)
     const comments = hybridDoc?.comments.concat(comment)
     await save({ comments }, id, setRecentlySaved)
     await mutate()
@@ -208,9 +132,6 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
 
     const commentId = checkForComment(editor)
     const comment = hybridDoc.comments.find((c) => c.id === commentId)
-    console.log('comment ID', commentId)
-    console.log('comment', comment)
-    console.log('all comments', hybridDoc.comments)
   
     if (commentId && comment && comment.content) {
       setOpenCommentId(commentId)
@@ -246,14 +167,6 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
     }, 250)
   }, [isLoading, setInitAnimate])
 
-  useEffectOnlyOnce(
-    () => {
-      console.log('on mount after document is truthy')
-      setTimeout(() => removePending(editor), 0)
-    }, [hybridDoc], 
-    () => hybridDoc !== null
-  )
-
   return (
     <>
       <Head>
@@ -281,6 +194,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
                 openComment={openComment}
                 title={hybridDoc.title} 
                 onUpdate={(data) => {
+                  console.log('update')
                   debouncedSave(data)
                   mutate()
                 }}
@@ -298,7 +212,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
             }}
             onCancel={() => {
               cleanCommentState()
-              if (pendingCommentRef) cancelComment(editor, pendingCommentRef[1])
+              if (pendingCommentRef) cancelComment(editor)
             }}
             deleteComment={deleteComment}
           />
