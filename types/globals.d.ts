@@ -8,6 +8,9 @@ type DocumentData = {
   content: string
   comments: CommentData[]
   lastUpdated: number
+  userId: string
+  edit: string[]
+  view: string[]
 }
 
 type CommentData = {

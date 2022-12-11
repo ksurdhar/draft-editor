@@ -31,7 +31,14 @@ const backdropStyles = `
   transition-opacity ease-in-out duration-[3000ms]
 `
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json())
+const fetcher = async (url: string) => {
+  const res = await fetch(url)
+  if (!res.ok) {
+    const { error: errorMessage } = await res.json()
+    throw new Error(errorMessage)
+  }
+  return res.json()
+}
 
 const useSyncHybridDoc = (id: string, databaseDoc: DocumentData | undefined, setHybridDoc: Dispatch<SetStateAction<DocumentData | null | undefined>>) => {
   useEffect(() => {
@@ -69,9 +76,11 @@ const save = async (data: Partial<DocumentData>, id: string, setRecentlySaved: (
 export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof getServerSideProps>) {  
   const [ editor ] = useState(() => withReact(withHistory(createEditor())))
   
-  const { data: databaseDoc, mutate } = useSWR<DocumentData>(`/api/documents/${id}`, fetcher) 
+  const { data: databaseDoc, error, mutate } = useSWR<DocumentData, Error>(`/api/documents/${id}`, fetcher) 
   const [ hybridDoc, setHybridDoc ] = useState<DocumentData | null>()
   useSyncHybridDoc(id, databaseDoc, setHybridDoc)
+
+  console.log('error?', error)
 
   const showSpinner = useSpinner(!hybridDoc)
   
@@ -160,12 +169,15 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
 
   useEffect(() => {
     if (!isLoading && !user) {
-      Router.push('/')
+      // Router.push('/')
+      console.log('no user!')
     }
     setTimeout(() => {
       setInitAnimate(true)
     }, 250)
   }, [isLoading, setInitAnimate])
+
+  if (!isLoading && !user ) return <>you are not authorized to view</>
 
   return (
     <>

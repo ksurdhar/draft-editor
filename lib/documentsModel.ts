@@ -33,7 +33,15 @@ const DocumentSchema = new Mongoose.Schema({
   lastUpdated: {
     type: Mongoose.Schema.Types.Number,
     default: Date.now()
-  }
+  },
+  edit: {
+    type: [Mongoose.Schema.Types.String],
+    default: []
+  },
+  view: {
+    type: [Mongoose.Schema.Types.String],
+    default: []
+  },
 })
 
 // replaces _id with id and removes versionKey when converted to json
@@ -46,9 +54,11 @@ DocumentSchema.set('toJSON', {
 export interface IDoc {
   title: string
   content: string
-  comments: string[]
+  comments: string[] // not quite true
   userId: string
   lastUpdated: number
+  edit: string[]
+  view: string[]
 }
 export interface IDocDocument extends IDoc, Document {}
 export interface IDocModel extends Model<IDocDocument> {}

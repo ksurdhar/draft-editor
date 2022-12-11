@@ -8,7 +8,7 @@ export default withApiAuthRequired(async function documentsHandler(req: NextApiR
 
   switch (method) {
     case 'POST': 
-      const newDocument = await createDocument(req.body)
+      const newDocument = await createDocument(req.body, session?.user.email)
       res.status(200).json(newDocument)
       break
     case 'GET':

@@ -1,19 +1,11 @@
 import Mongoose from 'mongoose'
-import { CommentData } from '../types/globals'
+import { DocumentData } from '../types/globals'
 import Document from './documentsModel'
 
 declare global {
   // allow global `var` declarations
   // eslint-disable-next-line no-var
   var db: Mongoose.Connection | undefined
-}
-
-type DocumentAttributes = {
-  title?: string
-  content?: string
-  userId?: string
-  comments?: CommentData[]
-  lastUpdated?: number
 }
 
 export const getDocuments = async (userId: string) => {
@@ -26,9 +18,16 @@ export const getEverybodysDocuments = async () => {
   return documents.map((document) => document.toJSON())
 }
 
-export const createDocument = async (body: DocumentAttributes) => {
+export const createDocument = async (body: Partial<DocumentData>, userEmail: string) => {
   const defaultContent = JSON.stringify([{ type: 'default', children: [{ text: '', highlight: 'none' }],}])
-  const document = await Document.create({ title: body.title, content: defaultContent, userId: body.userId, comments: [] })
+  const document = await Document.create({ 
+    title: body.title, 
+    content: defaultContent, 
+    userId: body.userId, 
+    comments: [],
+    view: [userEmail],
+    edit: [userEmail] 
+  })
   await document.save()
   return document.toJSON()
 }
@@ -39,7 +38,7 @@ export const getDocument = async (id: string) => {
   return document.toJSON()
 }
 
-export const updateDocument = async (id: string, body: DocumentAttributes) => {
+export const updateDocument = async (id: string, body: Partial<DocumentData>) => {
   // doesn't return new content, but nor does it really need to as of now
   const updatedDocument = await Document.findByIdAndUpdate(id, body)
   if (!updatedDocument) return null
