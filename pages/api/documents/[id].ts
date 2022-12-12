@@ -1,6 +1,6 @@
 import { getSession } from '@auth0/nextjs-auth0'
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { deleteDocument, getDocument, updateDocument } from "../../../lib/apiUtils"
+import { deleteDocument, getDocument, updateDocument } from "../../../lib/mongoUtils"
 import { DocumentData } from '../../../types/globals'
 
 export default async function documentHandler(req: NextApiRequest, res: NextApiResponse) {
@@ -11,7 +11,6 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
     case 'GET':
       const document = await getDocument(query.id.toString()) as DocumentData
       const viewPermissions = document.view && document.view.length > 0
-      console.log('document', document)
       if (viewPermissions) {
         if (session && document.view.includes(session.user.email)) {
           return res.status(200).json(document)
@@ -22,7 +21,7 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
       res.status(200).json(document)
       break
     case 'PATCH':
-      const updatedDocument = await updateDocument(query.id.toString(), req.body) as DocumentData
+      const updatedDocument = await updateDocument(query.id.toString(), JSON.parse(req.body)) as DocumentData
       res.status(200).json(updatedDocument)
       break
     case 'DELETE':

@@ -173,7 +173,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
       <Head>
         <title>{`whetstone - ${hybridDoc?.title}`}</title>
       </Head>
-      <Layout>
+      <Layout documentId={id}>
         <div className={`gradient ${initAnimate ? 'opacity-0' : 'opacity-100' } ${backdropStyles}`}/>
         <div className={`gradient-editor ${initAnimate ? 'opacity-100' : 'opacity-0' } ${backdropStyles}`}/>
         { recentlySaved && (

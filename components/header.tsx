@@ -2,13 +2,12 @@ import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { useUser } from '@auth0/nextjs-auth0'
 import { useEffect, useState } from 'react'
-
-import API, { fetcher } from '../lib/utils'
+import API, { fetcher, updateDoc } from '../lib/utils'
 import { useMouse } from '../pages/_app'
 import Switch from '@mui/material/switch'
 import useSWR from 'swr'
+import useSWRMutation from 'swr/mutation'
 import { DocumentData } from '../types/globals'
-
 
 const useScrollPosition = () => {
   const [scrollPosition, setScrollPosition] = useState(0)
@@ -49,16 +48,16 @@ type HeaderProps = {
   documentId: string
 }
 
-const HeaderComponent = ({ documentId: id}: HeaderProps) => {
+const HeaderComponent = ({ documentId }: HeaderProps) => {
   const { user } = useUser()
-  // console.log('headers concept of a user', user)
   const router = useRouter()
   const [ menuOpen, setMenuOpen ] = useState(false)
 
   const { mouseMoved, hoveringOverMenu } = useMouse()
   const [ initFadeIn, fadeOut ] = useEditorFades(!mouseMoved)
   
-  const { data: databaseDoc, error, mutate } = useSWR<DocumentData, Error>(`/api/documents/${id}`, fetcher) 
+  const { data: databaseDoc } = useSWR<DocumentData, Error>(`/api/documents/${documentId}`, fetcher) 
+  const { trigger } = useSWRMutation(`/api/documents/${documentId}`, updateDoc)
 
   const anyoneCanView = databaseDoc?.view?.length === 0
 
@@ -74,17 +73,14 @@ const HeaderComponent = ({ documentId: id}: HeaderProps) => {
           p-[10px] pt-[48px] text-[20px] text-white z-30`}>
             {
               databaseDoc && user &&
-              <Switch value={anyoneCanView} onChange={(event) => {
+              <Switch checked={anyoneCanView} value={anyoneCanView} onChange={(event) => {
                 if (!user.email) return
-                const newVal = event.currentTarget.value
-                console.log('new value')
-                if (newVal) {
-                  mutate({ ...databaseDoc, view: [] }) // examine options here
-                } 
-                else {
-                  mutate({ ...databaseDoc, view: [ user.email ] })
+                const newVal = event.target.value
+                if (newVal == 'true') {
+                  trigger({ ...databaseDoc, view: [ user.email ] })
+                } else {
+                  trigger({ ...databaseDoc, view: [] })
                 }
-  
               }} />
             }
             

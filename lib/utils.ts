@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { DocumentData } from '../types/globals'
 
 const API = axios.create({
   baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}/`,
@@ -12,6 +13,13 @@ export const fetcher = async (url: string) => {
     throw new Error(errorMessage)
   }
   return res.json()
+}
+
+export async function updateDoc(url: string, { arg }: { arg: any}) {
+  await fetch(url, {
+    method: 'PATCH',
+    body: JSON.stringify(arg)
+  })
 }
 
 export default API
