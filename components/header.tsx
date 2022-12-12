@@ -3,8 +3,12 @@ import { useRouter } from 'next/router'
 import { useUser } from '@auth0/nextjs-auth0'
 import { useEffect, useState } from 'react'
 
-import API from '../lib/utils'
+import API, { fetcher } from '../lib/utils'
 import { useMouse } from '../pages/_app'
+import Switch from '@mui/material/switch'
+import useSWR from 'swr'
+import { DocumentData } from '../types/globals'
+
 
 const useScrollPosition = () => {
   const [scrollPosition, setScrollPosition] = useState(0)
@@ -41,14 +45,23 @@ export const useEditorFades = (isMouseStill: boolean) => {
   return [initFadeIn, fadeOut]
 }
 
-const HeaderComponent = () => {
+type HeaderProps = {
+  documentId: string
+}
+
+const HeaderComponent = ({ documentId: id}: HeaderProps) => {
   const { user } = useUser()
+  // console.log('headers concept of a user', user)
   const router = useRouter()
   const [ menuOpen, setMenuOpen ] = useState(false)
 
   const { mouseMoved, hoveringOverMenu } = useMouse()
   const [ initFadeIn, fadeOut ] = useEditorFades(!mouseMoved)
   
+  const { data: databaseDoc, error, mutate } = useSWR<DocumentData, Error>(`/api/documents/${id}`, fetcher) 
+
+  const anyoneCanView = databaseDoc?.view?.length === 0
+
   return (
     <>
       <header className={`${initFadeIn ? 'header-gradient' : 'bg-transparent'} ${fadeOut && !menuOpen ? 'opacity-0' : 'opacity-100'} hover:opacity-100 transition-opacity duration-700 fixed top-0 w-[100vw] z-[39] flex flex-row p-5 pb-[30px] justify-between`}>
@@ -59,6 +72,23 @@ const HeaderComponent = () => {
       <div className='fixed top-0 right-0 z-40'>
         <div className={`${router.pathname === '/documents' ? 'bg-menu' : 'bg-menu-dark'} transition-[right] ease-in-out duration-500 absolute top-0 ${menuOpen ? 'right-0' : 'right-[-500px]'} h-[100vh] min-w-[300px] 
           p-[10px] pt-[48px] text-[20px] text-white z-30`}>
+            {
+              databaseDoc && user &&
+              <Switch value={anyoneCanView} onChange={(event) => {
+                if (!user.email) return
+                const newVal = event.currentTarget.value
+                console.log('new value')
+                if (newVal) {
+                  mutate({ ...databaseDoc, view: [] }) // examine options here
+                } 
+                else {
+                  mutate({ ...databaseDoc, view: [ user.email ] })
+                }
+  
+              }} />
+            }
+            
+
           <div className={'hover:bg-white/[.3] cursor-pointer p-2 px-[20px] pl-[26px]'}
             onClick={async () => {
               setMenuOpen(!menuOpen)

@@ -5,4 +5,13 @@ const API = axios.create({
   responseType: 'json'
 })
 
+export const fetcher = async (url: string) => {
+  const res = await fetch(url)
+  if (!res.ok) {
+    const { error: errorMessage } = await res.json()
+    throw new Error(errorMessage)
+  }
+  return res.json()
+}
+
 export default API

@@ -14,9 +14,9 @@ import Editor, { DefaultText } from "../../components/editor"
 import Layout from "../../components/layout"
 import { Loader } from "../../components/loader"
 import { useSpinner } from "../../lib/hooks"
-import API from "../../lib/utils"
+import API, { fetcher } from "../../lib/utils"
 import { AnimationState, CommentData, DocumentData } from "../../types/globals"
-import { cancelComment, captureCommentRef, checkForComment, commitComment, removeComment } from "./utils"
+import { cancelComment, captureCommentRef, checkForComment, commitComment, removeComment } from "./slateUtils"
 
 export const getServerSideProps: GetServerSideProps = async ({ params }) => {
   return {
@@ -30,15 +30,6 @@ const backdropStyles = `
   fixed top-0 left-0 h-screen w-screen z-[-1]
   transition-opacity ease-in-out duration-[3000ms]
 `
-
-const fetcher = async (url: string) => {
-  const res = await fetch(url)
-  if (!res.ok) {
-    const { error: errorMessage } = await res.json()
-    throw new Error(errorMessage)
-  }
-  return res.json()
-}
 
 const useSyncHybridDoc = (id: string, databaseDoc: DocumentData | undefined, setHybridDoc: Dispatch<SetStateAction<DocumentData | null | undefined>>) => {
   useEffect(() => {
@@ -79,8 +70,6 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
   const { data: databaseDoc, error, mutate } = useSWR<DocumentData, Error>(`/api/documents/${id}`, fetcher) 
   const [ hybridDoc, setHybridDoc ] = useState<DocumentData | null>()
   useSyncHybridDoc(id, databaseDoc, setHybridDoc)
-
-  console.log('error?', error)
 
   const showSpinner = useSpinner(!hybridDoc)
   
@@ -177,7 +166,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
     }, 250)
   }, [isLoading, setInitAnimate])
 
-  if (!isLoading && !user ) return <>you are not authorized to view</>
+  // if (!isLoading && !user ) return <>you are not authorized to view</>
 
   return (
     <>

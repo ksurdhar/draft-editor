@@ -11,7 +11,7 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
     case 'GET':
       const document = await getDocument(query.id.toString()) as DocumentData
       const viewPermissions = document.view && document.view.length > 0
-
+      console.log('document', document)
       if (viewPermissions) {
         if (session && document.view.includes(session.user.email)) {
           return res.status(200).json(document)
