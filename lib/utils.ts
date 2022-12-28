@@ -1,5 +1,4 @@
 import axios from 'axios'
-import { DocumentData } from '../types/globals'
 
 const API = axios.create({
   baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}/`,
