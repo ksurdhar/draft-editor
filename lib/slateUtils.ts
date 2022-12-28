@@ -1,7 +1,7 @@
 import { Dispatch, SetStateAction, useEffect, useRef } from "react"
 import { NodeEntry, Transforms, Editor as SlateEditor, Node, Text, Location } from "slate"
-import { DefaultText } from "../../components/editor"
-import { WhetstoneEditor } from "../../types/globals"
+import { DefaultText } from "../components/editor"
+import { WhetstoneEditor } from "../types/globals"
 
 export const useEffectOnlyOnce = (callback: any, dependencies: any, condition: any) => {
   const calledOnce = useRef(false)

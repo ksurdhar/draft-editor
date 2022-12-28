@@ -5,7 +5,7 @@ import { useEditorFades } from './header'
 import { useMouse } from '../pages/_app'
 import Footer from './footer'
 import { DocumentData, WhetstoneEditor } from '../types/globals'
-import { removePending } from '../pages/documents/slateUtils'
+import { removePending } from '../lib/slateUtils'
 
 type HighlightColor = 'red' | 'orange' | 'green' | 'blue' | 'pending' | 'comment'
 export type DefaultText = { text: string, highlight?: HighlightColor, commentId?: string }

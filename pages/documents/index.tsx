@@ -1,6 +1,6 @@
 import { DotsHorizontalIcon } from "@heroicons/react/solid"
 import Layout from "../../components/layout"
-import API from "../../lib/utils"
+import API from "../../lib/httpUtils"
 import { withPageAuthRequired } from "@auth0/nextjs-auth0"
 import useSWR, { useSWRConfig } from "swr"
 import { format } from "date-fns"
