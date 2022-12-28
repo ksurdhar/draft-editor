@@ -14,9 +14,9 @@ import Editor, { DefaultText } from "../../components/editor"
 import Layout from "../../components/layout"
 import { Loader } from "../../components/loader"
 import { useSpinner } from "../../lib/hooks"
-import API, { fetcher } from "../../lib/httpUtils"
 import { AnimationState, CommentData, DocumentData } from "../../types/globals"
 import { cancelComment, captureCommentRef, checkForComment, commitComment, removeComment } from "../../lib/slateUtils"
+import API, { fetcher } from "../../lib/httpUtils"
 
 export const getServerSideProps: GetServerSideProps = async ({ params }) => {
   return {

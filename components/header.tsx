@@ -2,12 +2,12 @@ import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { useUser } from '@auth0/nextjs-auth0'
 import { useEffect, useState } from 'react'
-import API, { fetcher, updateDoc } from '../lib/httpUtils'
 import { useMouse } from '../pages/_app'
 import Switch from '@mui/material/Switch'
 import useSWR from 'swr'
 import useSWRMutation from 'swr/mutation'
 import { DocumentData } from '../types/globals'
+import API, { fetcher, updateDoc } from '../lib/httpUtils'
 
 const useScrollPosition = () => {
   const [scrollPosition, setScrollPosition] = useState(0)
@@ -59,7 +59,7 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
   const { data: databaseDoc } = useSWR<DocumentData, Error>(`/api/documents/${documentId}`, fetcher) 
   const { trigger } = useSWRMutation(`/api/documents/${documentId}`, updateDoc)
 
-  const anyoneCanView = databaseDoc?.view.length === 0
+  const anyoneCanView = databaseDoc?.view?.length === 0
 
   return (
     <>
