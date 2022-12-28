@@ -15,10 +15,7 @@ export const fetcher = async (url: string) => {
 }
 
 export async function updateDoc(url: string, { arg }: { arg: any}) {
-  await fetch(url, {
-    method: 'PATCH',
-    body: JSON.stringify(arg)
-  })
+  await API.patch(url, arg)
 }
 
 export default API

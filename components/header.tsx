@@ -59,7 +59,7 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
   const { data: databaseDoc } = useSWR<DocumentData, Error>(`/api/documents/${documentId}`, fetcher) 
   const { trigger } = useSWRMutation(`/api/documents/${documentId}`, updateDoc)
 
-  const anyoneCanView = databaseDoc?.view?.length === 0
+  const anyoneCanView = databaseDoc?.view.length === 0
 
   return (
     <>
@@ -76,7 +76,7 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
               <Switch checked={anyoneCanView} value={anyoneCanView} onChange={(event) => {
                 if (!user.email) return
                 const newVal = event.target.value
-                if (newVal == 'true') {
+                if (newVal === 'true') {
                   trigger({ ...databaseDoc, view: [ user.email ] })
                 } else {
                   trigger({ ...databaseDoc, view: [] })

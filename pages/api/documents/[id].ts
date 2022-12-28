@@ -10,7 +10,7 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
   switch (method) {
     case 'GET':
       const document = await getDocument(query.id.toString()) as DocumentData
-      const viewPermissions = document.view && document.view.length > 0
+      const viewPermissions = document.view.length > 0
       if (viewPermissions) {
         if (session && document.view.includes(session.user.email)) {
           return res.status(200).json(document)
@@ -21,7 +21,7 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
       res.status(200).json(document)
       break
     case 'PATCH':
-      const updatedDocument = await updateDocument(query.id.toString(), JSON.parse(req.body)) as DocumentData
+      const updatedDocument = await updateDocument(query.id.toString(), req.body) as DocumentData
       res.status(200).json(updatedDocument)
       break
     case 'DELETE':

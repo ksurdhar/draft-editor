@@ -144,6 +144,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
 
   const debouncedSave = useDebouncedCallback((data: Partial<DocumentData>) => {
     save(data, id, setRecentlySaved)
+    mutate()
   }, 1000)
 
   useEffect(() => {
@@ -198,7 +199,6 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
                 onUpdate={(data) => {
                   console.log('update')
                   debouncedSave(data)
-                  mutate()
                 }}
               />
             }
