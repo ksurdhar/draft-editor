@@ -9,6 +9,16 @@ import useSWRMutation from 'swr/mutation'
 import { DocumentData } from '../types/globals'
 import API, { fetcher, updateDoc } from '../lib/httpUtils'
 
+import * as React from 'react'
+
+import Box from '@mui/material/Box'
+import Drawer from '@mui/material/Drawer'
+import List from '@mui/material/List'
+import Divider from '@mui/material/Divider'
+import ListItem from '@mui/material/ListItem'
+import ListItemButton from '@mui/material/ListItemButton'
+import ListItemText from '@mui/material/ListItemText'
+
 const useScrollPosition = () => {
   const [scrollPosition, setScrollPosition] = useState(0)
 
@@ -51,7 +61,20 @@ type HeaderProps = {
 const HeaderComponent = ({ documentId }: HeaderProps) => {
   const { user } = useUser()
   const router = useRouter()
+
   const [ menuOpen, setMenuOpen ] = useState(false)
+
+  const toggleDrawer = (open: boolean) => (event: React.KeyboardEvent | React.MouseEvent) => {
+    console.log('open', open)
+    if (
+      event.type === 'keydown' &&
+      ((event as React.KeyboardEvent).key === 'Tab' ||
+        (event as React.KeyboardEvent).key === 'Shift')
+    ) {
+      return
+    }
+    setMenuOpen(open)
+  }
 
   const { mouseMoved, hoveringOverMenu } = useMouse()
   const [ initFadeIn, fadeOut ] = useEditorFades(!mouseMoved)
@@ -67,58 +90,69 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
         <h1 className='lowercase'><Link href={'/'}>Whetstone</Link></h1>
       </header>
 
-      {/* drawer menu */}
-      <div className='fixed top-0 right-0 z-40'>
-        <div className={`${router.pathname === '/documents' ? 'bg-menu' : 'bg-menu-dark'} transition-[right] ease-in-out duration-500 absolute top-0 ${menuOpen ? 'right-0' : 'right-[-500px]'} h-[100vh] min-w-[300px] 
-          p-[10px] pt-[48px] text-[20px] text-white z-30`}>
-            {
-              databaseDoc && user &&
-              <Switch checked={anyoneCanView} value={anyoneCanView} onChange={(event) => {
-                if (!user.email) return
-                const newVal = event.target.value
-                if (newVal === 'true') {
-                  trigger({ ...databaseDoc, view: [ user.email ] })
-                } else {
-                  trigger({ ...databaseDoc, view: [] })
-                }
-              }} />
-            }
-            
-
-          <div className={'hover:bg-white/[.3] cursor-pointer p-2 px-[20px] pl-[26px]'}
-            onClick={async () => {
-              setMenuOpen(!menuOpen)
-              try {
-                const res = await API.post(`/api/documents`, { userId: user?.sub })
-                const documentId = res.data.id
-                router.push(`/documents/${documentId}`)
-              } catch (e) {
-                console.log(e)
-              }
-            }}>
-            Create Document
-          </div>
-          <div className={'hover:bg-white/[.3] cursor-pointer p-2 px-[20px] pl-[26px]'}
-            onClick={() => {
-              router.push('/documents')
-              setMenuOpen(!menuOpen)
-            }}>
-            All Documents
-          </div>
-          <Link href='/api/auth/logout'>
-            <div className={'hover:bg-white/[.3] cursor-pointer p-2 px-[20px] pl-[26px]'}>
-              Sign Out
-            </div>
-          </Link>
-        </div>
-      </div>
-
       <div className={`${fadeOut && !hoveringOverMenu && !menuOpen ? 'opacity-0' : 'opacity-100'} transition-opacity duration-700 flex flex-row-reverse z-50 fixed right-[20px] top-[20px]`}>
-        <div onClick={() => setMenuOpen(!menuOpen)} className={`hamburger hamburger--spin ${ menuOpen ? 'is-active' : ''}`}>
-        <span className="hamburger-box">
-          <span className="hamburger-inner"></span>
-        </span>
-        </div>
+        <React.Fragment>          
+          <div onClick={toggleDrawer(true)} 
+            className={`hamburger hamburger--spin ${ menuOpen ? 'is-active' : ''}`}>
+            <span className="hamburger-box">
+              <span className="hamburger-inner"></span>
+            </span>
+          </div>
+          <Drawer
+            anchor={'right'}
+            open={menuOpen}
+            onClose={toggleDrawer(false)}>
+            <Box
+              sx={{ width: 250, height: '100%', backgroundColor: '#f1f5f9', fontFamily: 'Mukta' }}
+              role="presentation"
+              onClick={toggleDrawer(false)}
+              onKeyDown={toggleDrawer(false)}>
+              <List>
+              { databaseDoc && user &&
+                <Switch checked={anyoneCanView} value={anyoneCanView} onChange={(event) => {
+                  if (!user.email) return
+                  const newVal = event.target.value
+                  if (newVal === 'true') {
+                    trigger({ ...databaseDoc, view: [ user.email ] })
+                  } else {
+                    trigger({ ...databaseDoc, view: [] })
+                  }
+                }} />
+              }
+                <ListItem disablePadding>
+                  <ListItemButton onClick={async () => {
+                    setMenuOpen(!menuOpen)
+                    try {
+                      const res = await API.post(`/api/documents`, { userId: user?.sub })
+                      const documentId = res.data.id
+                      router.push(`/documents/${documentId}`)
+                    } catch (e) {
+                      console.log(e)
+                    }
+                  }}>
+                    <ListItemText primary={'Create Document'} sx={{ fontFamily: 'Mukta' }}/>
+                  </ListItemButton>
+                </ListItem>
+                <ListItem disablePadding>
+                  <ListItemButton onClick={() => {
+                    router.push('/documents')
+                    setMenuOpen(!menuOpen)
+                  }}>
+                    <ListItemText primary={'Documents'} />
+                  </ListItemButton>
+                </ListItem>
+                <ListItem disablePadding>
+                  <Link href='/api/auth/logout'>
+                    <ListItemButton>
+                      <ListItemText primary={'Sign Out'} />
+                    </ListItemButton>
+                  </Link>
+                </ListItem>
+              </List>
+              <Divider />
+            </Box>
+          </Drawer>
+        </React.Fragment>
       </div>
     </>
   )
