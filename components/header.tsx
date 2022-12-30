@@ -18,6 +18,7 @@ import Divider from '@mui/material/Divider'
 import ListItem from '@mui/material/ListItem'
 import ListItemButton from '@mui/material/ListItemButton'
 import ListItemText from '@mui/material/ListItemText'
+import ShareModal from './shareModal'
 
 const useScrollPosition = () => {
   const [scrollPosition, setScrollPosition] = useState(0)
@@ -65,7 +66,6 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
   const [ menuOpen, setMenuOpen ] = useState(false)
 
   const toggleDrawer = (open: boolean) => (event: React.KeyboardEvent | React.MouseEvent) => {
-    console.log('open', open)
     if (
       event.type === 'keydown' &&
       ((event as React.KeyboardEvent).key === 'Tab' ||
@@ -76,6 +76,10 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
     setMenuOpen(open)
   }
 
+  const [isShareModalOpen, setIsShareModalOpen] = React.useState(false)
+  const openShareModal = () => setIsShareModalOpen(true)
+  const closeShareModal = () => setIsShareModalOpen(false)
+  
   const { mouseMoved, hoveringOverMenu } = useMouse()
   const [ initFadeIn, fadeOut ] = useEditorFades(!mouseMoved)
   
@@ -150,8 +154,24 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
                 </ListItem>
               </List>
               <Divider />
+              { databaseDoc && user &&  
+                <List>
+                  <ListItem disablePadding>
+                    <ListItemButton onClick={openShareModal}>
+                      <ListItemText primary={'Share'}/>
+                    </ListItemButton>
+                  </ListItem>
+                </List>
+              }
             </Box>
           </Drawer>
+          { databaseDoc && user &&  
+            <ShareModal 
+              open={isShareModalOpen} 
+              onClose={closeShareModal} 
+              document={databaseDoc}
+            />
+          }
         </React.Fragment>
       </div>
     </>
