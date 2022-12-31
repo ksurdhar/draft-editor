@@ -26,10 +26,25 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
           return res.status(400).send({ error: 'you do not have the permissions to view this file' })
         }
       }
+      document.canComment = document.comment.length === 0
+      document.canEdit = document.edit.length === 0
+
       res.status(200).json(document)
       break
     case 'PATCH':
-      // check to see whether user has permission to update
+      const oGDoc = await getDocument(query.id.toString()) as DocumentData
+      const isOGRestricted = oGDoc.view.length > 0
+      const inOGComment = oGDoc.comment.includes(session?.user.email)
+      const inOGEdit = oGDoc.edit.includes(session?.user.email)
+      
+      if (isOGRestricted) {
+        if (inOGComment || inOGEdit) {
+          const updatedDocument = await updateDocument(query.id.toString(), req.body) as DocumentData
+          res.status(200).json(updatedDocument)
+        } else {
+          return res.status(400).send({ error: 'you do not have the permissions to modify this file' })
+        }
+      }
       const updatedDocument = await updateDocument(query.id.toString(), req.body) as DocumentData
       res.status(200).json(updatedDocument)
       break
