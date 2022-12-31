@@ -41,7 +41,7 @@ export const getDocument = async (id: string) => {
 
 export const updateDocument = async (id: string, body: Partial<DocumentData>) => {
   // doesn't return new content, but nor does it really need to as of now
-  const updatedDocument = await Document.findByIdAndUpdate(id, body)
+  const updatedDocument = await Document.findByIdAndUpdate(id, body, {returnDocument: 'after'})
   if (!updatedDocument) return null
   return updatedDocument.toJSON()
 }

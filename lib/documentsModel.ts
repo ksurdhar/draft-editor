@@ -46,6 +46,10 @@ const DocumentSchema = new Mongoose.Schema({
     type: [Mongoose.Schema.Types.String],
     default: []
   },
+  coment: {
+    type: [Mongoose.Schema.Types.String],
+    default: []
+  },
 })
 
 // replaces _id with id and removes versionKey when converted to json
@@ -64,6 +68,7 @@ export interface IDoc {
   view: string[]
   edit: string[]
   comment: string[]
+  coment: string[]
 }
 export interface IDocDocument extends IDoc, Document {}
 export interface IDocModel extends Model<IDocDocument> {}

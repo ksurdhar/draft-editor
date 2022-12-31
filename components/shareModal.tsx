@@ -1,9 +1,12 @@
-import { Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, TextField, FormControl, MenuItem, Select, Box, IconButton, Switch, FormGroup, FormControlLabel } from '@mui/material'
+import { Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, TextField, FormControl, MenuItem, Select, Box, IconButton } from '@mui/material'
 import { useState } from 'react'
 import { DocumentData } from '../types/globals'
-import AddIcon from '@mui/icons-material/Add';
-import RemoveIcon from '@mui/icons-material/Remove';
-import {  useUser } from '@auth0/nextjs-auth0';
+import AddIcon from '@mui/icons-material/Add'
+import RemoveIcon from '@mui/icons-material/Remove'
+import {  useUser } from '@auth0/nextjs-auth0'
+import { updateDoc } from '../lib/httpUtils'
+import useSWRMutation from 'swr/mutation'
+
 
 interface ShareModalProps {
   open: boolean
@@ -24,17 +27,29 @@ interface ShareUser {
 
 const ShareModal = ({ open, onClose, document }: ShareModalProps) => {
   const { user } = useUser()
+  const { trigger } = useSWRMutation(`/api/documents/${document.id}`, updateDoc)
 
   const initialUsers: ShareUser[] = []
-  document.comment?.forEach((email) => initialUsers.push({ email, permission: Permission.Comment }))
-  document.edit?.forEach((email) => initialUsers.push({ email, permission: Permission.Edit }))
-  document.view?.forEach((email) => initialUsers.push({ email, permission: Permission.View }))
+  document.comment.forEach((email) => initialUsers.push({ email, permission: Permission.Comment }))
+  document.edit.forEach((email) => initialUsers.push({ email, permission: Permission.Edit }))
+  document.view.forEach((email) => initialUsers.push({ email, permission: Permission.View }))
   const [ users, setUsers ] = useState<ShareUser[]>(initialUsers.filter((usr) => user?.email !== usr.email))
 
-  const [ isRestricted, setIsRestricted] = useState(document?.view?.length > 0 || true)
-  const [ globalPermission, setGlobalPermission ] = useState(Permission.View)
+  const [ isRestricted, setIsRestricted] = useState(document.view.length > 0)
+
+  let initialGlobalPermission = Permission.Edit
+  if (document.edit.length > 0 && document.comment.length === 0) {
+    initialGlobalPermission = Permission.Comment
+  }
+  if (document.edit.length > 0 && document.comment.length > 0) {
+    initialGlobalPermission = Permission.View
+  }
+
+  const [ globalPermission, setGlobalPermission ] = useState(initialGlobalPermission)
   const [ permission, setPermission ] = useState(Permission.View)
   const [ email, setEmail] = useState('')
+
+  if (!user) return <></>
 
   return (
     <Dialog open={open} onClose={onClose}>
@@ -124,14 +139,68 @@ const ShareModal = ({ open, onClose, document }: ShareModalProps) => {
              </Box>
            </Box>
           }
-         
-          
-
         </Box>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Copy Link</Button>
-        <Button onClick={onClose}>Done</Button>
+        <Button onClick={async () => {
+
+          const view: string[] = []
+          const comment: string[] = []
+          const edit: string[] = []
+
+          if (isRestricted) {
+            view.push(user.email as string)
+            comment.push(user.email as string)
+            edit.push(user.email as string)
+
+            users.forEach((usr) => {
+              switch (usr.permission) {
+                case Permission.View: {
+                  view.push(usr.email)
+                  break
+                }
+                case Permission.Comment: {
+                  comment.push(usr.email)
+                  break
+                }
+                case Permission.Edit: {
+                  edit.push(usr.email)
+                  break
+                }
+              }
+            })
+          } else {
+            switch (globalPermission) {
+              case Permission.View: {
+                edit.push(user.email as string)
+                comment.push(user.email as string)
+                break
+              }
+              case Permission.Comment: {
+                edit.push(user.email as string)
+                break
+              }
+              // Edit case requires empty array
+            }
+          }
+
+          const updatedDoc: DocumentData = { 
+            ...document,
+            comment,
+            edit,
+            view,
+          }
+
+          // console.log('comment', comment)
+          // console.log('edit', edit)
+          // console.log('view', view)
+          // console.log('________________')
+
+          trigger(updatedDoc)
+
+          onClose()
+        }}>Done</Button>
       </DialogActions>
       </Box>
     </Dialog>

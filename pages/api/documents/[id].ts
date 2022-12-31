@@ -21,7 +21,9 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
       res.status(200).json(document)
       break
     case 'PATCH':
+      console.log('REQ BOD', req.body)
       const updatedDocument = await updateDocument(query.id.toString(), req.body) as DocumentData
+      console.log('UPDATED DOC', updatedDocument)
       res.status(200).json(updatedDocument)
       break
     case 'DELETE':
