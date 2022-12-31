@@ -46,10 +46,6 @@ const DocumentSchema = new Mongoose.Schema({
     type: [Mongoose.Schema.Types.String],
     default: []
   },
-  coment: {
-    type: [Mongoose.Schema.Types.String],
-    default: []
-  },
 })
 
 // replaces _id with id and removes versionKey when converted to json

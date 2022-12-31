@@ -12,6 +12,8 @@ type DocumentData = {
   edit: string[]
   view: string[]
   comment: string[]
+  canEdit?: boolean
+  canComment?: boolean
 }
 
 type CommentData = {

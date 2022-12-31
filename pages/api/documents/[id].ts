@@ -10,9 +10,17 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
   switch (method) {
     case 'GET':
       const document = await getDocument(query.id.toString()) as DocumentData
-      const viewPermissions = document.view.length > 0
-      if (viewPermissions) {
-        if (session && document.view.includes(session.user.email)) {
+      const isRestricted = document.view.length > 0
+      const inView = document.view.includes(session?.user.email)
+      const inComment = document.comment.includes(session?.user.email)
+      const inEdit = document.edit.includes(session?.user.email)
+      const userHasPermission = inView || inComment || inEdit
+
+      if (isRestricted) {
+        if (userHasPermission) {
+          document.canComment = inEdit || inComment
+          document.canEdit = inEdit
+
           return res.status(200).json(document)
         } else {
           return res.status(400).send({ error: 'you do not have the permissions to view this file' })
@@ -21,9 +29,8 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
       res.status(200).json(document)
       break
     case 'PATCH':
-      console.log('REQ BOD', req.body)
+      // check to see whether user has permission to update
       const updatedDocument = await updateDocument(query.id.toString(), req.body) as DocumentData
-      console.log('UPDATED DOC', updatedDocument)
       res.status(200).json(updatedDocument)
       break
     case 'DELETE':

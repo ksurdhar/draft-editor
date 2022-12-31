@@ -7,7 +7,6 @@ import {  useUser } from '@auth0/nextjs-auth0'
 import { updateDoc } from '../lib/httpUtils'
 import useSWRMutation from 'swr/mutation'
 
-
 interface ShareModalProps {
   open: boolean
   onClose: () => void
