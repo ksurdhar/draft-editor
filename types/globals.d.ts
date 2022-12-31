@@ -11,6 +11,7 @@ type DocumentData = {
   userId: string
   edit: string[]
   view: string[]
+  comment: string[]
 }
 
 type CommentData = {

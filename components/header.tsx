@@ -170,7 +170,6 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
               open={isShareModalOpen} 
               onClose={closeShareModal} 
               document={databaseDoc}
-              user={user}
             />
           }
         </React.Fragment>
