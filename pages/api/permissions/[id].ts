@@ -1,26 +1,31 @@
 import { getSession } from '@auth0/nextjs-auth0'
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { deletePermission, getPermissionByDoc, updatePermissionByDoc } from "../../../lib/mongoUtils"
+import { getPermissionByDoc, updatePermissionByDoc } from "../../../lib/mongoUtils"
 import { PermissionData } from '../../../types/globals'
 
 export default async function permissionHandler(req: NextApiRequest, res: NextApiResponse) {
   const { query, method } = req
+  const session = getSession(req, res)
+
+  const permission = await getPermissionByDoc(query.id.toString()) as PermissionData
+  const isOwner = permission.ownerId === session?.user.sub
 
   switch (method) {
     case 'GET':
-      const permission = await getPermissionByDoc(query.id.toString()) as PermissionData
-      return res.status(200).json(permission)
-      break
+      if (isOwner) {
+        return res.status(200).json(permission)
+      }
+      return res.status(400).send({ error: 'you do not have the permissions to access this resource' })
+
     case 'PATCH':
-      const updatedPermission = await updatePermissionByDoc(query.id.toString(), req.body) as PermissionData
-      res.status(200).json(updatedPermission)
-      break
-    case 'DELETE':
-      await deletePermission(query.id.toString())
-      res.status(200).json('permission deleted')
-      break
+      if (isOwner) {
+        const updatedPermission = await updatePermissionByDoc(query.id.toString(), req.body) as PermissionData
+        return res.status(200).json(updatedPermission)
+      }
+      return res.status(400).send({ error: 'you do not have the permissions to modify this resource' })
+
     default:
-      res.setHeader('Allow', ['GET', 'PATCH', 'DELETE'])
+      res.setHeader('Allow', ['GET', 'PATCH'])
       res.status(405).end(`Method ${method} Not Allowed`)
   }
 } 

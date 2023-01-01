@@ -8,10 +8,10 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
   const session = getSession(req, res)
 
   const permissions = await getPermissionByDoc(query.id.toString()) as PermissionData
-  const isOwner = permissions.ownerId === session?.user.sub
-  const isRestricted = permissions.globalPermission === UserPermission.None
   const user = permissions.users.find((user) => user.email === session?.user.email)
+  const isOwner = permissions.ownerId === session?.user.sub
 
+  const isRestricted = permissions.globalPermission === UserPermission.None
   const canComment = user && [UserPermission.Comment, UserPermission.Edit].indexOf(user.permission) > -1 || isOwner
   const canEdit = user && user.permission === UserPermission.Edit || isOwner
   const globalEdit = [UserPermission.Comment, UserPermission.Edit].indexOf(permissions.globalPermission) > -1
