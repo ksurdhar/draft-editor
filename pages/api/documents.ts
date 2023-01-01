@@ -1,6 +1,6 @@
 import { getSession, withApiAuthRequired } from '@auth0/nextjs-auth0'
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { createDocument, getDocuments } from "../../lib/mongoUtils"
+import { createDocument, createPermission, getDocuments } from "../../lib/mongoUtils"
 
 export default withApiAuthRequired(async function documentsHandler(req: NextApiRequest, res: NextApiResponse) {
   const { method } = req
@@ -9,6 +9,8 @@ export default withApiAuthRequired(async function documentsHandler(req: NextApiR
   switch (method) {
     case 'POST': 
       const newDocument = await createDocument(req.body, session?.user.email)
+      const docPermissions = await createPermission({ ownerId: session?.user.sub, documentId: newDocument.id })
+      console.log('docPErmissions', docPermissions)
       res.status(200).json(newDocument)
       break
     case 'GET':

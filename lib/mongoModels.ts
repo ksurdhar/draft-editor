@@ -48,8 +48,36 @@ const DocumentSchema = new Mongoose.Schema({
   },
 })
 
+const PermissionSchema = new Mongoose.Schema({
+  documentId: {
+    type: Mongoose.Schema.Types.String,
+    default: '',
+  },
+  ownerId: {
+    type: Mongoose.Schema.Types.String,
+    default: '',
+  },
+  globalPermission: {
+    type: Mongoose.Schema.Types.String,
+    default: '',
+  },
+  users: {
+    type: [{ 
+      email: Mongoose.Schema.Types.String, 
+      permission: Mongoose.Schema.Types.String
+    }],
+    default: []
+  },
+})
+
 // replaces _id with id and removes versionKey when converted to json
 DocumentSchema.set('toJSON', {
+  virtuals: true,
+  versionKey: false,
+  transform: function (doc, ret) { delete ret._id  }
+})
+
+PermissionSchema.set('toJSON', {
   virtuals: true,
   versionKey: false,
   transform: function (doc, ret) { delete ret._id  }
@@ -69,6 +97,6 @@ export interface IDoc {
 export interface IDocDocument extends IDoc, Document {}
 export interface IDocModel extends Model<IDocDocument> {}
 
-const Doc = Mongoose.models && Mongoose.models.Document || Mongoose.model<IDocDocument>('Document', DocumentSchema) 
+export const Doc = Mongoose.models && Mongoose.models.Document || Mongoose.model<IDocDocument>('Document', DocumentSchema) 
 
-export default Doc as IDocModel
+export const Permission = Mongoose.models && Mongoose.models.Permission 
