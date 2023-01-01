@@ -10,7 +10,6 @@ export default withApiAuthRequired(async function documentsHandler(req: NextApiR
     case 'POST': 
       const newDocument = await createDocument(req.body, session?.user.email)
       const docPermissions = await createPermission({ ownerId: session?.user.sub, documentId: newDocument.id })
-      console.log('docPErmissions', docPermissions)
       res.status(200).json(newDocument)
       break
     case 'GET':

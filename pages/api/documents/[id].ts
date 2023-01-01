@@ -1,6 +1,6 @@
 import { getSession } from '@auth0/nextjs-auth0'
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { deleteDocument, getDocument, updateDocument } from "../../../lib/mongoUtils"
+import { deleteDocument, deletePermission, deletePermissionByDoc, getDocument, updateDocument } from "../../../lib/mongoUtils"
 import { DocumentData } from '../../../types/globals'
 
 export default async function documentHandler(req: NextApiRequest, res: NextApiResponse) {
@@ -50,6 +50,8 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
       break
     case 'DELETE':
       await deleteDocument(query.id.toString())
+      await deletePermissionByDoc(query.id.toString())
+
       res.status(200).json('document deleted')
       break
     default:

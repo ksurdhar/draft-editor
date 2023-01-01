@@ -99,4 +99,12 @@ export interface IDocModel extends Model<IDocDocument> {}
 
 export const Doc = Mongoose.models && Mongoose.models.Document || Mongoose.model<IDocDocument>('Document', DocumentSchema) 
 
-export const Permission = Mongoose.models && Mongoose.models.Permission 
+export interface IPermission {
+  globalPermission: string
+  users: string[] // not quite true
+  ownerId: string
+  documentId: string
+}
+export interface IPermissionDocument extends IPermission, Document {}
+export interface IPermissionModel extends Model<IPermissionDocument> {}
+export const Permission = Mongoose.models && Mongoose.models.Permission || Mongoose.model<IPermissionDocument>('Permission', PermissionSchema) 

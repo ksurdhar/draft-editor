@@ -56,14 +56,20 @@ export const getPermission = async (id: string) => {
   return permission.toJSON()
 }
 
+export const getPermissionByDoc = async (documentId: string) => {
+  const permission = await Permission.findOne({ documentId })
+  if (!permission) return null
+  return permission.toJSON()
+}
+
 export const updateDocument = async (id: string, body: Partial<DocumentData>) => {
   const updatedDocument = await Doc.findByIdAndUpdate(id, body, {returnDocument: 'after'})
   if (!updatedDocument) return null
   return updatedDocument.toJSON()
 }
 
-export const updatePermission = async (id: string, body: Partial<PermissionData>) => {
-  const updatedPermission = await Permission.findByIdAndUpdate(id, body, {returnDocument: 'after'})
+export const updatePermissionByDoc = async (documentId: string, body: Partial<PermissionData>) => {
+  const updatedPermission = await Permission.findOneAndUpdate({ documentId }, body, {returnDocument: 'after'})
   if (!updatedPermission) return null
   return updatedPermission.toJSON()
 }
@@ -79,6 +85,14 @@ export const deleteDocument = async (id: string) => {
 export const deletePermission = async (id: string) => {
   try {
     await Permission.deleteOne({ _id: id })
+  } catch (e) {
+    console.log('ERROR:', e)
+  }
+}
+
+export const deletePermissionByDoc = async (documentId: string) => {
+  try {
+    await Permission.findOneAndDelete({ documentId })
   } catch (e) {
     console.log('ERROR:', e)
   }

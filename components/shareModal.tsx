@@ -1,11 +1,12 @@
 import { Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, TextField, FormControl, MenuItem, Select, Box, IconButton } from '@mui/material'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import AddIcon from '@mui/icons-material/Add'
 import RemoveIcon from '@mui/icons-material/Remove'
 import {  useUser } from '@auth0/nextjs-auth0'
-import { updateDoc } from '../lib/httpUtils'
+import { fetcher, updateDoc } from '../lib/httpUtils'
 import useSWRMutation from 'swr/mutation'
-import { DocumentData, ShareUser, UserPermission } from '../types/globals'
+import useSWR from 'swr'
+import { DocumentData, PermissionData, ShareUser, UserPermission } from '../types/globals'
 
 interface ShareModalProps {
   open: boolean
@@ -15,13 +16,21 @@ interface ShareModalProps {
 
 const ShareModal = ({ open, onClose, document }: ShareModalProps) => {
   const { user } = useUser()
-  const { trigger } = useSWRMutation(`/api/documents/${document.id}`, updateDoc)
+  const { trigger } = useSWRMutation(`/api/permissions/${document.id}`, updateDoc)
+  const { data: permissions, isLoading } = useSWR<PermissionData, Error>(`/api/permissions/${document.id}`, fetcher) 
 
   const [ users, setUsers ] = useState<ShareUser[]>([])
   const [ isRestricted, setIsRestricted ] = useState(true)
   const [ globalPermission, setGlobalPermission ] = useState(UserPermission.None)
   const [ permission, setPermission ] = useState(UserPermission.View)
   const [ email, setEmail] = useState('')
+
+  useEffect(() => {
+    if (!permissions) return
+    setUsers(permissions.users)
+    setGlobalPermission(permissions.globalPermission)
+    setIsRestricted(permissions.globalPermission === UserPermission.None)
+  }, [isLoading, permissions])
 
   if (!user) return <></>
 
@@ -127,18 +136,8 @@ const ShareModal = ({ open, onClose, document }: ShareModalProps) => {
       <DialogActions>
         <Button onClick={onClose}>Copy Link</Button>
         <Button onClick={async () => {
-
-          console.log('users', users)
-          console.log('globalPermission', globalPermission)
-          console.log('________________')
-
-          if (!isRestricted) {
-            // ignore users
-          }
-
-          // trigger(updatedDoc)
-
-          // onClose()
+          trigger({ globalPermission, users })
+          onClose()
         }}>Done</Button>
       </DialogActions>
       </Box>
