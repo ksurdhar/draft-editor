@@ -112,17 +112,6 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
               onClick={toggleDrawer(false)}
               onKeyDown={toggleDrawer(false)}>
               <List>
-              { databaseDoc && user &&
-                <Switch checked={anyoneCanView} value={anyoneCanView} onChange={(event) => {
-                  if (!user.email) return
-                  const newVal = event.target.value
-                  if (newVal === 'true') {
-                    trigger({ ...databaseDoc, view: [ user.email ] })
-                  } else {
-                    trigger({ ...databaseDoc, view: [] })
-                  }
-                }} />
-              }
                 <ListItem disablePadding>
                   <ListItemButton onClick={async () => {
                     setMenuOpen(!menuOpen)
