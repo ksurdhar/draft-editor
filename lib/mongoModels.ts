@@ -33,19 +33,7 @@ const DocumentSchema = new Mongoose.Schema({
   lastUpdated: {
     type: Mongoose.Schema.Types.Number,
     default: Date.now()
-  },
-  edit: {
-    type: [Mongoose.Schema.Types.String],
-    default: []
-  },
-  view: {
-    type: [Mongoose.Schema.Types.String],
-    default: []
-  },
-  comment: {
-    type: [Mongoose.Schema.Types.String],
-    default: []
-  },
+  }
 })
 
 const PermissionSchema = new Mongoose.Schema({
@@ -89,10 +77,6 @@ export interface IDoc {
   comments: string[] // not quite true
   userId: string
   lastUpdated: number
-  view: string[]
-  edit: string[]
-  comment: string[]
-  coment: string[]
 }
 export interface IDocDocument extends IDoc, Document {}
 export interface IDocModel extends Model<IDocDocument> {}

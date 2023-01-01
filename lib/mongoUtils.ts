@@ -25,9 +25,6 @@ export const createDocument = async (body: Partial<DocumentData>, userEmail: str
     content: defaultContent, 
     userId: body.userId, 
     comments: [],
-    view: [userEmail],
-    edit: [userEmail],
-    comment: [userEmail], 
   })
   await document.save()
   return document.toJSON()

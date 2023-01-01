@@ -9,9 +9,6 @@ export type DocumentData = {
   comments: CommentData[]
   lastUpdated: number
   userId: string
-  edit: string[]
-  view: string[]
-  comment: string[]
   canEdit?: boolean
   canComment?: boolean
 }

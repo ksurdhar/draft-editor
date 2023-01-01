@@ -64,7 +64,6 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
   const router = useRouter()
 
   const [ menuOpen, setMenuOpen ] = useState(false)
-
   const toggleDrawer = (open: boolean) => (event: React.KeyboardEvent | React.MouseEvent) => {
     if (
       event.type === 'keydown' &&
@@ -84,9 +83,8 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
   const [ initFadeIn, fadeOut ] = useEditorFades(!mouseMoved)
   
   const { data: databaseDoc } = useSWR<DocumentData, Error>(`/api/documents/${documentId}`, fetcher) 
-  const { trigger } = useSWRMutation(`/api/documents/${documentId}`, updateDoc)
 
-  const anyoneCanView = databaseDoc?.view?.length === 0
+  const isOwner = user && databaseDoc && databaseDoc.userId === user.sub
 
   return (
     <>
@@ -143,7 +141,7 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
                 </ListItem>
               </List>
               <Divider />
-              { databaseDoc && user &&  
+              { isOwner &&  
                 <List>
                   <ListItem disablePadding>
                     <ListItemButton onClick={openShareModal}>
@@ -154,7 +152,7 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
               }
             </Box>
           </Drawer>
-          { databaseDoc && user &&  
+          { isOwner &&  
             <ShareModal 
               open={isShareModalOpen} 
               onClose={closeShareModal} 
