@@ -16,7 +16,7 @@ export type DocumentData = {
   canComment?: boolean
 }
 
-type CommentData = {
+export type CommentData = {
   id: string
   timestamp: number
   content: string
@@ -41,6 +41,6 @@ export enum UserPermission {
   None = 'None'
 }
 
-type AnimationState = 'Active' | 'Complete' | 'Inactive'
+export type AnimationState = 'Active' | 'Complete' | 'Inactive'
 
-type WhetstoneEditor = BaseEditor & ReactEditor & HistoryEditor
+export type WhetstoneEditor = BaseEditor & ReactEditor & HistoryEditor

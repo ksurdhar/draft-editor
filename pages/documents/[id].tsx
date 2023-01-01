@@ -158,16 +158,10 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
   }, [commentActive, setCommentActive])
 
   useEffect(() => {
-    if (!isLoading && !user) {
-      // Router.push('/')
-      console.log('no user!')
-    }
     setTimeout(() => {
       setInitAnimate(true)
     }, 250)
   }, [isLoading, setInitAnimate])
-
-  // if (!isLoading && !user ) return <>you are not authorized to view</>
 
   return (
     <>
@@ -197,9 +191,9 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
                 openComment={openComment}
                 title={hybridDoc.title} 
                 onUpdate={(data) => {
-                  console.log('update')
                   debouncedSave(data)
                 }}
+                canEdit={!!hybridDoc.canEdit}
               />
             }
           </div>

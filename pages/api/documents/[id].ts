@@ -8,7 +8,7 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
   const session = getSession(req, res)
 
   const permissions = await getPermissionByDoc(query.id.toString()) as PermissionData
-  const user = permissions.users.find((user) => user.email === session?.user.email)
+  const user = permissions?.users.find((user) => user.email === session?.user.email)
   const isOwner = permissions.ownerId === session?.user.sub
 
   const isRestricted = permissions.globalPermission === UserPermission.None
@@ -32,20 +32,20 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
         }
       } 
 
-      document.canComment = globalComment
-      document.canEdit = globalEdit
+      document.canComment = globalComment || isOwner
+      document.canEdit = globalEdit || isOwner
       res.status(200).json(document)
       break
     case 'PATCH':
       if (isRestricted) {
         if (canComment || canEdit || isOwner) {
           const updatedDocument = await updateDocument(query.id.toString(), req.body) as DocumentData
-          res.status(200).json(updatedDocument)
+          return res.status(200).json(updatedDocument)
         } else {
           return res.status(400).send({ error: 'you do not have the permissions to modify this file' })
         }
       } 
-      if (globalEdit || globalComment) {
+      if (globalEdit || globalComment || isOwner) {
         const updatedDocument = await updateDocument(query.id.toString(), req.body) as DocumentData
         return res.status(200).json(updatedDocument)
       } else {

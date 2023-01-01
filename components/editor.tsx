@@ -91,6 +91,7 @@ type EditorProps = {
   openCommentId: string | null
   openComment: (isNewComment: boolean) => void
   onUpdate: (data: Partial<DocumentData>) => void
+  canEdit: boolean
 }
 
 // needs to be reworked to be more accurate
@@ -125,7 +126,7 @@ const setHighlight = (editor: WhetstoneEditor, color: HighlightColor) => {
   )
 }
 
-const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, commentActive, openCommentId }: EditorProps) => {
+const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, commentActive, openCommentId, canEdit }: EditorProps) => {
   const [ wordCount, setWordCount ] = useState(countWords(text))
   const [ wordCountAtPos, setWordCountAtPos ] = useState(0)
   const titleState = useRef(title)
@@ -176,7 +177,6 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, comme
             const offset = editor.selection?.focus.offset || 0
             const position = editor.selection?.focus.path[0] || 0
             setWordCountAtPos(getWordCountAtPosition(value, position, offset))
-            console.log('something changed!')
             const isAstChange = editor.operations.some(
               op => 'set_selection' !== op.type
             )
@@ -198,6 +198,10 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, comme
               openComment(false)
             }}
             onKeyDown={event => {
+              if (!canEdit) {
+                event.preventDefault()
+                return
+              }
               if (event.metaKey) {
                 switch (event.key) {
                   case '1': {
