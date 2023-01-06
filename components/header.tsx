@@ -19,6 +19,7 @@ import ListItem from '@mui/material/ListItem'
 import ListItemButton from '@mui/material/ListItemButton'
 import ListItemText from '@mui/material/ListItemText'
 import ShareModal from './shareModal'
+import VersionModal from './versionModal'
 
 const useScrollPosition = () => {
   const [scrollPosition, setScrollPosition] = useState(0)
@@ -78,6 +79,10 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
   const [isShareModalOpen, setIsShareModalOpen] = React.useState(false)
   const openShareModal = () => setIsShareModalOpen(true)
   const closeShareModal = () => setIsShareModalOpen(false)
+
+  const [isVersionModalOpen, setIsVersionModalOpen] = React.useState(false)
+  const openVersionModal = () => setIsVersionModalOpen(true)
+  const closeVersionModal = () => setIsVersionModalOpen(false)
   
   const { mouseMoved, hoveringOverMenu } = useMouse()
   const [ initFadeIn, fadeOut ] = useEditorFades(!mouseMoved)
@@ -148,6 +153,11 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
                       <ListItemText primary={'Share'}/>
                     </ListItemButton>
                   </ListItem>
+                  <ListItem disablePadding>
+                    <ListItemButton onClick={openVersionModal}>
+                      <ListItemText primary={'Versions'}/>
+                    </ListItemButton>
+                  </ListItem>
                 </List>
               }
             </Box>
@@ -156,6 +166,13 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
             <ShareModal 
               open={isShareModalOpen} 
               onClose={closeShareModal} 
+              document={databaseDoc}
+            />
+          }
+          { isOwner &&  
+            <VersionModal 
+              open={isVersionModalOpen} 
+              onClose={closeVersionModal} 
               document={databaseDoc}
             />
           }
