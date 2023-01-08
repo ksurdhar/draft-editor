@@ -20,6 +20,7 @@ import ListItemButton from '@mui/material/ListItemButton'
 import ListItemText from '@mui/material/ListItemText'
 import ShareModal from './shareModal'
 import VersionModal from './versionModal'
+import { useSyncHybridDoc } from '../lib/hooks'
 
 const useScrollPosition = () => {
   const [scrollPosition, setScrollPosition] = useState(0)
@@ -87,9 +88,11 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
   const { mouseMoved, hoveringOverMenu } = useMouse()
   const [ initFadeIn, fadeOut ] = useEditorFades(!mouseMoved)
   
-  const { data: databaseDoc } = useSWR<DocumentData, Error>(`/api/documents/${documentId}`, fetcher) 
+  const { data: databaseDoc } = useSWR<DocumentData, Error>(`/api/documents/${documentId}`, fetcher)
+  const [ hybridDoc, setHybridDoc ] = useState<DocumentData | null>()
+  useSyncHybridDoc(documentId, databaseDoc, setHybridDoc)
 
-  const isOwner = user && databaseDoc && databaseDoc.userId === user.sub
+  const isOwner = user && hybridDoc && hybridDoc.userId === user.sub
 
   return (
     <>
@@ -166,14 +169,14 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
             <ShareModal 
               open={isShareModalOpen} 
               onClose={closeShareModal} 
-              document={databaseDoc}
+              document={hybridDoc}
             />
           }
           { isOwner &&  
             <VersionModal 
               open={isVersionModalOpen} 
               onClose={closeVersionModal} 
-              document={databaseDoc}
+              document={hybridDoc}
             />
           }
         </React.Fragment>

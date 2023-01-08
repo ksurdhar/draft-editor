@@ -1,13 +1,18 @@
 import { getSession } from '@auth0/nextjs-auth0'
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { deleteDocument, deletePermissionByDoc, getDocument, getPermissionByDoc, updateDocument } from "../../../lib/mongoUtils"
+import { createPermission, deleteDocument, deletePermissionByDoc, getDocument, getPermissionByDoc, updateDocument } from "../../../lib/mongoUtils"
 import { DocumentData, PermissionData, UserPermission } from '../../../types/globals'
 
 export default async function documentHandler(req: NextApiRequest, res: NextApiResponse) {
   const { query, method } = req
   const session = getSession(req, res)
+  const documentId = query.id.toString()
 
-  const permissions = await getPermissionByDoc(query.id.toString()) as PermissionData
+  let permissions = await getPermissionByDoc(documentId) as PermissionData
+  if (permissions === null) { // for older, pre permission documents
+    permissions = await createPermission({ ownerId: session?.user.sub, documentId: documentId })
+  }
+
   const user = permissions?.users.find((user) => user.email === session?.user.email)
   const isOwner = permissions.ownerId === session?.user.sub
 
@@ -19,7 +24,7 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
 
   switch (method) {
     case 'GET':
-      const document = await getDocument(query.id.toString()) as DocumentData
+      const document = await getDocument(documentId) as DocumentData
 
       if (isRestricted) {
         if (user || isOwner) {
@@ -39,14 +44,14 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
     case 'PATCH':
       if (isRestricted) {
         if (canComment || canEdit || isOwner) {
-          const updatedDocument = await updateDocument(query.id.toString(), req.body) as DocumentData
+          const updatedDocument = await updateDocument(documentId, req.body) as DocumentData
           return res.status(200).json(updatedDocument)
         } else {
           return res.status(400).send({ error: 'you do not have the permissions to modify this file' })
         }
       } 
       if (globalEdit || globalComment || isOwner) {
-        const updatedDocument = await updateDocument(query.id.toString(), req.body) as DocumentData
+        const updatedDocument = await updateDocument(documentId, req.body) as DocumentData
         return res.status(200).json(updatedDocument)
       } else {
         return res.status(400).send({ error: 'you do not have the permissions to modify this file' })
@@ -54,8 +59,8 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
       break
     case 'DELETE':
       if (isOwner) {
-        await deleteDocument(query.id.toString())
-        await deletePermissionByDoc(query.id.toString())
+        await deleteDocument(documentId)
+        await deletePermissionByDoc(documentId)
         res.status(200).json('document deleted')
       } else {
         return res.status(400).send({ error: 'you do not have the permissions to delete this file' })

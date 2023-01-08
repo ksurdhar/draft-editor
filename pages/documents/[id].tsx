@@ -13,7 +13,7 @@ import CommentEditor from "../../components/comment-editor"
 import Editor, { DefaultText } from "../../components/editor"
 import Layout from "../../components/layout"
 import { Loader } from "../../components/loader"
-import { useSpinner } from "../../lib/hooks"
+import { useSpinner, useSyncHybridDoc } from "../../lib/hooks"
 import { AnimationState, CommentData, DocumentData } from "../../types/globals"
 import { cancelComment, captureCommentRef, checkForComment, commitComment, removeComment } from "../../lib/slateUtils"
 import API, { fetcher } from "../../lib/httpUtils"
@@ -30,24 +30,6 @@ const backdropStyles = `
   fixed top-0 left-0 h-screen w-screen z-[-1]
   transition-opacity ease-in-out duration-[3000ms]
 `
-
-const useSyncHybridDoc = (id: string, databaseDoc: DocumentData | undefined, setHybridDoc: Dispatch<SetStateAction<DocumentData | null | undefined>>) => {
-  useEffect(() => {
-    let cachedDoc: DocumentData | {} = {}
-    if (typeof window !== 'undefined') {
-      cachedDoc = JSON.parse(sessionStorage.getItem(id) || '{}')
-    }
-    const documentNotCached = Object.keys(cachedDoc).length === 0
-
-    if (documentNotCached) {
-      // console.log('document not cached, applying DB doc')
-      setHybridDoc(databaseDoc)
-    } else {
-      // console.log('document cached, using session storage doc')
-      setHybridDoc(cachedDoc as DocumentData)
-    }
-  }, [databaseDoc, setHybridDoc])
-}
 
 const save = async (data: Partial<DocumentData>, id: string, setRecentlySaved: (bool: boolean) => void) => {
   const updatedData = {
