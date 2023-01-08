@@ -92,6 +92,7 @@ type EditorProps = {
   openComment: (isNewComment: boolean) => void
   onUpdate: (data: Partial<DocumentData>) => void
   canEdit: boolean
+  hideFooter?: boolean
 }
 
 // needs to be reworked to be more accurate
@@ -126,7 +127,7 @@ const setHighlight = (editor: WhetstoneEditor, color: HighlightColor) => {
   )
 }
 
-const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, commentActive, openCommentId, canEdit }: EditorProps) => {
+const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, commentActive, openCommentId, canEdit, hideFooter }: EditorProps) => {
   const [ wordCount, setWordCount ] = useState(countWords(text))
   const [ wordCountAtPos, setWordCountAtPos ] = useState(0)
   const titleState = useRef(title)
@@ -230,12 +231,16 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, comme
           />
         </Slate>
       </div>
-      <Footer 
-        initFadeIn={initFadeIn} 
-        fadeOut={fadeOut} 
-        wordCount={wordCount} 
-        wordCountAtPos={wordCountAtPos} 
-      />
+      {
+        !hideFooter &&
+        <Footer 
+          initFadeIn={initFadeIn} 
+          fadeOut={fadeOut} 
+          wordCount={wordCount} 
+          wordCountAtPos={wordCountAtPos} 
+        />
+      }
+      
     </div>
   )
 }
