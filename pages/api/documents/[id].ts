@@ -4,7 +4,7 @@ import { createPermission, deleteDocument, deletePermissionByDoc, getDocument, g
 import { DocumentData, PermissionData, UserPermission } from '../../../types/globals'
 
 export default async function documentHandler(req: NextApiRequest, res: NextApiResponse) {
-  const { query, method } = req
+  const { query, method  } = req
   const session = getSession(req, res)
   const documentId = query.id.toString()
 
