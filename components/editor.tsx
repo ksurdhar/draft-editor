@@ -5,7 +5,7 @@ import { useEditorFades } from './header'
 import { useMouse } from '../pages/_app'
 import Footer from './footer'
 import { DocumentData, WhetstoneEditor } from '../types/globals'
-import { removePending } from '../lib/slateUtils'
+import { countWords, removePending } from '../lib/slateUtils'
 
 type HighlightColor = 'red' | 'orange' | 'green' | 'blue' | 'pending' | 'comment'
 export type DefaultText = { text: string, highlight?: HighlightColor, commentId?: string }
@@ -95,11 +95,6 @@ type EditorProps = {
   hideFooter?: boolean
 }
 
-// needs to be reworked to be more accurate
-const countWords = (nodes: Descendant[]) => {
-  const wordCount = nodes.map((n) => Node.string(n)).join(' ').match(/[a-zA-Z\d]+/g)
-  return wordCount?.length || 0
-}
 
 const getWordCountAtPosition = (nodes: Descendant[], rangeIdx: number, offset: number) => {
   let currentRowCount = 0

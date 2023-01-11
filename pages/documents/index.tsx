@@ -15,9 +15,8 @@ import API from "../../lib/httpUtils"
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 const useDocSync = () => {
-  const { data: docs, mutate } = useSWR<DocumentData[]>('/api/documents', fetcher, { })
+  const { data: docs, mutate } = useSWR<DocumentData[]>('/api/documents', fetcher)
   useEffect(() => {
-    console.log('adding documents', docs)
     docs?.forEach((doc) => {
       sessionStorage.setItem(doc.id, JSON.stringify(doc))
     })

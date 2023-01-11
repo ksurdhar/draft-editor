@@ -1,5 +1,5 @@
 import { Dispatch, SetStateAction, useEffect, useRef } from "react"
-import { NodeEntry, Transforms, Editor as SlateEditor, Node, Text, Location } from "slate"
+import { NodeEntry, Transforms, Editor as SlateEditor, Node, Text, Location, Descendant } from "slate"
 import { DefaultText } from "../components/editor"
 import { WhetstoneEditor } from "../types/globals"
 
@@ -86,4 +86,10 @@ export const cancelComment = (editor: WhetstoneEditor) => {
     { highlight: undefined },
     { match: n => Text.isText(n) && n.highlight === 'pending', at: [] }
   )
+}
+
+// needs to be reworked to be more accurate
+export const countWords = (nodes: Descendant[]) => {
+  const wordCount = nodes.map((n) => Node.string(n)).join(' ').match(/[a-zA-Z\d]+/g)
+  return wordCount?.length || 0
 }
