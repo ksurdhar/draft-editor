@@ -147,7 +147,7 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, comme
 
   return (
     <div className='flex-grow normal-case animate-fadein'>
-      <div className='mb-[20px]'>
+      <div className='mb-[20px] mt-[44px]'>
         <div contentEditable={true} placeholder='New Title' ref={titleRef}
           className="editable mb-2 text-3xl md:text-4xl uppercase border-b border-transparent focus:outline-none active:outline-none" 
           spellCheck={false} 

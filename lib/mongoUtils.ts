@@ -66,8 +66,7 @@ export const createOrUpdateVersion = async (documentId: string, document: Docume
     if (autogenVersions.length > 0) {
       autogenVersions.sort((a, b) => b.createdAt - a.createdAt)
       const mostRecentVersion = autogenVersions[0]
-
-      if (mostRecentVersion.createdAt - Date.now() <= 21600000) {
+      if (mostRecentVersion.createdAt - Date.now() <= 10800000) { // 3 hour windows
         const updatedVersion = await Version.findByIdAndUpdate(mostRecentVersion.id , {
           content: document.content,
           createdAt: Date.now(),
@@ -78,7 +77,6 @@ export const createOrUpdateVersion = async (documentId: string, document: Docume
       }
     }
   }
-  console.log('no version found, creating new') 
 
   version = await Version.create(newVersion)
   await version.save()

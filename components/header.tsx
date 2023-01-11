@@ -3,11 +3,9 @@ import { useRouter } from 'next/router'
 import { useUser } from '@auth0/nextjs-auth0'
 import { useEffect, useState } from 'react'
 import { useMouse } from '../pages/_app'
-import Switch from '@mui/material/Switch'
 import useSWR, { mutate } from 'swr'
-import useSWRMutation from 'swr/mutation'
 import { DocumentData } from '../types/globals'
-import API, { fetcher, updateDoc } from '../lib/httpUtils'
+import API, { fetcher } from '../lib/httpUtils'
 
 import * as React from 'react'
 
@@ -26,12 +24,16 @@ const useScrollPosition = () => {
   const [scrollPosition, setScrollPosition] = useState(0)
 
   useEffect(() => {
+    const editorContainer = document.getElementById('editor-container')
+    if (!editorContainer) return
+
     const updatePosition = () => {
-      setScrollPosition(window.pageYOffset)
+      setScrollPosition(editorContainer.scrollTop)
     }
-    window.addEventListener('scroll', updatePosition)
+ 
+    editorContainer.addEventListener('scroll', updatePosition)
     updatePosition()
-    return () => window.removeEventListener('scroll', updatePosition)
+    return () => editorContainer.removeEventListener('scroll', updatePosition)
   }, [])
 
   return scrollPosition

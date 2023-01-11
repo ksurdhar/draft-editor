@@ -45,7 +45,7 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
       if (isRestricted) {
         if (canComment || canEdit || isOwner) {
           const updatedDocument = await updateDocument(documentId, req.body) as DocumentData
-          createOrUpdateVersion(documentId, updatedDocument)
+          await createOrUpdateVersion(documentId, updatedDocument)
 
           return res.status(200).json(updatedDocument)
         } else {

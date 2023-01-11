@@ -158,7 +158,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
             <CloudIcon className='animate-bounce fill-black/[.10] md:fill-black/[.15] h-[20px] w-[20px] md:h-[24px] md:w-[24px] self-center'/>
           </div>
         )}
-        <div className={`flex justify-center h-[calc(100vh_-_64px)] overflow-y-scroll pb-10 p-[20px] mt-[64px] text-black/[.79] font-editor2`}>
+        <div id="editor-container" className={`flex justify-center h-[100vh] overflow-y-scroll pb-10 p-[20px] text-black/[.79] font-editor2`}>
           <div className={`
               duration-500 transition-flex
               flex ease-in ${showSpinner ? 'justify-center flex-col mt-[-36px]' : ''}

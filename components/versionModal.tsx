@@ -29,7 +29,7 @@ const VersionModal = ({ open, onClose, document }: VersionModalProps) => {
   const { data, isLoading, mutate } = useSWR<VersionData[], Error>(`/api/documents/${document.id}/versions`, fetcher) 
   const [versions, setVersions] = useState<VersionData[]>([])
   const [selectedVersion, setSelectedVersion] = useState<VersionData | null>()
-  
+
   useEffect(() => {
     if (!data) return
     setVersions(data)
@@ -111,7 +111,6 @@ const VersionModal = ({ open, onClose, document }: VersionModalProps) => {
                 wordCount: countWords(JSON.parse(document.content)),
               }
               const version = await API.post(`/api/documents/${document.id}/versions`, newVersion)
-              console.log('version', version)
               mutate()
             } catch (e) {
               console.log(e)
@@ -125,12 +124,13 @@ const VersionModal = ({ open, onClose, document }: VersionModalProps) => {
         }}>Done</Button>
       </DialogActions>
       </Box>
+      {/* Preview Modal Below */}
       { selectedVersion &&
         <Dialog
           fullScreen
           open={previewOpen}
           onClose={handleClose}>
-          <div className={`flex justify-center h-[calc(100vh_-_64px)] overflow-y-scroll pb-10 p-[20px] text-black/[.79] font-editor2`}>
+          <div className={`flex justify-center h-[calc(100vh)] overflow-y-scroll pb-10 p-[20px] text-black/[.79] font-editor2`}>
             <div className={`flex relative max-w-[740px] min-w-[calc(100vw_-_40px)] md:min-w-[0px] pb-10`}>
             <Editor 
               id={'preview'} 

@@ -94,7 +94,7 @@ const DocumentsPage = withPageAuthRequired(() => {
     </Head>
     <Layout>
       <div className='gradient absolute top-0 left-0 h-screen w-screen z-[-1]'/>
-      <div className="relative top-[64px] flex justify-center h-[calc(100vh_-_64px)] pb-10"
+      <div className="relative top-[44px] flex justify-center h-[calc(100vh_-_44px)] pb-10"
         onClick={() => {
           if (selectedDocId || renameActive) {
             setSelectedDoc(null)
