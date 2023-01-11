@@ -1,6 +1,6 @@
 import { getSession } from '@auth0/nextjs-auth0'
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { createPermission, deleteDocument, deletePermissionByDoc, getDocument, getPermissionByDoc, updateDocument } from "../../../lib/mongoUtils"
+import { createOrUpdateVersion, createPermission, deleteDocument, deletePermissionByDoc, getDocument, getPermissionByDoc, updateDocument } from "../../../lib/mongoUtils"
 import { DocumentData, PermissionData, UserPermission } from '../../../types/globals'
 
 export default async function documentHandler(req: NextApiRequest, res: NextApiResponse) {
@@ -45,6 +45,8 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
       if (isRestricted) {
         if (canComment || canEdit || isOwner) {
           const updatedDocument = await updateDocument(documentId, req.body) as DocumentData
+          createOrUpdateVersion(documentId, updatedDocument)
+
           return res.status(200).json(updatedDocument)
         } else {
           return res.status(400).send({ error: 'you do not have the permissions to modify this file' })

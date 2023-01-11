@@ -2,15 +2,14 @@ import { useUser } from "@auth0/nextjs-auth0"
 import { CloudIcon } from "@heroicons/react/solid"
 import { GetServerSideProps, InferGetServerSidePropsType } from "next"
 import Head from "next/head"
-import Router from "next/router"
-import { Dispatch, SetStateAction, useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { createEditor, Descendant, Node, NodeEntry } from "slate"
 import { withHistory } from "slate-history"
 import { withReact } from "slate-react"
 import useSWR from "swr"
 import { useDebouncedCallback } from "use-debounce"
 import CommentEditor from "../../components/comment-editor"
-import Editor, { DefaultText } from "../../components/editor"
+import Editor from "../../components/editor"
 import Layout from "../../components/layout"
 import { Loader } from "../../components/loader"
 import { useSpinner, useSyncHybridDoc } from "../../lib/hooks"
@@ -127,6 +126,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
   const debouncedSave = useDebouncedCallback((data: Partial<DocumentData>) => {
     save(data, id, setRecentlySaved)
     mutate()
+
   }, 1000)
 
   useEffect(() => {
