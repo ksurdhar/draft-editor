@@ -4,7 +4,7 @@ import { useUser } from '@auth0/nextjs-auth0'
 import { useEffect, useState } from 'react'
 import { useMouse } from '../pages/_app'
 import Switch from '@mui/material/Switch'
-import useSWR from 'swr'
+import useSWR, { mutate } from 'swr'
 import useSWRMutation from 'swr/mutation'
 import { DocumentData } from '../types/globals'
 import API, { fetcher, updateDoc } from '../lib/httpUtils'
@@ -82,7 +82,10 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
   const closeShareModal = () => setIsShareModalOpen(false)
 
   const [isVersionModalOpen, setIsVersionModalOpen] = React.useState(false)
-  const openVersionModal = () => setIsVersionModalOpen(true)
+  const openVersionModal = () => {
+    mutate(`/api/documents/${documentId}/versions`)
+    setIsVersionModalOpen(true)
+  }
   const closeVersionModal = () => setIsVersionModalOpen(false)
   
   const { mouseMoved, hoveringOverMenu } = useMouse()

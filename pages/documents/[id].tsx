@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react"
 import { createEditor, Descendant, Node, NodeEntry } from "slate"
 import { withHistory } from "slate-history"
 import { withReact } from "slate-react"
-import useSWR from "swr"
+import useSWR, { mutate } from "swr"
 import { useDebouncedCallback } from "use-debounce"
 import CommentEditor from "../../components/comment-editor"
 import Editor from "../../components/editor"
@@ -48,7 +48,7 @@ const save = async (data: Partial<DocumentData>, id: string, setRecentlySaved: (
 export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof getServerSideProps>) {  
   const [ editor ] = useState(() => withReact(withHistory(createEditor())))
   
-  const { data: databaseDoc, error, mutate } = useSWR<DocumentData, Error>(`/api/documents/${id}`, fetcher) 
+  const { data: databaseDoc, error } = useSWR<DocumentData, Error>(`/api/documents/${id}`, fetcher) 
   const [ hybridDoc, setHybridDoc ] = useState<DocumentData | null>()
   useSyncHybridDoc(id, databaseDoc, setHybridDoc)
 
@@ -73,7 +73,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
     }
     const comments = hybridDoc?.comments.concat(comment)
     await save({ comments }, id, setRecentlySaved)
-    await mutate()
+    await mutate(`/api/documents/${id}`)
     if (pendingCommentRef) commitComment(editor, pendingCommentRef[1], commentId)
   }, [hybridDoc, pendingCommentRef])
 
@@ -83,7 +83,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
 
     const comments = hybridDoc?.comments.filter((comment) => comment.id !== openCommentId)
     await save({ comments }, id, setRecentlySaved)
-    await mutate()
+    await mutate(`/api/documents/${id}`)
 
     cleanCommentState()
   }
@@ -96,7 +96,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
       return comment
     })
     await save({ comments }, id, setRecentlySaved)
-    await mutate()
+    await mutate(`/api/documents/${id}`)
     if (pendingCommentRef) commitComment(editor, pendingCommentRef[1], commentId)
   }, [hybridDoc, pendingCommentRef])
 
@@ -124,9 +124,9 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
   }, [hybridDoc, editor, setCommentText, setCommentActive, captureCommentRef, setPendingCommentRef, setOpenCommentId])
 
   const debouncedSave = useDebouncedCallback((data: Partial<DocumentData>) => {
+    mutate(`/api/documents/${id}/versions`)
     save(data, id, setRecentlySaved)
-    mutate()
-
+    mutate(`/api/documents/${id}`)
   }, 1000)
 
   useEffect(() => {

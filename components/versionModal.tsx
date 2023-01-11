@@ -29,11 +29,11 @@ const VersionModal = ({ open, onClose, document }: VersionModalProps) => {
   const { data, isLoading, mutate } = useSWR<VersionData[], Error>(`/api/documents/${document.id}/versions`, fetcher) 
   const [versions, setVersions] = useState<VersionData[]>([])
   const [selectedVersion, setSelectedVersion] = useState<VersionData | null>()
-
+  
   useEffect(() => {
     if (!data) return
     setVersions(data)
-  }, [data])
+  }, [data, isLoading])
 
   const [previewOpen, setPreviewOpen] = useState(false)
   const handleOpen = () => setPreviewOpen(true)
