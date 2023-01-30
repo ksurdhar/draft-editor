@@ -54,6 +54,8 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
       } 
       if (globalEdit || globalComment || isOwner) {
         const updatedDocument = await updateDocument(documentId, req.body) as DocumentData
+        await createOrUpdateVersion(documentId, updatedDocument)
+
         return res.status(200).json(updatedDocument)
       } else {
         return res.status(400).send({ error: 'you do not have the permissions to modify this file' })

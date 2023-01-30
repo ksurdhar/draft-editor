@@ -54,7 +54,8 @@ export const useEditorFades = (isMouseStill: boolean) => {
   }, [])
   
   const initFadeIn = editorActive && fadeHeader
-  const fadeOut = editorActive && isMouseStill && scrollPosition > 20
+  const fadeOut = editorActive && isMouseStill && scrollPosition > 20 && false
+  // currently disabled because its kinda annoying
 
   return [initFadeIn, fadeOut]
 }
