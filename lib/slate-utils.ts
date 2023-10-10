@@ -1,14 +1,14 @@
 import { Dispatch, SetStateAction, useEffect, useRef } from "react"
-import { NodeEntry, Transforms, Editor as SlateEditor, Node, Text, Location, Descendant } from "slate"
-import { DefaultText } from "../components/editor"
+import { Descendant, Location, Node, NodeEntry, Editor as SlateEditor, Text, Transforms } from "slate"
 import { WhetstoneEditor } from "../types/globals"
+import { DefaultText } from "./slate-renderers"
 
 export const useEffectOnlyOnce = (callback: any, dependencies: any, condition: any) => {
   const calledOnce = useRef(false)
 
   useEffect(() => {
     if (calledOnce.current) {
-      return;
+      return
     }
 
     if (condition(dependencies)) {
@@ -40,18 +40,6 @@ export const commitComment = (editor: WhetstoneEditor, location: Location, comme
     { match: n => Text.isText(n) && n.highlight === 'pending', at: [] }
   )
   removePending(editor) // helps clean up
-}
-
-export const checkForComment = (editor: WhetstoneEditor) => {
-  const [match] = SlateEditor.nodes(editor, {
-    match: n => Text.isText(n) && n.highlight === 'comment',
-    at: editor.selection?.focus
-  })
-  if (!!match) {
-    const textNode = match[0] as DefaultText
-    return textNode.commentId
-  }
-  return null
 }
 
 export const removeComment = (editor: WhetstoneEditor, commentId: string) => {
@@ -86,6 +74,18 @@ export const cancelComment = (editor: WhetstoneEditor) => {
     { highlight: undefined },
     { match: n => Text.isText(n) && n.highlight === 'pending', at: [] }
   )
+}
+
+export const checkForComment = (editor: WhetstoneEditor) => {
+  const [match] = SlateEditor.nodes(editor, {
+    match: n => Text.isText(n) && n.highlight === 'comment',
+    at: editor.selection?.focus
+  })
+  if (!!match) {
+    const textNode = match[0] as DefaultText
+    return textNode.commentId
+  }
+  return null
 }
 
 // needs to be reworked to be more accurate

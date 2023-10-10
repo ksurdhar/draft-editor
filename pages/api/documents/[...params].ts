@@ -1,6 +1,6 @@
-import { getSession, withApiAuthRequired } from '@auth0/nextjs-auth0'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { createVersion, getVersionsForDoc } from '../../../lib/mongoUtils'
+import { getSession, withApiAuthRequired } from '../../../mocks/auth-wrapper'
 import { VersionData } from '../../../types/globals'
 
 export default withApiAuthRequired(async function nestedDocumentsHandler(req: NextApiRequest, res: NextApiResponse) {
@@ -10,7 +10,6 @@ export default withApiAuthRequired(async function nestedDocumentsHandler(req: Ne
 
   // /documents/123/versions GET
   // /documents/123/versions POST
-  
   switch (method) {
     case 'POST':  
       const newVersion = await createVersion(req.body)

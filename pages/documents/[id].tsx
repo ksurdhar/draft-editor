@@ -1,21 +1,21 @@
-import { useUser } from "@auth0/nextjs-auth0"
 import { CloudIcon } from "@heroicons/react/solid"
 import { GetServerSideProps, InferGetServerSidePropsType } from "next"
 import Head from "next/head"
 import { useCallback, useEffect, useState } from "react"
-import { createEditor, Descendant, Node, NodeEntry } from "slate"
+import { Descendant, Node, NodeEntry, createEditor } from "slate"
 import { withHistory } from "slate-history"
 import { withReact } from "slate-react"
 import useSWR, { mutate } from "swr"
 import { useDebouncedCallback } from "use-debounce"
-import CommentEditor from "../../components/comment-editor"
-import Editor from "../../components/editor"
-import Layout from "../../components/layout"
-import { Loader } from "../../components/loader"
+import CommentEditor from "../../components/CommentEditor"
+import Layout from "../../components/Layout"
+import { Loader } from "../../components/Loader"
+import Editor from "../../components/editor/Editor"
 import { useSpinner, useSyncHybridDoc } from "../../lib/hooks"
-import { AnimationState, CommentData, DocumentData } from "../../types/globals"
-import { cancelComment, captureCommentRef, checkForComment, commitComment, removeComment } from "../../lib/slateUtils"
 import API, { fetcher } from "../../lib/httpUtils"
+import { cancelComment, captureCommentRef, checkForComment, commitComment, removeComment } from "../../lib/slate-utils"
+import { useUser } from '../../mocks/auth-wrapper'
+import { AnimationState, CommentData, DocumentData } from "../../types/globals"
 
 export const getServerSideProps: GetServerSideProps = async ({ params }) => {
   return {
@@ -54,7 +54,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
 
   const showSpinner = useSpinner(!hybridDoc)
   
-  const { user, isLoading } = useUser()
+  const { isLoading } = useUser()
   const [ initAnimate, setInitAnimate ] = useState(false)
   const [ recentlySaved, setRecentlySaved ] = useState(false)
 
@@ -75,7 +75,7 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
     await save({ comments }, id, setRecentlySaved)
     await mutate(`/api/documents/${id}`)
     if (pendingCommentRef) commitComment(editor, pendingCommentRef[1], commentId)
-  }, [hybridDoc, pendingCommentRef])
+  }, [hybridDoc, pendingCommentRef, editor, id])
 
   const deleteComment = async () => {
     if (!openCommentId) return
@@ -97,31 +97,32 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
     })
     await save({ comments }, id, setRecentlySaved)
     await mutate(`/api/documents/${id}`)
-    if (pendingCommentRef) commitComment(editor, pendingCommentRef[1], commentId)
-  }, [hybridDoc, pendingCommentRef])
+    if (pendingCommentRef) {
+      commitComment(editor, pendingCommentRef[1], commentId)
+    }
+  }, [hybridDoc, pendingCommentRef, editor, id])
 
   const cleanCommentState = useCallback(() => {
     setOpenCommentId(null)
     setCommentActive('Inactive')
     setCommentText([])
-  }, [setCommentText, setCommentText, setOpenCommentId])
+  }, [setCommentText, setOpenCommentId])
 
   const openComment = useCallback((isNewComment: boolean) => {
-    if (!hybridDoc) return 
-
     const commentId = checkForComment(editor)
-    const comment = hybridDoc.comments.find((c) => c.id === commentId)
+    const comment = hybridDoc?.comments.find((c) => c.id === commentId)
   
     if (commentId && comment && comment.content) {
       setOpenCommentId(commentId)
       setCommentText(JSON.parse(comment.content)) 
       setCommentActive('Active')
-    } else if (isNewComment) {
+    } 
+    if (isNewComment) {
       captureCommentRef(editor, setPendingCommentRef)
       setCommentText([{ type: 'default', children: [{text: ''}]}])
       setCommentActive('Active')
     }
-  }, [hybridDoc, editor, setCommentText, setCommentActive, captureCommentRef, setPendingCommentRef, setOpenCommentId])
+  }, [hybridDoc, editor, setCommentText, setCommentActive, setPendingCommentRef, setOpenCommentId])
 
   const debouncedSave = useDebouncedCallback((data: Partial<DocumentData>) => {
     mutate(`/api/documents/${id}/versions`)

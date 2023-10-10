@@ -1,16 +1,16 @@
 import { DotsHorizontalIcon } from "@heroicons/react/solid"
-import Layout from "../../components/layout"
-import { withPageAuthRequired } from "@auth0/nextjs-auth0"
-import useSWR, { useSWRConfig } from "swr"
 import { format } from "date-fns"
-import { useRouter } from "next/router"
 import Head from "next/head"
 import Link from "next/link"
+import { useRouter } from "next/router"
 import { useEffect, useState } from "react"
-import { Loader } from "../../components/loader"
+import useSWR, { useSWRConfig } from "swr"
+import Layout from "../../components/Layout"
+import { Loader } from "../../components/Loader"
 import { useSpinner } from "../../lib/hooks"
-import { DocumentData } from "../../types/globals"
 import API from "../../lib/httpUtils"
+import { withPageAuthRequired } from '../../mocks/auth-wrapper'
+import { DocumentData } from "../../types/globals"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
@@ -24,7 +24,7 @@ const useDocSync = () => {
   return { docs, mutate }
 }
 
-const DocumentsPage = withPageAuthRequired(() => {
+const DocumentsPage = () => {
   const { docs, mutate } = useDocSync()
   const safeDocs = docs ? docs : []
   const { cache } = useSWRConfig()
@@ -156,6 +156,6 @@ const DocumentsPage = withPageAuthRequired(() => {
     </Layout>
     </>
   )
-})
+}
 
-export default DocumentsPage
+export default withPageAuthRequired(DocumentsPage)

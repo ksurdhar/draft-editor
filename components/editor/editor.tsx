@@ -1,86 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { BaseEditor, Descendant, Editor, Transforms, Text, Node } from 'slate'
-import { Slate, Editable, ReactEditor } from 'slate-react'
-import { useEditorFades } from './header'
-import { useMouse } from '../pages/_app'
-import Footer from './footer'
-import { DocumentData, WhetstoneEditor } from '../types/globals'
-import { countWords, removePending } from '../lib/slateUtils'
-
-type HighlightColor = 'red' | 'orange' | 'green' | 'blue' | 'pending' | 'comment'
-export type DefaultText = { text: string, highlight?: HighlightColor, commentId?: string }
-type DefaultElement = { type: 'default'; children: DefaultText[] }
-type CustomElement = DefaultElement 
-
-declare module 'slate' {
-  interface CustomTypes {
-    Editor: BaseEditor & ReactEditor
-    Element: CustomElement
-    Text: DefaultText
-  }
-}
-
-type RenderElementProps = {
-  attributes: Object
-  element: CustomElement
-  children: React.ReactNode
-}
-
-const BodyElement = ({ attributes, children} : RenderElementProps) => {
-  return (
-    <div {...attributes}>
-      <div className='transition'>{children}</div>
-    </div>
-  )
-}
-
-// this is where additional element types can be rendered
-export const renderElement = (props: RenderElementProps) => {
-  switch (props.element.type) {
-    default:
-      return <BodyElement {...props} />
-  }
-}
-
-type RenderLeafProps = {
-  attributes: Object
-  leaf: DefaultText
-  children: React.ReactNode
-  openCommentId: string
-}
-
-type ColorMap = Record<HighlightColor, string>
-
-const Leaf = ({ attributes, leaf, children, openCommentId }: RenderLeafProps) => {
-  let highlight = ''
-
-  const colorMap: ColorMap = {
-    blue: 'bg-blue-200',
-    green: 'bg-green-200',
-    orange: 'bg-orange-200',
-    red: 'bg-red-200',
-    pending: 'bg-slate-200',
-    comment: `${openCommentId === leaf.commentId ? 'bg-orange-300' : 'bg-orange-200' } hover:bg-orange-300`
-  }
-
-  if (leaf.highlight) {
-    highlight = colorMap[leaf.highlight]
-  }
-
-  // onmouseover, send my parent the hoveredCommentID
-  // all leaves check for whether their commentID matches
-  // apply a class to all those nodes... 
-  
-  return (
-    <span {...attributes} className={`transition duration-500 ${highlight}`}>
-      {children}
-    </span>
-  )
-}
-
-export const renderLeaf = (props: any) => {
-  return <Leaf {...props} />
-}
+import { Descendant, Editor, Node, Text, Transforms } from 'slate'
+import { Editable, Slate } from 'slate-react'
+import { HighlightColor, renderElement, renderLeaf } from '../../lib/slate-renderers'
+import { countWords, removePending } from '../../lib/slate-utils'
+import { useMouse } from '../../pages/_app'
+import { DocumentData, WhetstoneEditor } from '../../types/globals'
+import Footer from '../Footer'
+import { useEditorFades } from '../Header'
 
 type EditorProps = {
   id: string
@@ -94,7 +20,6 @@ type EditorProps = {
   canEdit: boolean
   hideFooter?: boolean
 }
-
 
 const getWordCountAtPosition = (nodes: Descendant[], rangeIdx: number, offset: number) => {
   let currentRowCount = 0
@@ -143,7 +68,7 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, comme
     if (title.length === 0) {
       titleRef?.current?.focus()
     }
-  }, [titleRef])
+  }, [titleRef, title.length])
 
   return (
     <div className='flex-grow normal-case animate-fadein'>

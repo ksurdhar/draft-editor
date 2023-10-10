@@ -1,20 +1,20 @@
-import { Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, Box } from '@mui/material'
+import InsertDriveFileTwoToneIcon from '@mui/icons-material/InsertDriveFileTwoTone'
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@mui/material'
 import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
 import TableCell from '@mui/material/TableCell'
 import TableContainer from '@mui/material/TableContainer'
 import TableRow from '@mui/material/TableRow'
 import { useEffect, useState } from 'react'
-import InsertDriveFileTwoToneIcon from '@mui/icons-material/InsertDriveFileTwoTone'
-import {  useUser } from '@auth0/nextjs-auth0'
-import { DocumentData, VersionData } from '../types/globals'
-import Editor from './editor'
-import { withReact } from 'slate-react'
 import { createEditor } from 'slate'
 import { withHistory } from 'slate-history'
-import API, { fetcher } from '../lib/httpUtils'
+import { withReact } from 'slate-react'
 import useSWR from 'swr'
-import { countWords } from '../lib/slateUtils'
+import API, { fetcher } from '../lib/httpUtils'
+import { countWords } from '../lib/slate-utils'
+import { useUser } from '../mocks/auth-wrapper'
+import { DocumentData, VersionData } from '../types/globals'
+import EditorComponent from './editor/Editor'
 
 interface VersionModalProps {
   open: boolean
@@ -132,7 +132,7 @@ const VersionModal = ({ open, onClose, document }: VersionModalProps) => {
           onClose={handleClose}>
           <div className={`flex justify-center h-[calc(100vh)] overflow-y-scroll pb-10 p-[20px] text-black/[.79] font-editor2`}>
             <div className={`flex relative max-w-[740px] min-w-[calc(100vw_-_40px)] md:min-w-[0px] pb-10`}>
-            <Editor 
+            <EditorComponent
               id={'preview'} 
               title={document.title} 
               text={JSON.parse(selectedVersion.content)}

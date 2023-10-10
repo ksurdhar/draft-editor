@@ -1,6 +1,6 @@
-import { withApiAuthRequired } from '@auth0/nextjs-auth0'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { deleteVersion, updateVersion } from "../../../lib/mongoUtils"
+import { withApiAuthRequired } from '../../../mocks/auth-wrapper'
 import { VersionData } from '../../../types/globals'
 
 export default withApiAuthRequired(async function versionHandler(req: NextApiRequest, res: NextApiResponse) {

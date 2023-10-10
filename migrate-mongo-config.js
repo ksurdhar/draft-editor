@@ -28,6 +28,6 @@ const config = {
 
   // Don't change this, unless you know what you're doing
   moduleSystem: 'commonjs',
-};
+}
 
-module.exports = config;
+module.exports = config

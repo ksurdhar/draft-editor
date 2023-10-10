@@ -1,11 +1,11 @@
-import { Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, TextField, FormControl, MenuItem, Select, Box, IconButton } from '@mui/material'
-import { useEffect, useState } from 'react'
 import AddIcon from '@mui/icons-material/Add'
 import RemoveIcon from '@mui/icons-material/Remove'
-import {  useUser } from '@auth0/nextjs-auth0'
-import { fetcher, updateDoc } from '../lib/httpUtils'
-import useSWRMutation from 'swr/mutation'
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, FormControl, IconButton, MenuItem, Select, TextField } from '@mui/material'
+import { useEffect, useState } from 'react'
 import useSWR from 'swr'
+import useSWRMutation from 'swr/mutation'
+import { fetcher, updateDoc } from '../lib/httpUtils'
+import { useUser } from '../mocks/auth-wrapper'
 import { DocumentData, PermissionData, ShareUser, UserPermission } from '../types/globals'
 
 interface ShareModalProps {

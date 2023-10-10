@@ -1,24 +1,24 @@
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { useUser } from '@auth0/nextjs-auth0'
 import { useEffect, useState } from 'react'
-import { useMouse } from '../pages/_app'
 import useSWR, { mutate } from 'swr'
-import { DocumentData } from '../types/globals'
 import API, { fetcher } from '../lib/httpUtils'
+import { useUser } from '../mocks/auth-wrapper'
+import { useMouse } from '../pages/_app'
+import { DocumentData } from '../types/globals'
 
 import * as React from 'react'
 
 import Box from '@mui/material/Box'
+import Divider from '@mui/material/Divider'
 import Drawer from '@mui/material/Drawer'
 import List from '@mui/material/List'
-import Divider from '@mui/material/Divider'
 import ListItem from '@mui/material/ListItem'
 import ListItemButton from '@mui/material/ListItemButton'
 import ListItemText from '@mui/material/ListItemText'
-import ShareModal from './shareModal'
-import VersionModal from './versionModal'
 import { useSyncHybridDoc } from '../lib/hooks'
+import ShareModal from './ShareModal'
+import VersionModal from './VersionModal'
 
 const useScrollPosition = () => {
   const [scrollPosition, setScrollPosition] = useState(0)
@@ -51,7 +51,7 @@ export const useEditorFades = (isMouseStill: boolean) => {
         setFadeHeader(true)
       }, 2000)
     }
-  }, [])
+  }, [editorActive])
   
   const initFadeIn = editorActive && fadeHeader
   const fadeOut = editorActive && isMouseStill && scrollPosition > 20 && false
@@ -67,7 +67,6 @@ type HeaderProps = {
 const HeaderComponent = ({ documentId }: HeaderProps) => {
   const { user } = useUser()
   const router = useRouter()
-
   const [ menuOpen, setMenuOpen ] = useState(false)
   const toggleDrawer = (open: boolean) => (event: React.KeyboardEvent | React.MouseEvent) => {
     if (

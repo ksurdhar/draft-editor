@@ -1,6 +1,6 @@
-import { getSession } from '@auth0/nextjs-auth0'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { getPermissionByDoc, updatePermissionByDoc } from "../../../lib/mongoUtils"
+import { getSession } from '../../../mocks/auth-wrapper'
 import { PermissionData } from '../../../types/globals'
 
 export default async function permissionHandler(req: NextApiRequest, res: NextApiResponse) {
@@ -9,7 +9,7 @@ export default async function permissionHandler(req: NextApiRequest, res: NextAp
 
   const permission = await getPermissionByDoc(query.id.toString()) as PermissionData
   const isOwner = permission.ownerId === session?.user.sub
-
+  
   switch (method) {
     case 'GET':
       if (isOwner) {

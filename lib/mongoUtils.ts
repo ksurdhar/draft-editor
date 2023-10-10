@@ -1,7 +1,7 @@
 import Mongoose from 'mongoose'
 import { DocumentData, PermissionData, UserPermission, VersionData } from '../types/globals'
 import { Doc, Permission, Version } from './mongoModels'
-import { countWords } from './slateUtils'
+import { countWords } from './slate-utils'
 
 declare global {
   // allow global `var` declarations

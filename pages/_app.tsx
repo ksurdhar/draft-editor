@@ -1,11 +1,10 @@
 import '../styles/globals.css'
-import '../styles/loading-indicator.css'
 import '../styles/hamburgers/hamburgers.scss'
+import '../styles/loading-indicator.css'
 
 import type { AppProps } from 'next/app'
-import { UserProvider } from '@auth0/nextjs-auth0'
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react'
-
+import { UserProvider } from '../mocks/auth-wrapper'
 
 type mouseContextType = {
   hoveringOverMenu: boolean
@@ -33,7 +32,7 @@ const useDebouncedEffect = (effect: () => void, deps: any[], delay: number) => {
   useEffect(() => {
     const handler = setTimeout(() => effect(), delay)
     return () => clearTimeout(handler)
-  }, [...deps || [], delay])
+  }, [...deps || [], delay, effect])
 }
 
 export function MouseProvider({ children }: Props) {
@@ -72,11 +71,13 @@ export function MouseProvider({ children }: Props) {
 
 function MyApp({ Component, pageProps }: AppProps) {
   return (
-    <MouseProvider>
-      <UserProvider>
-        <Component {...pageProps} />
-      </UserProvider>
-    </MouseProvider>
+    <>
+      <MouseProvider>
+        <UserProvider>
+          <Component {...pageProps} />
+        </UserProvider>
+      </MouseProvider>
+    </>
   )
 }
 

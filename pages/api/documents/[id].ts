@@ -1,6 +1,6 @@
-import { getSession } from '@auth0/nextjs-auth0'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { createOrUpdateVersion, createPermission, deleteDocument, deletePermissionByDoc, getDocument, getPermissionByDoc, updateDocument } from "../../../lib/mongoUtils"
+import { getSession } from '../../../mocks/auth-wrapper'
 import { DocumentData, PermissionData, UserPermission } from '../../../types/globals'
 
 export default async function documentHandler(req: NextApiRequest, res: NextApiResponse) {
@@ -13,37 +13,38 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
     permissions = await createPermission({ ownerId: session?.user.sub, documentId: documentId })
   }
 
-  const user = permissions?.users.find((user) => user.email === session?.user.email)
   const isOwner = permissions.ownerId === session?.user.sub
+  const permissableUser = permissions?.users.find((user) => user.email === session?.user.email)
+  const isOwnerOrInvited = permissableUser || isOwner
 
   const isRestricted = permissions.globalPermission === UserPermission.None
-  const canComment = user && [UserPermission.Comment, UserPermission.Edit].indexOf(user.permission) > -1 || isOwner
-  const canEdit = user && user.permission === UserPermission.Edit || isOwner
-  const globalEdit = [UserPermission.Comment, UserPermission.Edit].indexOf(permissions.globalPermission) > -1
-  const globalComment = permissions.globalPermission === UserPermission.Edit
+  const userCanComment = permissableUser && [UserPermission.Comment, UserPermission.Edit].includes(permissableUser.permission) || isOwner
+  const userCanEdit = permissableUser && permissableUser.permission === UserPermission.Edit || isOwner
+
+  const anyoneCanComment = [UserPermission.Comment, UserPermission.Edit].includes(permissions.globalPermission)
+  const anyoneCanEdit = permissions.globalPermission === UserPermission.Edit
 
   switch (method) {
     case 'GET':
       const document = await getDocument(documentId) as DocumentData
 
-      if (isRestricted) {
-        if (user || isOwner) {
-          document.canComment = canComment
-          document.canEdit = canEdit
-          return res.status(200).json(document)
-        } 
-        else {
-          return res.status(400).send({ error: 'you do not have the permissions to view this file' })
-        }
-      } 
+      if (isRestricted && isOwnerOrInvited) {
+        document.canComment = userCanComment
+        document.canEdit = userCanEdit
+        return res.status(200).json(document)
+      }
 
-      document.canComment = globalComment || isOwner
-      document.canEdit = globalEdit || isOwner
+      if (isRestricted && !isOwnerOrInvited) {
+        return res.status(400).send({ error: 'you do not have the permissions to view this file' })
+      }
+      
+      document.canComment = anyoneCanComment || isOwner
+      document.canEdit = anyoneCanEdit || isOwner
       res.status(200).json(document)
       break
     case 'PATCH':
       if (isRestricted) {
-        if (canComment || canEdit || isOwner) {
+        if (userCanComment || userCanEdit || isOwner) {
           const updatedDocument = await updateDocument(documentId, req.body) as DocumentData
           await createOrUpdateVersion(documentId, updatedDocument)
 
@@ -52,7 +53,7 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
           return res.status(400).send({ error: 'you do not have the permissions to modify this file' })
         }
       } 
-      if (globalEdit || globalComment || isOwner) {
+      if (anyoneCanEdit || anyoneCanComment || isOwner) {
         const updatedDocument = await updateDocument(documentId, req.body) as DocumentData
         await createOrUpdateVersion(documentId, updatedDocument)
 
@@ -60,7 +61,6 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
       } else {
         return res.status(400).send({ error: 'you do not have the permissions to modify this file' })
       }
-      break
     case 'DELETE':
       if (isOwner) {
         await deleteDocument(documentId)
