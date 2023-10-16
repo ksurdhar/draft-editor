@@ -10,11 +10,11 @@ import { createEditor } from 'slate'
 import { withHistory } from 'slate-history'
 import { withReact } from 'slate-react'
 import useSWR from 'swr'
-import API, { fetcher } from '../lib/httpUtils'
+import API, { fetcher } from '../lib/http-utils'
 import { countWords } from '../lib/slate-utils'
 import { useUser } from '../mocks/auth-wrapper'
 import { DocumentData, VersionData } from '../types/globals'
-import EditorComponent from './Editor'
+import EditorComponent from './editor'
 
 interface VersionModalProps {
   open: boolean

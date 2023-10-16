@@ -4,7 +4,7 @@ import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, D
 import { useEffect, useState } from 'react'
 import useSWR from 'swr'
 import useSWRMutation from 'swr/mutation'
-import { fetcher, updateDoc } from '../lib/httpUtils'
+import { fetcher, updateDoc } from '../lib/http-utils'
 import { useUser } from '../mocks/auth-wrapper'
 import { DocumentData, PermissionData, ShareUser, UserPermission } from '../types/globals'
 

@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { createOrUpdateVersion, createPermission, deleteDocument, deletePermissionByDoc, getDocument, getPermissionByDoc, updateDocument } from "../../../lib/mongoUtils"
+import { createOrUpdateVersion, createPermission, deleteDocument, deletePermissionByDoc, getDocument, getPermissionByDoc, updateDocument } from "../../../lib/mongo-utils"
 import { getSession } from '../../../mocks/auth-wrapper'
 import { DocumentData, PermissionData, UserPermission } from '../../../types/globals'
 

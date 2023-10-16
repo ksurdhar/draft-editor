@@ -1,5 +1,5 @@
 import { useMouse } from '../pages/_app'
-import HeaderComponent from './Header'
+import HeaderComponent from './header'
 
 type Props = {
   children?: React.ReactNode

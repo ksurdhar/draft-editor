@@ -5,10 +5,10 @@ import Link from "next/link"
 import { useRouter } from "next/router"
 import { useEffect, useState } from "react"
 import useSWR, { useSWRConfig } from "swr"
-import Layout from "../../components/Layout"
-import { Loader } from "../../components/Loader"
+import Layout from "../../components/layout"
+import { Loader } from "../../components/loader"
 import { useSpinner } from "../../lib/hooks"
-import API from "../../lib/httpUtils"
+import API from "../../lib/http-utils"
 import { withPageAuthRequired } from '../../mocks/auth-wrapper'
 import { DocumentData } from "../../types/globals"
 

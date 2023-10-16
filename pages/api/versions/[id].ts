@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { deleteVersion, updateVersion } from "../../../lib/mongoUtils"
+import { deleteVersion, updateVersion } from "../../../lib/mongo-utils"
 import { withApiAuthRequired } from '../../../mocks/auth-wrapper'
 import { VersionData } from '../../../types/globals'
 

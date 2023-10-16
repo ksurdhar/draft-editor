@@ -5,8 +5,8 @@ import { HighlightColor, renderElement, renderLeaf } from '../lib/slate-renderer
 import { countWords, removePending } from '../lib/slate-utils'
 import { useMouse } from '../pages/_app'
 import { DocumentData, WhetstoneEditor } from '../types/globals'
-import Footer from './Footer'
-import { useEditorFades } from './Header'
+import Footer from './footer'
+import { useEditorFades } from './header'
 
 type EditorProps = {
   id: string

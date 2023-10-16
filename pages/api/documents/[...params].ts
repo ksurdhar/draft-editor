@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { createVersion, getVersionsForDoc } from '../../../lib/mongoUtils'
+import { createVersion, getVersionsForDoc } from '../../../lib/mongo-utils'
 import { getSession, withApiAuthRequired } from '../../../mocks/auth-wrapper'
 import { VersionData } from '../../../types/globals'
 
