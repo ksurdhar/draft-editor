@@ -14,7 +14,7 @@ import API, { fetcher } from '../lib/httpUtils'
 import { countWords } from '../lib/slate-utils'
 import { useUser } from '../mocks/auth-wrapper'
 import { DocumentData, VersionData } from '../types/globals'
-import EditorComponent from './editor/Editor'
+import EditorComponent from './Editor'
 
 interface VersionModalProps {
   open: boolean
