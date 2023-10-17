@@ -1,7 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { createDocument, createPermission, getDocuments } from "../../../lib/mongo-utils"
+import { createNewDocument, fetchUserDocuments } from '../../../controllers/documents'
 import { getSession, withApiAuthRequired } from '../../../mocks/auth-wrapper'
-import { DocumentData } from '../../../types/globals'
 
 export default withApiAuthRequired(async function documentsHandler(req: NextApiRequest, res: NextApiResponse) {
   const { method } = req
@@ -9,19 +8,13 @@ export default withApiAuthRequired(async function documentsHandler(req: NextApiR
 
   switch (method) {
     case 'POST': 
-      const newDocument = await createDocument(req.body)
-      await createPermission({ ownerId: session?.user.sub, documentId: newDocument.id })
-      res.status(200).json(newDocument)
+        const newDoc = await createNewDocument(req.body, session?.user.sub)
+        res.status(200).json(newDoc)
       break
     case 'GET':
       if (session) {
-        const documents = await getDocuments(session.user.sub)
-        const docsWithPermissions = documents.map(doc => {
-          doc.canEdit = true
-          doc.canComment = true
-          return doc
-        })
-        res.status(200).json(docsWithPermissions as DocumentData[])
+        const docs = await fetchUserDocuments(session.user.sub)
+        res.status(200).json(docs)
       }
       break
     default:

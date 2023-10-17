@@ -1,8 +1,10 @@
 import * as realAuth from '@auth0/nextjs-auth0'
+import { IncomingMessage, ServerResponse } from 'http'
 import { NextApiHandler, NextApiRequest, NextApiResponse } from 'next'
 import * as mockAuth from './auth0-mocks'
 
 const isAuthMocked = process.env.MOCK_AUTH === 'true'
+// console.log('MOCK_AUTH set to', isAuthMocked)
 
 export function handleAuth() {
   if (isAuthMocked) {
@@ -18,7 +20,7 @@ export function useUser() {
   return realAuth.useUser()
 }
 
-export function getSession(req: NextApiRequest, res: NextApiResponse) {
+export function getSession(req: NextApiRequest | IncomingMessage, res: NextApiResponse | ServerResponse) {
   if (isAuthMocked) {
     return mockAuth.getSession(req, res)
   }

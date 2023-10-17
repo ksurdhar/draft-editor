@@ -1,5 +1,6 @@
 import { DotsHorizontalIcon } from "@heroicons/react/solid"
 import { format } from "date-fns"
+import { GetServerSideProps, GetServerSidePropsContext } from "next"
 import Head from "next/head"
 import Link from "next/link"
 import { useRouter } from "next/router"
@@ -7,25 +8,32 @@ import { useEffect, useState } from "react"
 import useSWR, { useSWRConfig } from "swr"
 import Layout from "../../components/layout"
 import { Loader } from "../../components/loader"
+import { fetchUserDocuments } from "../../controllers/documents"
 import { useSpinner } from "../../lib/hooks"
 import API from "../../lib/http-utils"
-import { withPageAuthRequired } from '../../mocks/auth-wrapper'
+import { getSession, withPageAuthRequired } from '../../mocks/auth-wrapper'
 import { DocumentData } from "../../types/globals"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
-const useDocSync = () => {
-  const { data: docs, mutate } = useSWR<DocumentData[]>('/api/documents', fetcher)
+const useDocSync = (initialDocs: DocumentData[]) => {
+  const { data: docs = initialDocs, mutate } = useSWR<DocumentData[]>('/api/documents', fetcher, { fallbackData: initialDocs })
+
   useEffect(() => {
     docs?.forEach((doc) => {
       sessionStorage.setItem(doc.id, JSON.stringify(doc))
     })
   }, [docs])
+
   return { docs, mutate }
 }
 
-const DocumentsPage = () => {
-  const { docs, mutate } = useDocSync()
+type DocumentsPageProps = {
+  initialDocs: DocumentData[]
+}
+
+const DocumentsPage: React.FC<DocumentsPageProps> = ({ initialDocs }) => {
+  const { docs, mutate } = useDocSync(initialDocs)
   const safeDocs = docs ? docs : []
   const { cache } = useSWRConfig()
 
@@ -159,3 +167,12 @@ const DocumentsPage = () => {
 }
 
 export default withPageAuthRequired(DocumentsPage)
+
+export const getServerSideProps: GetServerSideProps = async (context: GetServerSidePropsContext) => {
+  const session = getSession(context.req, context.res)
+  const docs = await fetchUserDocuments(session?.user.sub)
+  console.log('docs length on the server', docs.length)
+  return {
+    props: { docs }
+  }
+}

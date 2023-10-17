@@ -2,7 +2,7 @@ import Mongoose, { Document, Model } from 'mongoose'
 
 // Mongo Init Code
 if (!global.db) {
-  const MONGO_DB = process.env.MOCK_AUTH === 'true' 
+  const MONGO_DB = process.env.LOCAL_DB === 'true' 
   ? 'mongodb://localhost:27017/whetstone'
   : `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_CLUSTER}.mongodb.net/${process.env.DB_NAME}?retryWrites=true&w=majority`
   Mongoose.connect(MONGO_DB)

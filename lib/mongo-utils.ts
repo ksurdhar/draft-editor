@@ -11,7 +11,8 @@ declare global {
 
 export const getDocuments = async (userId: string) => {
   const documents = await Doc.find({ userId })
-  return documents.map((document) => document.toJSON())
+  // hack for older nextjs
+  return documents.map((document) => JSON.parse(JSON.stringify(document)))
 }
 
 export const getEverybodysDocuments = async () => {
