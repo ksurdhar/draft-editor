@@ -1,3 +1,4 @@
+'use client'
 import InsertDriveFileTwoToneIcon from '@mui/icons-material/InsertDriveFileTwoTone'
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@mui/material'
 import Table from '@mui/material/Table'

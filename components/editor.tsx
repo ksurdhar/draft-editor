@@ -1,12 +1,13 @@
+'use client'
 import { useEffect, useRef, useState } from 'react'
 import { Descendant, Editor, Node, Text, Transforms } from 'slate'
 import { Editable, Slate } from 'slate-react'
 import { HighlightColor, renderElement, renderLeaf } from '../lib/slate-renderers'
 import { countWords, removePending } from '../lib/slate-utils'
-import { useMouse } from '../pages/_app'
 import { DocumentData, WhetstoneEditor } from '../types/globals'
 import Footer from './footer'
 import { useEditorFades } from './header'
+import { useMouse } from './providers'
 
 type EditorProps = {
   id: string

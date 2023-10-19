@@ -1,13 +1,12 @@
+'use client'
 import Link from 'next/link'
-import { useRouter } from 'next/router'
-import { useEffect, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { Fragment, useEffect, useState } from 'react'
 import useSWR, { mutate } from 'swr'
 import API, { fetcher } from '../lib/http-utils'
 import { useUser } from '../mocks/auth-wrapper'
-import { useMouse } from '../pages/_app'
 import { DocumentData } from '../types/globals'
-
-import * as React from 'react'
+import { useMouse } from './providers'
 
 import Box from '@mui/material/Box'
 import Divider from '@mui/material/Divider'
@@ -40,9 +39,9 @@ const useScrollPosition = () => {
 }
 
 export const useEditorFades = (isMouseStill: boolean) => {
-  const router = useRouter()
+  const pathname = usePathname()
   const scrollPosition = useScrollPosition()
-  const editorActive = router.pathname.includes('/documents/')
+  const editorActive = (pathname || '').includes('/documents/')
   const [ fadeHeader, setFadeHeader ] = useState(false)
 
   useEffect(() => {
@@ -79,11 +78,11 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
     setMenuOpen(open)
   }
 
-  const [isShareModalOpen, setIsShareModalOpen] = React.useState(false)
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false)
   const openShareModal = () => setIsShareModalOpen(true)
   const closeShareModal = () => setIsShareModalOpen(false)
 
-  const [isVersionModalOpen, setIsVersionModalOpen] = React.useState(false)
+  const [isVersionModalOpen, setIsVersionModalOpen] = useState(false)
   const openVersionModal = () => {
     mutate(`/api/documents/${documentId}/versions`)
     setIsVersionModalOpen(true)
@@ -106,7 +105,7 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
       </header>
 
       <div className={`${fadeOut && !hoveringOverMenu && !menuOpen ? 'opacity-0' : 'opacity-100'} transition-opacity duration-700 flex flex-row-reverse z-50 fixed right-[20px] top-[20px]`}>
-        <React.Fragment>          
+        <Fragment>          
           <div onClick={toggleDrawer(true)} 
             className={`hamburger hamburger--spin ${ menuOpen ? 'is-active' : ''}`}>
             <span className="hamburger-box">
@@ -184,7 +183,7 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
               document={hybridDoc}
             />
           }
-        </React.Fragment>
+        </Fragment>
       </div>
     </>
   )

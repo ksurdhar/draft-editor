@@ -1,3 +1,4 @@
+'use client'
 export const Loader = () => {
   return (
     <div className='flex flex-row justify-center'>

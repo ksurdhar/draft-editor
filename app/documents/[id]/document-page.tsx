@@ -1,29 +1,22 @@
-import { CloudIcon } from "@heroicons/react/solid"
-import { GetServerSideProps, InferGetServerSidePropsType } from "next"
-import Head from "next/head"
-import { useCallback, useEffect, useState } from "react"
-import { Descendant, Node, NodeEntry, createEditor } from "slate"
-import { withHistory } from "slate-history"
-import { withReact } from "slate-react"
-import useSWR, { mutate } from "swr"
-import { useDebouncedCallback } from "use-debounce"
-import CommentEditor from "../../components/comment-editor"
-import Editor from "../../components/editor"
-import Layout from "../../components/layout"
-import { Loader } from "../../components/loader"
-import { useSpinner, useSyncHybridDoc } from "../../lib/hooks"
-import API, { fetcher } from "../../lib/http-utils"
-import { cancelComment, captureCommentRef, checkForComment, commitComment, removeComment } from "../../lib/slate-utils"
-import { useUser } from '../../mocks/auth-wrapper'
-import { AnimationState, CommentData, DocumentData } from "../../types/globals"
+'use client'
 
-export const getServerSideProps: GetServerSideProps = async ({ params }) => {
-  return {
-    props: {
-      id: params && params.id
-    },
-  }
-}
+import { CloudIcon } from '@heroicons/react/solid'
+import { usePathname } from 'next/navigation'
+import { useCallback, useEffect, useState } from 'react'
+import { Descendant, Node, NodeEntry, createEditor } from 'slate'
+import { withHistory } from 'slate-history'
+import { withReact } from 'slate-react'
+import useSWR, { mutate } from 'swr'
+import { useDebouncedCallback } from 'use-debounce'
+import CommentEditor from '../../../components/comment-editor'
+import Editor from '../../../components/editor'
+import Layout from '../../../components/layout'
+import { Loader } from '../../../components/loader'
+import { useSpinner, useSyncHybridDoc } from '../../../lib/hooks'
+import API, { fetcher } from '../../../lib/http-utils'
+import { cancelComment, captureCommentRef, checkForComment, commitComment, removeComment } from '../../../lib/slate-utils'
+import { useUser } from '../../../mocks/auth-wrapper'
+import { AnimationState, CommentData, DocumentData } from '../../../types/globals'
 
 const backdropStyles = `
   fixed top-0 left-0 h-screen w-screen z-[-1]
@@ -45,10 +38,12 @@ const save = async (data: Partial<DocumentData>, id: string, setRecentlySaved: (
   setRecentlySaved(true)
 }
 
-export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof getServerSideProps>) {  
+export default function DocumentPage() {  
+  const pathname = usePathname()
+  const id = (pathname || '').split('/').pop() || ''
   const [ editor ] = useState(() => withReact(withHistory(createEditor())))
   
-  const { data: databaseDoc, error } = useSWR<DocumentData, Error>(`/api/documents/${id}`, fetcher) 
+  const { data: databaseDoc } = useSWR<DocumentData, Error>(`/api/documents/${id}`, fetcher) 
   const [ hybridDoc, setHybridDoc ] = useState<DocumentData | null>()
   useSyncHybridDoc(id, databaseDoc, setHybridDoc)
 
@@ -147,60 +142,55 @@ export default function DocumentPage({ id }: InferGetServerSidePropsType<typeof 
   }, [isLoading, setInitAnimate])
 
   return (
-    <>
-      <Head>
-        <title>{`whetstone - ${hybridDoc?.title}`}</title>
-      </Head>
-      <Layout documentId={id}>
-        <div className={`gradient ${initAnimate ? 'opacity-0' : 'opacity-100' } ${backdropStyles}`}/>
-        <div className={`gradient-editor ${initAnimate ? 'opacity-100' : 'opacity-0' } ${backdropStyles}`}/>
-        { recentlySaved && (
-          <div className={`fixed top-0 right-[30px] z-[40] p-[20px]`}>
-            <CloudIcon className='animate-bounce fill-black/[.10] md:fill-black/[.15] h-[20px] w-[20px] md:h-[24px] md:w-[24px] self-center'/>
-          </div>
-        )}
-        <div id="editor-container" className={`flex justify-center h-[100vh] overflow-y-scroll pb-10 p-[20px] text-black/[.79] font-editor2`}>
-          <div className={`
-              duration-500 transition-flex
-              flex ease-in ${showSpinner ? 'justify-center flex-col mt-[-36px]' : ''}
-              relative max-w-[740px] min-w-[calc(100vw_-_40px)] md:min-w-[0px] pb-10`}>
-            { showSpinner && <Loader/> }
-            { hybridDoc && 
-              <Editor id={id} 
-                text={JSON.parse(hybridDoc.content)}
-                editor={editor}
-                commentActive={commentActive !== 'Inactive'}
-                openCommentId={openCommentId}
-                openComment={openComment}
-                title={hybridDoc.title} 
-                onUpdate={(data) => {
-                  debouncedSave(data)
-                }}
-                canEdit={!!hybridDoc.canEdit}
-              />
-            }
-          </div>
-          <div className={`
-            duration-500 transition-flex ${commentActive !== 'Inactive' ? 'flex-[1]' : 'flex-0'}
-            max-w-[740px]
-          `}>
-          { commentActive === 'Complete' && 
-            <CommentEditor 
-              comment={commentText}
-              isPending={!Boolean(openCommentId)} 
-              onSubmit={(text) => {
-                openCommentId ? updateComment(text, openCommentId) : addComment(text)            
-                cleanCommentState()
+    <Layout documentId={id}>
+      <div className={`gradient ${initAnimate ? 'opacity-0' : 'opacity-100' } ${backdropStyles}`}/>
+      <div className={`gradient-editor ${initAnimate ? 'opacity-100' : 'opacity-0' } ${backdropStyles}`}/>
+      { recentlySaved && (
+        <div className={`fixed top-0 right-[30px] z-[40] p-[20px]`}>
+          <CloudIcon className='animate-bounce fill-black/[.10] md:fill-black/[.15] h-[20px] w-[20px] md:h-[24px] md:w-[24px] self-center'/>
+        </div>
+      )}
+      <div id='editor-container' className={`flex justify-center h-[100vh] overflow-y-scroll pb-10 p-[20px] text-black/[.79] font-editor2`}>
+        <div className={`
+            duration-500 transition-flex
+            flex ease-in ${showSpinner ? 'justify-center flex-col mt-[-36px]' : ''}
+            relative max-w-[740px] min-w-[calc(100vw_-_40px)] md:min-w-[0px] pb-10`}>
+          { showSpinner && <Loader/> }
+          { hybridDoc && 
+            <Editor id={id} 
+              text={JSON.parse(hybridDoc.content)}
+              editor={editor}
+              commentActive={commentActive !== 'Inactive'}
+              openCommentId={openCommentId}
+              openComment={openComment}
+              title={hybridDoc.title} 
+              onUpdate={(data) => {
+                debouncedSave(data)
               }}
-              onCancel={() => {
-                cleanCommentState()
-                if (pendingCommentRef) cancelComment(editor)
-              }}
-              deleteComment={deleteComment}
-            />}
-         </div>
-        </div> 
-      </Layout> 
-    </>
+              canEdit={!!hybridDoc.canEdit}
+            />
+          }
+        </div>
+        <div className={`
+          duration-500 transition-flex ${commentActive !== 'Inactive' ? 'flex-[1]' : 'flex-0'}
+          max-w-[740px]
+        `}>
+        { commentActive === 'Complete' && 
+          <CommentEditor 
+            comment={commentText}
+            isPending={!Boolean(openCommentId)} 
+            onSubmit={(text) => {
+              openCommentId ? updateComment(text, openCommentId) : addComment(text)            
+              cleanCommentState()
+            }}
+            onCancel={() => {
+              cleanCommentState()
+              if (pendingCommentRef) cancelComment(editor)
+            }}
+            deleteComment={deleteComment}
+          />}
+        </div>
+      </div> 
+    </Layout> 
   )
 }
