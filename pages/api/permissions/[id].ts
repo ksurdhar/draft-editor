@@ -7,7 +7,9 @@ export default async function permissionHandler(req: NextApiRequest, res: NextAp
   const { query, method } = req
   const session = getSession(req, res)
 
-  const permission = await getPermissionByDoc(query.id.toString()) as PermissionData
+  const permissionId = (query.id?.toString() || '')
+
+  const permission = await getPermissionByDoc(permissionId) as PermissionData
   const isOwner = permission.ownerId === session?.user.sub
   
   switch (method) {
@@ -19,7 +21,7 @@ export default async function permissionHandler(req: NextApiRequest, res: NextAp
 
     case 'PATCH':
       if (isOwner) {
-        const updatedPermission = await updatePermissionByDoc(query.id.toString(), req.body) as PermissionData
+        const updatedPermission = await updatePermissionByDoc(permissionId, req.body) as PermissionData
         return res.status(200).json(updatedPermission)
       }
       return res.status(400).send({ error: 'you do not have the permissions to modify this resource' })

@@ -5,7 +5,7 @@ import { VersionData } from '../../../types/globals'
 
 export default withApiAuthRequired(async function versionHandler(req: NextApiRequest, res: NextApiResponse) {
   const { query, method } = req
-  const versionId = query.id.toString()
+  const versionId = (query.id?.toString() || '')
 
   // apply access control via auth0's interface
   switch (method) {

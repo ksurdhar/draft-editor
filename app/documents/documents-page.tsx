@@ -1,16 +1,17 @@
-import { DotsHorizontalIcon } from "@heroicons/react/solid"
-import { format } from "date-fns"
-import Head from "next/head"
-import Link from "next/link"
-import { useRouter } from "next/router"
-import { useEffect, useState } from "react"
-import useSWR, { useSWRConfig } from "swr"
-import Layout from "../../components/layout"
-import { Loader } from "../../components/loader"
-import { useSpinner } from "../../lib/hooks"
-import API from "../../lib/http-utils"
+'use client'
+
+import { DotsHorizontalIcon } from '@heroicons/react/solid'
+import { format } from 'date-fns'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import useSWR, { useSWRConfig } from 'swr'
+import Layout from '../../components/layout'
+import { Loader } from '../../components/loader'
+import { useSpinner } from '../../lib/hooks'
+import API from '../../lib/http-utils'
 import { withPageAuthRequired } from '../../mocks/auth-wrapper'
-import { DocumentData } from "../../types/globals"
+import { DocumentData } from '../../types/globals'
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
@@ -54,15 +55,15 @@ const DocumentsPage = () => {
         }}
         key={id}
       >
-        <div className="grow self-center whitespace-nowrap overflow-hidden text-ellipsis">
+        <div className='grow self-center whitespace-nowrap overflow-hidden text-ellipsis'>
           <Link href={`/documents/${id}`}>{title}</Link>
         </div>
 
-        <div className="min-w-[7rem] w-28 md:w-44 md:min-w-[11rem] self-center text-black/[.65]">
+        <div className='min-w-[7rem] w-28 md:w-44 md:min-w-[11rem] self-center text-black/[.65]'>
           {format(new Date(lastUpdated), 'PP')}
         </div>
 
-      <div className="flex items-center">
+      <div className='flex items-center'>
         <div className='rounded-full h-[28px] w-[28px] flex flex-col justify-center hover:bg-black/[.10]'
           onClick={async (e) => {
             e.stopPropagation()
@@ -89,12 +90,9 @@ const DocumentsPage = () => {
 
   return (
     <>
-    <Head>
-      <title>whetstone</title>
-    </Head>
     <Layout>
       <div className='gradient absolute top-0 left-0 h-screen w-screen z-[-1]'/>
-      <div className="relative top-[44px] flex justify-center h-[calc(100vh_-_44px)] pb-10"
+      <div className='relative top-[44px] flex justify-center h-[calc(100vh_-_44px)] pb-10'
         onClick={() => {
           if (selectedDocId || renameActive) {
             setSelectedDoc(null)
@@ -117,31 +115,42 @@ const DocumentsPage = () => {
                 <button onClick={(e) => {
                   e.stopPropagation()
                   setRenameActive(true)
-                }} className="file-button hover:bg-white/[.15]" role="button">rename</button>
+                }} className='file-button hover:bg-white/[.15]' role='button'>rename</button>
                 <button onClick={async (e) => {
                   e.stopPropagation()
+                  const updatedDocs = safeDocs.filter(doc => doc.id !== selectedDocId)
+                  mutate(updatedDocs, false)
+                  setSelectedDoc(null)
                   try {
                     await API.delete(`/api/documents/${selectedDocId}`)
-                    mutate()
-                  } catch(e) {
+                  } catch (e) {
                     console.log(e)
+                    mutate()
                   }
-                  setSelectedDoc(null)
                 }}
-                  className="file-button file-button-red hover:bg-white/[.15]" role="button">delete</button>
+                  className='file-button file-button-red hover:bg-white/[.15]' role='button'>delete</button>
               </>
             }
              {
               renameActive && 
               <form className={'w-[70%]'} onSubmit={async (e) => {
                 e.preventDefault()
-                await API.patch(`/api/documents/${selectedDocId}`, {
-                  title: newName,
-                  lastUpdated: Date.now()
-                }) 
-                setRenameActive(false)
+                const updatedDocs = safeDocs.map(doc => 
+                  doc.id === selectedDocId ? { ...doc, title: newName } : doc
+                )
+                mutate(updatedDocs, false)
                 setSelectedDoc(null)
-                mutate()
+                setRenameActive(false)
+                try {
+                  await API.patch(`/api/documents/${selectedDocId}`, {
+                    title: newName,
+                    lastUpdated: Date.now()
+                  })
+                } catch (e) {
+                  console.log(e)
+                  mutate()
+                }
+            
                 cache.delete(`/api/documents/${selectedDocId}`)
               }}>
                 <input onChange={(e) => setNewName(e.currentTarget.value)} onClick={(e) => e.stopPropagation()} type='text' spellCheck='false' autoFocus placeholder={`New Title`} className={

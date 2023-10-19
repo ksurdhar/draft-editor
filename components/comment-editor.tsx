@@ -1,3 +1,4 @@
+'use client'
 import Button from '@mui/material/Button'
 import { useEffect, useRef, useState } from 'react'
 import { Descendant, createEditor } from 'slate'

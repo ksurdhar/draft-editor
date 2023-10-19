@@ -1,14 +1,14 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
-    "./pages/**/*.{js,ts,jsx,tsx}",
-    "./components/**/*.{js,ts,jsx,tsx}",
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
+    './pages/**/*.{js,ts,jsx,tsx}',
+    './components/**/*.{js,ts,jsx,tsx}',
   ],
   theme: {
     fontFamily: {
-      'editor': ['EB Garamond', 'serif'],
-      'editor2': ['Ibarra Real Nova', 'serif'],
-      'index': ['Mukta', 'sans-serif'],
+      'editor2': ['var(--font-ibarra)'],
+      'index': ['var(--font-mukta)'],
     },
     extend: {
       keyframes: {

@@ -1,8 +1,8 @@
+'use client'
 import '../styles/globals.css'
 import '../styles/hamburgers/hamburgers.scss'
 import '../styles/loading-indicator.css'
 
-import type { AppProps } from 'next/app'
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react'
 import { UserProvider } from '../mocks/auth-wrapper'
 
@@ -32,7 +32,7 @@ const useDebouncedEffect = (effect: () => void, deps: any[], delay: number) => {
   useEffect(() => {
     const handler = setTimeout(() => effect(), delay)
     return () => clearTimeout(handler)
-  }, [...deps || [], delay, effect])
+  }, [deps, delay, effect])
 }
 
 export function MouseProvider({ children }: Props) {
@@ -69,16 +69,14 @@ export function MouseProvider({ children }: Props) {
   )
 }
 
-function MyApp({ Component, pageProps }: AppProps) {
+function Providers({ children }: {children: ReactNode}) {
   return (
-    <>
-      <MouseProvider>
-        <UserProvider>
-          <Component {...pageProps} />
-        </UserProvider>
-      </MouseProvider>
-    </>
+    <MouseProvider>
+      <UserProvider>
+        { children }
+      </UserProvider>
+    </MouseProvider>
   )
 }
 
-export default MyApp
+export default Providers

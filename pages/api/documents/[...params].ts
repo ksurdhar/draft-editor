@@ -6,7 +6,7 @@ import { VersionData } from '../../../types/globals'
 export default withApiAuthRequired(async function nestedDocumentsHandler(req: NextApiRequest, res: NextApiResponse) {
   const { query, method  } = req
   const session = getSession(req, res)
-  const documentId = query.params[0]
+  const documentId = query.params && query.params.length > 0 ? query.params[0] : ''
 
   // /documents/123/versions GET
   // /documents/123/versions POST

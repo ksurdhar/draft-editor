@@ -31,5 +31,5 @@ export const useSyncHybridDoc = (id: string, databaseDoc: DocumentData | undefin
       // console.log('document cached, using session storage doc')
       setHybridDoc(cachedDoc as DocumentData)
     }
-  }, [databaseDoc, setHybridDoc])
+  }, [databaseDoc, setHybridDoc, id])
 }
