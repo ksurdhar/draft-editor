@@ -90,8 +90,9 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, comme
             onUpdate({ title: `${e.currentTarget.textContent}` })
           }}
           suppressContentEditableWarning={true}
-          dangerouslySetInnerHTML={{__html: titleState.current }}
-        />
+        >
+        { titleState.current }
+        </div>
       </div>
       <div ref={containerRef}>
         <Slate editor={editor} key={id} value={text} 
