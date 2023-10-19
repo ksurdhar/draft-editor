@@ -118,13 +118,15 @@ const DocumentsPage = () => {
                 }} className='file-button hover:bg-white/[.15]' role='button'>rename</button>
                 <button onClick={async (e) => {
                   e.stopPropagation()
+                  const updatedDocs = safeDocs.filter(doc => doc.id !== selectedDocId)
+                  mutate(updatedDocs, false)
+                  setSelectedDoc(null)
                   try {
                     await API.delete(`/api/documents/${selectedDocId}`)
-                    mutate()
-                  } catch(e) {
+                  } catch (e) {
                     console.log(e)
+                    mutate()
                   }
-                  setSelectedDoc(null)
                 }}
                   className='file-button file-button-red hover:bg-white/[.15]' role='button'>delete</button>
               </>
@@ -133,13 +135,22 @@ const DocumentsPage = () => {
               renameActive && 
               <form className={'w-[70%]'} onSubmit={async (e) => {
                 e.preventDefault()
-                await API.patch(`/api/documents/${selectedDocId}`, {
-                  title: newName,
-                  lastUpdated: Date.now()
-                }) 
-                setRenameActive(false)
+                const updatedDocs = safeDocs.map(doc => 
+                  doc.id === selectedDocId ? { ...doc, title: newName } : doc
+                )
+                mutate(updatedDocs, false)
                 setSelectedDoc(null)
-                mutate()
+                setRenameActive(false)
+                try {
+                  await API.patch(`/api/documents/${selectedDocId}`, {
+                    title: newName,
+                    lastUpdated: Date.now()
+                  })
+                } catch (e) {
+                  console.log(e)
+                  mutate()
+                }
+            
                 cache.delete(`/api/documents/${selectedDocId}`)
               }}>
                 <input onChange={(e) => setNewName(e.currentTarget.value)} onClick={(e) => e.stopPropagation()} type='text' spellCheck='false' autoFocus placeholder={`New Title`} className={
