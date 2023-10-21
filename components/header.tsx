@@ -2,6 +2,7 @@
 import API, { fetcher } from '@lib/http-utils'
 import { DocumentData } from '@typez/globals'
 import { useUser } from '@wrappers/auth-wrapper-client'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Fragment, useEffect, useState } from 'react'
@@ -16,8 +17,8 @@ import List from '@mui/material/List'
 import ListItem from '@mui/material/ListItem'
 import ListItemButton from '@mui/material/ListItemButton'
 import ListItemText from '@mui/material/ListItemText'
-import ShareModal from './share-modal'
-import VersionModal from './version-modal'
+const ShareModal = dynamic(() => import('./share-modal'))
+const VersionModal = dynamic(() => import('./version-modal'))
 
 const useScrollPosition = () => {
   const [scrollPosition, setScrollPosition] = useState(0)

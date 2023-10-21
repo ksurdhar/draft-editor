@@ -1,6 +1,4 @@
 'use client'
-
-import CommentEditor from '@components/comment-editor'
 import Editor from '@components/editor'
 import Layout from '@components/layout'
 import { Loader } from '@components/loader'
@@ -10,7 +8,10 @@ import API, { fetcher } from '@lib/http-utils'
 import { cancelComment, captureCommentRef, checkForComment, commitComment, removeComment } from '@lib/slate-utils'
 import { AnimationState, CommentData, DocumentData } from '@typez/globals'
 import { useUser } from '@wrappers/auth-wrapper-client'
+import dynamic from 'next/dynamic'
 import { usePathname } from 'next/navigation'
+const CommentEditor = dynamic(() => import('@components/comment-editor'))
+
 import { useCallback, useEffect, useState } from 'react'
 import { Descendant, Node, NodeEntry, createEditor } from 'slate'
 import { withHistory } from 'slate-history'

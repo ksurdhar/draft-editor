@@ -1,4 +1,5 @@
 'use client'
+import { ReactNode } from 'react'
 import HeaderComponent from './header'
 import { useMouse } from './providers'
 
@@ -7,7 +8,7 @@ type Props = {
   documentId?: string
 }
 
-const Layout = ({ children, documentId }: Props) => {
+const Layout = ({ children, documentId }: Props): ReactNode => {
   const { onMouseMove } = useMouse()
 
   return (
