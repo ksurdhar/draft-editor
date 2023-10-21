@@ -5,7 +5,7 @@ import { PermissionData } from '../../../types/globals'
 
 export default async function permissionHandler(req: NextApiRequest, res: NextApiResponse) {
   const { query, method } = req
-  const session = getSession(req, res)
+  const session = await getSession(req, res)
 
   const permissionId = (query.id?.toString() || '')
 

@@ -5,7 +5,7 @@ import { DocumentData, PermissionData, UserPermission } from '../../../types/glo
 
 export default async function documentHandler(req: NextApiRequest, res: NextApiResponse) {
   const { query, method  } = req
-  const session = getSession(req, res)
+  const session = await getSession(req, res)
   const documentId = (query.id?.toString() || '')
 
   let permissions = await getPermissionByDoc(documentId) as PermissionData

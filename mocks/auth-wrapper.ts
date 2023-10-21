@@ -11,13 +11,6 @@ export function handleAuth() {
   return realAuth.handleAuth()
 }
 
-export function useUser() {
-  if (isAuthMocked) {
-    return mockAuth.useUser()
-  }
-  return realAuth.useUser()
-}
-
 export function getSession(req: NextApiRequest, res: NextApiResponse) {
   if (isAuthMocked) {
     return mockAuth.getSession(req, res)
@@ -31,12 +24,3 @@ export function withApiAuthRequired(handler: NextApiHandler) {
   }
   return realAuth.withApiAuthRequired(handler)
 }
-
-export function withPageAuthRequired(reactCmp: any) {
-  if (isAuthMocked) {
-    return mockAuth.withPageAuthRequired(reactCmp)
-  }
-  return realAuth.withPageAuthRequired(reactCmp)
-}
-
-export const UserProvider = isAuthMocked ? mockAuth.MockUserProvider : realAuth.UserProvider

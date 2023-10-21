@@ -5,6 +5,7 @@ if (!global.db) {
   const MONGO_DB = process.env.MOCK_AUTH === 'true' 
   ? 'mongodb://localhost:27017/whetstone'
   : `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_CLUSTER}.mongodb.net/${process.env.DB_NAME}?retryWrites=true&w=majority`
+  Mongoose.set('strictQuery', true)
   Mongoose.connect(MONGO_DB)
   global.db = Mongoose.connection
 }

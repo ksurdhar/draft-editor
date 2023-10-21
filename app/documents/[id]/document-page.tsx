@@ -15,7 +15,7 @@ import { Loader } from '../../../components/loader'
 import { useSpinner, useSyncHybridDoc } from '../../../lib/hooks'
 import API, { fetcher } from '../../../lib/http-utils'
 import { cancelComment, captureCommentRef, checkForComment, commitComment, removeComment } from '../../../lib/slate-utils'
-import { useUser } from '../../../mocks/auth-wrapper'
+import { useUser } from '../../../mocks/auth-wrapper-client'
 import { AnimationState, CommentData, DocumentData } from '../../../types/globals'
 
 const backdropStyles = `

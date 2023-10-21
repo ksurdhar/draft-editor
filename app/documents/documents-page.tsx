@@ -10,7 +10,7 @@ import Layout from '../../components/layout'
 import { Loader } from '../../components/loader'
 import { useSpinner } from '../../lib/hooks'
 import API from '../../lib/http-utils'
-import { withPageAuthRequired } from '../../mocks/auth-wrapper'
+import { withPageAuthRequired } from '../../mocks/auth-wrapper-client'
 import { DocumentData } from '../../types/globals'
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())

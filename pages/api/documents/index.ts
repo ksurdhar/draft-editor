@@ -5,7 +5,7 @@ import { DocumentData } from '../../../types/globals'
 
 export default withApiAuthRequired(async function documentsHandler(req: NextApiRequest, res: NextApiResponse) {
   const { method } = req
-  const session = getSession(req, res)
+  const session = await getSession(req, res)
 
   switch (method) {
     case 'POST': 
@@ -15,6 +15,7 @@ export default withApiAuthRequired(async function documentsHandler(req: NextApiR
       break
     case 'GET':
       if (session) {
+        
         const documents = await getDocuments(session.user.sub)
         const docsWithPermissions = documents.map(doc => {
           doc.canEdit = true

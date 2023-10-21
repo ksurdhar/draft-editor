@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { Fragment, useEffect, useState } from 'react'
 import useSWR, { mutate } from 'swr'
 import API, { fetcher } from '../lib/http-utils'
-import { useUser } from '../mocks/auth-wrapper'
+import { useUser } from '../mocks/auth-wrapper-client'
 import { DocumentData } from '../types/globals'
 import { useMouse } from './providers'
 

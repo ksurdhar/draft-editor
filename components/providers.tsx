@@ -4,7 +4,7 @@ import '../styles/hamburgers/hamburgers.scss'
 import '../styles/loading-indicator.css'
 
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react'
-import { UserProvider } from '../mocks/auth-wrapper'
+import { UserProvider } from '../mocks/auth-wrapper-client'
 
 type mouseContextType = {
   hoveringOverMenu: boolean
