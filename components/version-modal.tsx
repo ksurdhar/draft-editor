@@ -13,8 +13,8 @@ import { withReact } from 'slate-react'
 import useSWR from 'swr'
 import API, { fetcher } from '../lib/http-utils'
 import { countWords } from '../lib/slate-utils'
-import { useUser } from '../mocks/auth-wrapper-client'
 import { DocumentData, VersionData } from '../types/globals'
+import { useUser } from '../wrappers/auth-wrapper-client'
 import EditorComponent from './editor'
 
 interface VersionModalProps {

@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { deleteVersion, updateVersion } from "../../../lib/mongo-utils"
-import { withApiAuthRequired } from '../../../mocks/auth-wrapper'
 import { VersionData } from '../../../types/globals'
+import { withApiAuthRequired } from '../../../wrappers/auth-wrapper'
 
 export default withApiAuthRequired(async function versionHandler(req: NextApiRequest, res: NextApiResponse) {
   const { query, method } = req

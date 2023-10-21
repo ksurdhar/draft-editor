@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { createDocument, createPermission, getDocuments } from "../../../lib/mongo-utils"
-import { getSession, withApiAuthRequired } from '../../../mocks/auth-wrapper'
 import { DocumentData } from '../../../types/globals'
+import { getSession, withApiAuthRequired } from '../../../wrappers/auth-wrapper'
 
 export default withApiAuthRequired(async function documentsHandler(req: NextApiRequest, res: NextApiResponse) {
   const { method } = req

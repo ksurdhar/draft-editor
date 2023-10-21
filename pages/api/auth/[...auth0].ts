@@ -1,3 +1,3 @@
-import { handleAuth } from '../../../mocks/auth-wrapper'
+import { handleAuth } from '../../../wrappers/auth-wrapper'
 
 export default handleAuth()
