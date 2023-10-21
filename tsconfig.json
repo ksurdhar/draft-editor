@@ -19,7 +19,14 @@
     "noImplicitAny": true,
     "sourceMap": true,
     "baseUrl": ".",
-    "outDir": "dist"
+    "outDir": "dist",
+    "paths": {
+      "@components/*": ["components/*"],
+      "@styles/*": ["styles/*"],
+      "@wrappers/*": ["wrappers/*"],
+      "@lib/*": ["lib/*"],
+      "@typez/*": ["types/*"],
+    }
   },
   "include": [
     "next-env.d.ts",

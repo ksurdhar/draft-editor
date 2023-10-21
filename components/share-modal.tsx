@@ -1,13 +1,13 @@
 'use client'
+import { fetcher, updateDoc } from '@lib/http-utils'
 import AddIcon from '@mui/icons-material/Add'
 import RemoveIcon from '@mui/icons-material/Remove'
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, FormControl, IconButton, MenuItem, Select, TextField } from '@mui/material'
+import { DocumentData, PermissionData, ShareUser, UserPermission } from '@typez/globals'
+import { useUser } from '@wrappers/auth-wrapper-client'
 import { useEffect, useState } from 'react'
 import useSWR from 'swr'
 import useSWRMutation from 'swr/mutation'
-import { fetcher, updateDoc } from '../lib/http-utils'
-import { DocumentData, PermissionData, ShareUser, UserPermission } from '../types/globals'
-import { useUser } from '../wrappers/auth-wrapper-client'
 
 interface ShareModalProps {
   open: boolean

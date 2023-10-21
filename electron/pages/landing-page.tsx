@@ -1,5 +1,5 @@
+import { Container, Titles } from '@components/landing-page'
 import { useLocation } from 'wouter'
-import { Container, Titles } from '../../components/landing-page'
 
 const LandingPage = () => {
   const [_, setLocation] = useLocation()

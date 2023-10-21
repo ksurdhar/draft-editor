@@ -1,7 +1,7 @@
+import { createOrUpdateVersion, createPermission, deleteDocument, deletePermissionByDoc, getDocument, getPermissionByDoc, updateDocument } from "@lib/mongo-utils"
+import { DocumentData, PermissionData, UserPermission } from '@typez/globals'
+import { getSession } from '@wrappers/auth-wrapper'
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { createOrUpdateVersion, createPermission, deleteDocument, deletePermissionByDoc, getDocument, getPermissionByDoc, updateDocument } from "../../../lib/mongo-utils"
-import { DocumentData, PermissionData, UserPermission } from '../../../types/globals'
-import { getSession } from '../../../wrappers/auth-wrapper'
 
 export default async function documentHandler(req: NextApiRequest, res: NextApiResponse) {
   const { query, method  } = req

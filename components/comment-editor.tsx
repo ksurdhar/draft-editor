@@ -1,9 +1,9 @@
 'use client'
+import { renderElement, renderLeaf } from '@lib/slate-renderers'
 import Button from '@mui/material/Button'
 import { useEffect, useRef, useState } from 'react'
 import { Descendant, createEditor } from 'slate'
 import { Editable, Slate, withReact } from 'slate-react'
-import { renderElement, renderLeaf } from '../lib/slate-renderers'
 
 interface CommentEditorProps {
   onSubmit: (text: string) => void

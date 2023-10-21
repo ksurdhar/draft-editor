@@ -1,17 +1,17 @@
 'use client'
 
+import Layout from '@components/layout'
+import { Loader } from '@components/loader'
 import { DotsHorizontalIcon } from '@heroicons/react/solid'
+import { useSpinner } from '@lib/hooks'
+import API from '@lib/http-utils'
+import { DocumentData } from '@typez/globals'
+import { withPageAuthRequired } from '@wrappers/auth-wrapper-client'
 import { format } from 'date-fns'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
-import Layout from '../../components/layout'
-import { Loader } from '../../components/loader'
-import { useSpinner } from '../../lib/hooks'
-import API from '../../lib/http-utils'
-import { DocumentData } from '../../types/globals'
-import { withPageAuthRequired } from '../../wrappers/auth-wrapper-client'
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 

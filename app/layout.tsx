@@ -1,10 +1,10 @@
 import { Ibarra_Real_Nova, Mukta } from 'next/font/google'
 import { ReactNode } from 'react'
 
-import Providers from '../components/providers'
-import '../styles/globals.css'
-import '../styles/hamburgers/hamburgers.scss'
-import '../styles/loading-indicator.css'
+import Providers from '@components/providers'
+import '@styles/globals.css'
+import '@styles/hamburgers/hamburgers.scss'
+import '@styles/loading-indicator.css'
 
 const ibarra = Ibarra_Real_Nova({
   subsets: ['latin'],

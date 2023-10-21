@@ -1,7 +1,7 @@
+import { getPermissionByDoc, updatePermissionByDoc } from "@lib/mongo-utils"
+import { PermissionData } from '@typez/globals'
+import { getSession } from '@wrappers/auth-wrapper'
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { getPermissionByDoc, updatePermissionByDoc } from "../../../lib/mongo-utils"
-import { PermissionData } from '../../../types/globals'
-import { getSession } from '../../../wrappers/auth-wrapper'
 
 export default async function permissionHandler(req: NextApiRequest, res: NextApiResponse) {
   const { query, method } = req

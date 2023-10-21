@@ -1,5 +1,6 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import TsconfigPaths from 'vite-tsconfig-paths'
 
 // https://vitejs.dev/config
 export default defineConfig({
@@ -8,5 +9,5 @@ export default defineConfig({
       plugins: [require('tailwindcss'), require('autoprefixer')]
     }
   },
-  plugins: [react()]
+  plugins: [react(), TsconfigPaths()]
 })

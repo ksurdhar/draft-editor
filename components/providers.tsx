@@ -1,10 +1,10 @@
 'use client'
-import '../styles/globals.css'
-import '../styles/hamburgers/hamburgers.scss'
-import '../styles/loading-indicator.css'
+import '@styles/globals.css'
+import '@styles/hamburgers/hamburgers.scss'
+import '@styles/loading-indicator.css'
 
+import { UserProvider } from '@wrappers/auth-wrapper-client'
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react'
-import { UserProvider } from '../wrappers/auth-wrapper-client'
 
 type mouseContextType = {
   hoveringOverMenu: boolean
