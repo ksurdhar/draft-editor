@@ -10,8 +10,8 @@ import Layout from '../../components/layout'
 import { Loader } from '../../components/loader'
 import { useSpinner } from '../../lib/hooks'
 import API from '../../lib/http-utils'
-import { withPageAuthRequired } from '../../mocks/auth-wrapper-client'
 import { DocumentData } from '../../types/globals'
+import { withPageAuthRequired } from '../../wrappers/auth-wrapper-client'
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
@@ -58,26 +58,23 @@ const DocumentsPage = () => {
         <div className='grow self-center whitespace-nowrap overflow-hidden text-ellipsis'>
           <Link href={`/documents/${id}`}>{title}</Link>
         </div>
-
         <div className='min-w-[7rem] w-28 md:w-44 md:min-w-[11rem] self-center text-black/[.65]'>
           {format(new Date(lastUpdated), 'PP')}
         </div>
-
-      <div className='flex items-center'>
-        <div className='rounded-full h-[28px] w-[28px] flex flex-col justify-center hover:bg-black/[.10]'
-          onClick={async (e) => {
-            e.stopPropagation()
-            if (selectedDocId === id) {
-              setSelectedDoc(null)
-            } else {
-              setSelectedDoc(id)
-            }
-          }}
-        >
-          <DotsHorizontalIcon className='h-[16px] w-[16px] self-center'/>
+        <div className='flex items-center'>
+          <div className='rounded-full h-[28px] w-[28px] flex flex-col justify-center hover:bg-black/[.10]'
+            onClick={async (e) => {
+              e.stopPropagation()
+              if (selectedDocId === id) {
+                setSelectedDoc(null)
+              } else {
+                setSelectedDoc(id)
+              }
+            }}
+          >
+            <DotsHorizontalIcon className='h-[16px] w-[16px] self-center'/>
+          </div>
         </div>
-      </div>
-        
       </div>
     )
   })

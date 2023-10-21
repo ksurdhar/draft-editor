@@ -6,8 +6,8 @@ import { useEffect, useState } from 'react'
 import useSWR from 'swr'
 import useSWRMutation from 'swr/mutation'
 import { fetcher, updateDoc } from '../lib/http-utils'
-import { useUser } from '../mocks/auth-wrapper-client'
 import { DocumentData, PermissionData, ShareUser, UserPermission } from '../types/globals'
+import { useUser } from '../wrappers/auth-wrapper-client'
 
 interface ShareModalProps {
   open: boolean

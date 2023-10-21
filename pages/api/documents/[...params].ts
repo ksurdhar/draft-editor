@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { createVersion, getVersionsForDoc } from '../../../lib/mongo-utils'
-import { getSession, withApiAuthRequired } from '../../../mocks/auth-wrapper'
 import { VersionData } from '../../../types/globals'
+import { getSession, withApiAuthRequired } from '../../../wrappers/auth-wrapper'
 
 export default withApiAuthRequired(async function nestedDocumentsHandler(req: NextApiRequest, res: NextApiResponse) {
   const { query, method  } = req
