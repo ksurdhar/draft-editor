@@ -55,7 +55,7 @@ const extractBearerToken = async (req: ExtendedApiRequest): Promise<Claims | nul
 const withHybridAuth = (handler: (req: ExtendedApiRequest, res: NextApiResponse) => Promise<void>) => {
   return async (req: ExtendedApiRequest, res: NextApiResponse) => {
     try {
-      const userFromToken = extractBearerToken(req)
+      const userFromToken = await extractBearerToken(req)
 
       if (userFromToken) {
         // token-based authentication
