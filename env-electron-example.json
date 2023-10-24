@@ -1,0 +1,5 @@
+{
+  "API_IDENTIFIER": "https://www.whetstone-writer.com/api",
+  "AUTH0_DOMAIN": "auth0-domain",
+  "CLIENT_ID": "auth0-electron-client-id"
+}
