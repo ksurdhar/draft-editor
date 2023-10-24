@@ -1,7 +1,7 @@
 import { Claims } from "@auth0/nextjs-auth0"
 import { createDocument, createPermission, getDocuments } from "@lib/mongo-utils"
 import { DocumentData } from '@typez/globals'
-import { getSession, withApiAuthRequired } from '@wrappers/auth-wrapper'
+import { getSession } from '@wrappers/auth-wrapper'
 import jwt from 'jsonwebtoken'
 import jwksClient from 'jwks-rsa'
 import type { NextApiRequest, NextApiResponse } from 'next'
@@ -23,7 +23,7 @@ const getSigningKeyAsync = async (kid: string): Promise<string> => {
   })
 }
 
-export default withApiAuthRequired(async function documentsHandler(req: NextApiRequest, res: NextApiResponse) {
+export default async function documentsHandler(req: NextApiRequest, res: NextApiResponse) {
   const authHeader = req.headers.authorization
 
   let user: Claims | undefined 
@@ -76,4 +76,4 @@ export default withApiAuthRequired(async function documentsHandler(req: NextApiR
       res.setHeader('Allow', ['GET', 'POST'])
       res.status(405).end(`Method ${method} Not Allowed`)
   }
-})
+}
