@@ -38,3 +38,5 @@ yarn-error.log*
 /.vite
 
 /analyze
+
+env-electron.json
