@@ -8,7 +8,6 @@ const DocumentsPage = () => {
   useEffect(() => {
     const fetchDocuments = async () => {
       const result = await window.electronAPI.getDocuments()
-      console.log('result', result)
       setDocuments(result)
     }
     fetchDocuments()
@@ -16,7 +15,7 @@ const DocumentsPage = () => {
   console.log('documents', documents)
 
   return (
-    <div className='self-center text-center'>
+    <div className="self-center text-center">
       <a onClick={() => setLocation('/')}>You found your documents</a>
     </div>
   )

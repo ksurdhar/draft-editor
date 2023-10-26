@@ -13,12 +13,12 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json())
+const fetcher = (url: string) => fetch(url).then(res => res.json())
 
 const useDocSync = () => {
   const { data: docs, mutate } = useSWR<DocumentData[]>('/api/documents', fetcher)
   useEffect(() => {
-    docs?.forEach((doc) => {
+    docs?.forEach(doc => {
       sessionStorage.setItem(doc.id, JSON.stringify(doc))
     })
   }, [docs])
@@ -30,49 +30,49 @@ const DocumentsPage = () => {
   const safeDocs = docs ? docs : []
   const { cache } = useSWRConfig()
 
-  const [ selectedDocId , setSelectedDoc ] = useState<string | null>(null)
-  const [ renameActive , setRenameActive ] = useState(false)
-  const [ newName, setNewName ] = useState('')
-  const router =  useRouter()
+  const [selectedDocId, setSelectedDoc] = useState<string | null>(null)
+  const [renameActive, setRenameActive] = useState(false)
+  const [newName, setNewName] = useState('')
+  const router = useRouter()
   const showSpinner = useSpinner(!docs)
 
   const documentItems = safeDocs.map(({ id, title, lastUpdated }, idx) => {
     return (
-      <div className={`
-          animate-fadein
-          transition duration-[250ms]
-          ${id === selectedDocId ? 'bg-white/[.30] border-black/[.14]' : ''}
-          ${ selectedDocId && id !== selectedDocId ? 'opacity-40 pointer-events-none' : ''} 
-          flex justify-between min-h-[40px] px-[10px]
-          hover:cursor-pointer hover:bg-white/[.30] 
-          uppercase text-[14px] font-semibold
-          ${idx !== safeDocs.length - 1 ? 'border-b' : 'border-transparent'} border-solid border-black/[.35]`
-        }
+      <div
+        className={`
+          flex min-h-[40px] animate-fadein
+          justify-between border-solid border-black/[.35] px-[10px]
+          text-[14px] font-semibold 
+          uppercase transition duration-[250ms]
+          hover:cursor-pointer hover:bg-white/[.30]
+          ${id === selectedDocId ? 'border-black/[.14] bg-white/[.30]' : ''}
+          ${selectedDocId && id !== selectedDocId ? 'pointer-events-none opacity-40' : ''} 
+          ${idx !== safeDocs.length - 1 ? 'border-b' : 'border-transparent'} 
+        `}
         onClick={() => {
           if (!selectedDocId) {
             router.push(`/documents/${id}`)
           }
         }}
-        key={id}
-      >
-        <div className='grow self-center whitespace-nowrap overflow-hidden text-ellipsis'>
+        key={id}>
+        <div className="grow self-center overflow-hidden text-ellipsis whitespace-nowrap">
           <Link href={`/documents/${id}`}>{title}</Link>
         </div>
-        <div className='min-w-[7rem] w-28 md:w-44 md:min-w-[11rem] self-center text-black/[.65]'>
+        <div className="w-28 min-w-[7rem] self-center text-black/[.65] md:w-44 md:min-w-[11rem]">
           {format(new Date(lastUpdated), 'PP')}
         </div>
-        <div className='flex items-center'>
-          <div className='rounded-full h-[28px] w-[28px] flex flex-col justify-center hover:bg-black/[.10]'
-            onClick={async (e) => {
+        <div className="flex items-center">
+          <div
+            className="flex h-[28px] w-[28px] flex-col justify-center rounded-full hover:bg-black/[.10]"
+            onClick={async e => {
               e.stopPropagation()
               if (selectedDocId === id) {
                 setSelectedDoc(null)
               } else {
                 setSelectedDoc(id)
               }
-            }}
-          >
-            <DotsHorizontalIcon className='h-[16px] w-[16px] self-center'/>
+            }}>
+            <DotsHorizontalIcon className="h-[16px] w-[16px] self-center" />
           </div>
         </div>
       </div>
@@ -80,86 +80,104 @@ const DocumentsPage = () => {
   })
 
   const emptyMessage = (
-    <div className={'uppercase text-[14px] font-semibold text-center text-black/[.5]'}>
-      Empty / Go create something of worth 
+    <div className={'text-center text-[14px] font-semibold uppercase text-black/[.5]'}>
+      Empty / Go create something of worth
     </div>
   )
 
   return (
     <>
-    <Layout>
-      <div className='gradient absolute top-0 left-0 h-screen w-screen z-[-1]'/>
-      <div className='relative top-[44px] flex justify-center h-[calc(100vh_-_44px)] pb-10'
-        onClick={() => {
-          if (selectedDocId || renameActive) {
-            setSelectedDoc(null)
-            setTimeout(() => setRenameActive(false), 251) // bit of a hack to prevent animations
-          }          
-        }}
-      >
-        <div className={'flex flex-col justify-center w-11/12 sm:w-9/12 max-w-[740px]'}> 
-          <div className='overflow-y-scroll max-h-[280px]'>
-            { showSpinner && <Loader/> }
-            { documentItems }
-            { docs && documentItems.length < 1 && emptyMessage }
-          </div>
+      <Layout>
+        <div className="gradient absolute left-0 top-0 z-[-1] h-screen w-screen" />
+        <div
+          className="relative top-[44px] flex h-[calc(100vh_-_44px)] justify-center pb-10"
+          onClick={() => {
+            if (selectedDocId || renameActive) {
+              setSelectedDoc(null)
+              setTimeout(() => setRenameActive(false), 251) // bit of a hack to prevent animations
+            }
+          }}>
+          <div className={'flex w-11/12 max-w-[740px] flex-col justify-center sm:w-9/12'}>
+            <div className="max-h-[280px] overflow-y-scroll">
+              {showSpinner && <Loader />}
+              {documentItems}
+              {docs && documentItems.length < 1 && emptyMessage}
+            </div>
 
-          {/* the selected item's 'menu' area  */}
-          <div className={`${selectedDocId ? 'opacity-100' : 'opacity-0 pointer-events-none'} transition-opacity duration-[250ms] h-[40px] flex justify-evenly mt-[48px]`}>
-            {
-              !renameActive && 
-              <>
-                <button onClick={(e) => {
-                  e.stopPropagation()
-                  setRenameActive(true)
-                }} className='file-button hover:bg-white/[.15]' role='button'>rename</button>
-                <button onClick={async (e) => {
-                  e.stopPropagation()
-                  const updatedDocs = safeDocs.filter(doc => doc.id !== selectedDocId)
-                  mutate(updatedDocs, false)
-                  setSelectedDoc(null)
-                  try {
-                    await API.delete(`/api/documents/${selectedDocId}`)
-                  } catch (e) {
-                    console.log(e)
-                    mutate()
-                  }
-                }}
-                  className='file-button file-button-red hover:bg-white/[.15]' role='button'>delete</button>
-              </>
-            }
-             {
-              renameActive && 
-              <form className={'w-[70%]'} onSubmit={async (e) => {
-                e.preventDefault()
-                const updatedDocs = safeDocs.map(doc => 
-                  doc.id === selectedDocId ? { ...doc, title: newName } : doc
-                )
-                mutate(updatedDocs, false)
-                setSelectedDoc(null)
-                setRenameActive(false)
-                try {
-                  await API.patch(`/api/documents/${selectedDocId}`, {
-                    title: newName,
-                    lastUpdated: Date.now()
-                  })
-                } catch (e) {
-                  console.log(e)
-                  mutate()
-                }
-            
-                cache.delete(`/api/documents/${selectedDocId}`)
-              }}>
-                <input onChange={(e) => setNewName(e.currentTarget.value)} onClick={(e) => e.stopPropagation()} type='text' spellCheck='false' autoFocus placeholder={`New Title`} className={
-                  `w-[100%] bg-transparent border-x-0 border-t-0 border-b-[1px] focus:border-black/[.2] focus:ring-transparent ring-transparent 
-                  uppercase text-[18px] font-editor2 text-black/[.70] text-center placeholder:text-black/[.25]`} 
-                />
-             </form>
-            }
+            {/* the selected item's 'menu' area  */}
+            <div
+              className={`${
+                selectedDocId ? 'opacity-100' : 'pointer-events-none opacity-0'
+              } mt-[48px] flex h-[40px] justify-evenly transition-opacity duration-[250ms]`}>
+              {!renameActive && (
+                <>
+                  <button
+                    onClick={e => {
+                      e.stopPropagation()
+                      setRenameActive(true)
+                    }}
+                    className="file-button hover:bg-white/[.15]"
+                    role="button">
+                    rename
+                  </button>
+                  <button
+                    onClick={async e => {
+                      e.stopPropagation()
+                      const updatedDocs = safeDocs.filter(doc => doc.id !== selectedDocId)
+                      mutate(updatedDocs, false)
+                      setSelectedDoc(null)
+                      try {
+                        await API.delete(`/api/documents/${selectedDocId}`)
+                      } catch (e) {
+                        console.log(e)
+                        mutate()
+                      }
+                    }}
+                    className="file-button file-button-red hover:bg-white/[.15]"
+                    role="button">
+                    delete
+                  </button>
+                </>
+              )}
+              {renameActive && (
+                <form
+                  className={'w-[70%]'}
+                  onSubmit={async e => {
+                    e.preventDefault()
+                    const updatedDocs = safeDocs.map(doc =>
+                      doc.id === selectedDocId ? { ...doc, title: newName } : doc,
+                    )
+                    mutate(updatedDocs, false)
+                    setSelectedDoc(null)
+                    setRenameActive(false)
+                    try {
+                      await API.patch(`/api/documents/${selectedDocId}`, {
+                        title: newName,
+                        lastUpdated: Date.now(),
+                      })
+                    } catch (e) {
+                      console.log(e)
+                      mutate()
+                    }
+
+                    cache.delete(`/api/documents/${selectedDocId}`)
+                  }}>
+                  <input
+                    onChange={e => setNewName(e.currentTarget.value)}
+                    onClick={e => e.stopPropagation()}
+                    type="text"
+                    spellCheck="false"
+                    autoFocus
+                    placeholder={`New Title`}
+                    className={`w-[100%] border-x-0 border-b-[1px] border-t-0 bg-transparent text-center font-editor2 text-[18px] 
+                  uppercase text-black/[.70] ring-transparent placeholder:text-black/[.25] focus:border-black/[.2] focus:ring-transparent`}
+                  />
+                </form>
+              )}
+            </div>
           </div>
         </div>
-      </div>
-    </Layout>
+      </Layout>
     </>
   )
 }

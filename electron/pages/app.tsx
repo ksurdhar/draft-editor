@@ -4,9 +4,9 @@ import { useLocation } from 'wouter'
 import DocumentsPage from './documents-page'
 import LandingPage from './landing-page'
 
-interface Profile { 
+interface Profile {
   name: string
-  email: string 
+  email: string
 }
 
 function App() {
@@ -23,14 +23,14 @@ function App() {
 
   return (
     <Container>
-      <div className='self-center flex-col'>
+      <div className="flex-col self-center">
         <button onClick={() => window.electronAPI.logOut()}>logout</button>
-        <div className='flex flex-col'>
+        <div className="flex flex-col">
           <div>{profile?.name}</div>
         </div>
       </div>
-      { location === '/' && <LandingPage/>}
-      { location === '/documents' && <DocumentsPage/>}
+      {location === '/' && <LandingPage />}
+      {location === '/documents' && <DocumentsPage />}
     </Container>
   )
 }
