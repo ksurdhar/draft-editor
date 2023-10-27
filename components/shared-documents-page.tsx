@@ -5,24 +5,29 @@ import { Loader } from '@components/loader'
 import { DotsHorizontalIcon } from '@heroicons/react/solid'
 import { useSpinner } from '@lib/hooks'
 import { DocumentData } from '@typez/globals'
-import { withPageAuthRequired } from '@wrappers/auth-wrapper-client'
 import { format } from 'date-fns'
 import Link from 'next/link'
 import { useState } from 'react'
 
-interface SharedDocumentsPageProps {
+export interface SharedDocumentsPageProps {
   docs: DocumentData[]
   isLoading: boolean
-  removeDocument: (id: string) => void
-  updateDocument: (id: string, title: string) => void
-  navigateToDocument: (id: string) => void
+  deleteDocument: (id: string) => void
+  renameDocument: (id: string, title: string) => void
+  navigateTo: (path: string) => void
 }
 
-const SharedDocumentsPage = ({ docs, isLoading }: SharedDocumentsPageProps) => {
+const SharedDocumentsPage = ({
+  docs,
+  isLoading,
+  navigateTo,
+  deleteDocument,
+  renameDocument,
+}: SharedDocumentsPageProps) => {
   const [selectedDocId, setSelectedDoc] = useState<string | null>(null)
   const [renameActive, setRenameActive] = useState(false)
   const [newName, setNewName] = useState('')
-  const showSpinner = useSpinner(!isLoading)
+  const showSpinner = useSpinner(isLoading)
 
   const documentItems = docs.map(({ id, title, lastUpdated }, idx) => {
     return (
@@ -39,8 +44,7 @@ const SharedDocumentsPage = ({ docs, isLoading }: SharedDocumentsPageProps) => {
         `}
         onClick={() => {
           if (!selectedDocId) {
-            // navigate
-            // router.push(`/documents/${id}`)
+            navigateTo(`/documents/${id}`)
           }
         }}
         key={id}>
@@ -112,7 +116,7 @@ const SharedDocumentsPage = ({ docs, isLoading }: SharedDocumentsPageProps) => {
                   <button
                     onClick={async e => {
                       e.stopPropagation()
-                      // removeDocument
+                      deleteDocument(selectedDocId as string)
                     }}
                     className="file-button file-button-red hover:bg-white/[.15]"
                     role="button">
@@ -125,10 +129,7 @@ const SharedDocumentsPage = ({ docs, isLoading }: SharedDocumentsPageProps) => {
                   className={'w-[70%]'}
                   onSubmit={async e => {
                     e.preventDefault()
-                    const updatedDocs = docs.map(doc =>
-                      doc.id === selectedDocId ? { ...doc, title: newName } : doc,
-                    )
-                    // updateDocument
+                    renameDocument(selectedDocId as string, newName)
                     setSelectedDoc(null)
                     setRenameActive(false)
                   }}>
@@ -152,4 +153,4 @@ const SharedDocumentsPage = ({ docs, isLoading }: SharedDocumentsPageProps) => {
   )
 }
 
-export default withPageAuthRequired(SharedDocumentsPage)
+export default SharedDocumentsPage
