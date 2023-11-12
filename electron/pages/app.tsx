@@ -2,7 +2,7 @@ import { Container } from '@components/landing-page'
 import Providers, { NavigationProvider } from '@components/providers'
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation } from 'wouter'
-import DocumentsPage from './documents-page'
+import DocumentsPage from './electron-documents-page'
 import LandingPage from './landing-page'
 
 interface Profile {

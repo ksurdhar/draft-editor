@@ -11,18 +11,14 @@ import tokenStore from './token-store'
 const envPath = path.resolve(__dirname, '../../env-electron.json')
 const env = JSON.parse(fs.readFileSync(envPath, 'utf-8'))
 
-const apiIdentifier = env.API_IDENTIFIER
+const apiIdentifier = env.NEXT_PUBLIC_BASE_URL + '/api'
 const auth0Domain = env.AUTH0_DOMAIN
 const clientId = env.CLIENT_ID
 
 const redirectUri = 'http://localhost/callback*'
 
 function base64URLEncode(buffer: Buffer) {
-  return buffer
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '')
+  return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
 }
 
 const verifier = base64URLEncode(randomBytes(32))
@@ -47,14 +43,23 @@ function getProfile() {
 
 function getAuthenticationURL() {
   return (
-    "https://" + auth0Domain + "/authorize?" +
-    'audience=' + apiIdentifier + '&' +
-    "scope=openid profile offline_access&" +
-    "response_type=code&" +
-    "code_challenge=" + challenge + '&' +
-    "code_challenge_method=S256&" + 
-    "client_id=" + clientId + "&" +
-    "redirect_uri=" + redirectUri
+    'https://' +
+    auth0Domain +
+    '/authorize?' +
+    'audience=' +
+    apiIdentifier +
+    '&' +
+    'scope=openid profile offline_access&' +
+    'response_type=code&' +
+    'code_challenge=' +
+    challenge +
+    '&' +
+    'code_challenge_method=S256&' +
+    'client_id=' +
+    clientId +
+    '&' +
+    'redirect_uri=' +
+    redirectUri
   )
 }
 
@@ -66,12 +71,12 @@ async function refreshTokens() {
   const refreshOptions = {
     method: 'POST',
     url: `https://${auth0Domain}/oauth/token`,
-    headers: {'content-type': 'application/json'},
+    headers: { 'content-type': 'application/json' },
     data: {
       grant_type: 'refresh_token',
       client_id: clientId,
       refresh_token: refreshToken,
-    }
+    },
   }
 
   try {
@@ -101,7 +106,7 @@ async function loadTokens(callbackURL: string) {
     method: 'POST',
     url: `https://${auth0Domain}/oauth/token`,
     headers: {
-      'content-type': 'application/json'
+      'content-type': 'application/json',
     },
     data: JSON.stringify(exchangeOptions),
   }
@@ -144,7 +149,7 @@ function isTokenExpired(token: string, bufferTime = 300): boolean {
     }
     return false
   } catch (error) {
-    console.error("Error decoding token:", error)
+    console.error('Error decoding token:', error)
     return true
   }
 }

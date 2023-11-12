@@ -14,11 +14,18 @@ import type { NextApiResponse } from 'next'
 
 export default withHybridAuth(async function documentHandler(req: ExtendedApiRequest, res: NextApiResponse) {
   let { query, method, user } = req
-  const documentId = query.id?.toString() || ''
+  console.log('Query: ', query)
+  console.log('Method: ', method)
+  console.log('User: ', user)
 
-  // may need to re-examine use of withHybridAuth for sessionless users
+  const documentId = query.id?.toString() || ''
+  console.log('Document ID: ', documentId)
+
   const session = await getSession(req, res)
+  console.log('Session: ', session)
+
   user = user || session?.user
+  console.log('Updated User: ', user)
 
   if (!user) {
     res.status(401).end('Unauthorized')
@@ -26,26 +33,40 @@ export default withHybridAuth(async function documentHandler(req: ExtendedApiReq
   }
 
   let permissions = (await getPermissionByDoc(documentId)) as PermissionData
+  console.log('Permissions: ', permissions)
+
   if (permissions === null) {
-    // for older, pre permission documents
     permissions = await createPermission({ ownerId: user.sub, documentId: documentId })
+    console.log('Created Permissions for Older Document: ', permissions)
   }
 
   const isOwner = permissions.ownerId === user.sub
-  const permissableUser = permissions?.users.find(user => user.email === user.email)
+  console.log('Is Owner: ', isOwner)
+
+  const permissableUser = permissions?.users.find(u => u.email === user!.email)
+  console.log('Permissable User: ', permissableUser)
+
   const isOwnerOrInvited = permissableUser || isOwner
+  console.log('Is Owner Or Invited: ', isOwnerOrInvited)
 
   const isRestricted = permissions.globalPermission === UserPermission.None
+  console.log('Is Restricted: ', isRestricted)
+
   const userCanComment =
     (permissableUser && [UserPermission.Comment, UserPermission.Edit].includes(permissableUser.permission)) ||
     isOwner
+  console.log('User Can Comment: ', userCanComment)
+
   const userCanEdit = (permissableUser && permissableUser.permission === UserPermission.Edit) || isOwner
+  console.log('User Can Edit: ', userCanEdit)
 
   const anyoneCanComment = [UserPermission.Comment, UserPermission.Edit].includes(
     permissions.globalPermission,
   )
-  const anyoneCanEdit = permissions.globalPermission === UserPermission.Edit
+  console.log('Anyone Can Comment: ', anyoneCanComment)
 
+  const anyoneCanEdit = permissions.globalPermission === UserPermission.Edit
+  console.log('Anyone Can Edit: ', anyoneCanEdit)
   switch (method) {
     case 'GET':
       const document = (await getDocument(documentId)) as DocumentData
