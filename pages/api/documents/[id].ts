@@ -1,32 +1,54 @@
-import { createOrUpdateVersion, createPermission, deleteDocument, deletePermissionByDoc, getDocument, getPermissionByDoc, updateDocument } from "@lib/mongo-utils"
+import {
+  createOrUpdateVersion,
+  createPermission,
+  deleteDocument,
+  deletePermissionByDoc,
+  getDocument,
+  getPermissionByDoc,
+  updateDocument,
+} from '@lib/mongo-utils'
+import withHybridAuth, { ExtendedApiRequest } from '@lib/with-hybrid-auth'
 import { DocumentData, PermissionData, UserPermission } from '@typez/globals'
 import { getSession } from '@wrappers/auth-wrapper'
-import type { NextApiRequest, NextApiResponse } from 'next'
+import type { NextApiResponse } from 'next'
 
-export default async function documentHandler(req: NextApiRequest, res: NextApiResponse) {
-  const { query, method  } = req
+export default withHybridAuth(async function documentHandler(req: ExtendedApiRequest, res: NextApiResponse) {
+  let { query, method, user } = req
+  const documentId = query.id?.toString() || ''
+
+  // may need to re-examine use of withHybridAuth for sessionless users
   const session = await getSession(req, res)
-  const documentId = (query.id?.toString() || '')
+  user = user || session?.user
 
-  let permissions = await getPermissionByDoc(documentId) as PermissionData
-  if (permissions === null) { // for older, pre permission documents
-    permissions = await createPermission({ ownerId: session?.user.sub, documentId: documentId })
+  if (!user) {
+    res.status(401).end('Unauthorized')
+    return
   }
 
-  const isOwner = permissions.ownerId === session?.user.sub
-  const permissableUser = permissions?.users.find((user) => user.email === session?.user.email)
+  let permissions = (await getPermissionByDoc(documentId)) as PermissionData
+  if (permissions === null) {
+    // for older, pre permission documents
+    permissions = await createPermission({ ownerId: user.sub, documentId: documentId })
+  }
+
+  const isOwner = permissions.ownerId === user.sub
+  const permissableUser = permissions?.users.find(user => user.email === user.email)
   const isOwnerOrInvited = permissableUser || isOwner
 
   const isRestricted = permissions.globalPermission === UserPermission.None
-  const userCanComment = permissableUser && [UserPermission.Comment, UserPermission.Edit].includes(permissableUser.permission) || isOwner
-  const userCanEdit = permissableUser && permissableUser.permission === UserPermission.Edit || isOwner
+  const userCanComment =
+    (permissableUser && [UserPermission.Comment, UserPermission.Edit].includes(permissableUser.permission)) ||
+    isOwner
+  const userCanEdit = (permissableUser && permissableUser.permission === UserPermission.Edit) || isOwner
 
-  const anyoneCanComment = [UserPermission.Comment, UserPermission.Edit].includes(permissions.globalPermission)
+  const anyoneCanComment = [UserPermission.Comment, UserPermission.Edit].includes(
+    permissions.globalPermission,
+  )
   const anyoneCanEdit = permissions.globalPermission === UserPermission.Edit
 
   switch (method) {
     case 'GET':
-      const document = await getDocument(documentId) as DocumentData
+      const document = (await getDocument(documentId)) as DocumentData
 
       if (isRestricted && isOwnerOrInvited) {
         document.canComment = userCanComment
@@ -37,7 +59,7 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
       if (isRestricted && !isOwnerOrInvited) {
         return res.status(400).send({ error: 'you do not have the permissions to view this file' })
       }
-      
+
       document.canComment = anyoneCanComment || isOwner
       document.canEdit = anyoneCanEdit || isOwner
       res.status(200).json(document)
@@ -45,16 +67,16 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
     case 'PATCH':
       if (isRestricted) {
         if (userCanComment || userCanEdit || isOwner) {
-          const updatedDocument = await updateDocument(documentId, req.body) as DocumentData
+          const updatedDocument = (await updateDocument(documentId, req.body)) as DocumentData
           await createOrUpdateVersion(documentId, updatedDocument)
 
           return res.status(200).json(updatedDocument)
         } else {
           return res.status(400).send({ error: 'you do not have the permissions to modify this file' })
         }
-      } 
+      }
       if (anyoneCanEdit || anyoneCanComment || isOwner) {
-        const updatedDocument = await updateDocument(documentId, req.body) as DocumentData
+        const updatedDocument = (await updateDocument(documentId, req.body)) as DocumentData
         await createOrUpdateVersion(documentId, updatedDocument)
 
         return res.status(200).json(updatedDocument)
@@ -69,10 +91,10 @@ export default async function documentHandler(req: NextApiRequest, res: NextApiR
       } else {
         return res.status(400).send({ error: 'you do not have the permissions to delete this file' })
       }
-      
+
       break
     default:
       res.setHeader('Allow', ['GET', 'PATCH', 'DELETE'])
       res.status(405).end(`Method ${method} Not Allowed`)
   }
-} 
+})

@@ -1,8 +1,9 @@
 import axios from 'axios'
+import env from './env'
 
 const API = axios.create({
-  baseURL: `${process.env.NEXT_PUBLIC_BASE_URL}/`,
-  responseType: 'json'
+  baseURL: `${env.BASE_URL}/`,
+  responseType: 'json',
 })
 
 export const fetcher = async (url: string) => {
@@ -14,7 +15,7 @@ export const fetcher = async (url: string) => {
   return res.json()
 }
 
-export async function updateDoc(url: string, { arg }: { arg: any}) {
+export async function updateDoc(url: string, { arg }: { arg: any }) {
   await API.patch(url, arg)
 }
 

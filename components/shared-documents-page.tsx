@@ -8,19 +8,18 @@ import { DocumentData } from '@typez/globals'
 import { format } from 'date-fns'
 import Link from 'next/link'
 import { useState } from 'react'
+import { useNavigation } from './providers'
 
 export interface SharedDocumentsPageProps {
   docs: DocumentData[]
   isLoading: boolean
   deleteDocument: (id: string) => void
   renameDocument: (id: string, title: string) => void
-  navigateTo: (path: string) => void
 }
 
 const SharedDocumentsPage = ({
   docs,
   isLoading,
-  navigateTo,
   deleteDocument,
   renameDocument,
 }: SharedDocumentsPageProps) => {
@@ -28,6 +27,7 @@ const SharedDocumentsPage = ({
   const [renameActive, setRenameActive] = useState(false)
   const [newName, setNewName] = useState('')
   const showSpinner = useSpinner(isLoading)
+  const { navigateTo } = useNavigation()
 
   const documentItems = docs.map(({ id, title, lastUpdated }, idx) => {
     return (
@@ -117,6 +117,7 @@ const SharedDocumentsPage = ({
                     onClick={async e => {
                       e.stopPropagation()
                       deleteDocument(selectedDocId as string)
+                      setSelectedDoc(null)
                     }}
                     className="file-button file-button-red hover:bg-white/[.15]"
                     role="button">
