@@ -30,8 +30,10 @@ app
     // Handle IPC messages from the renderer process.
     ipcMain.handle('auth:get-profile', authService.getProfile)
     ipcMain.handle('api:get-documents', apiService.getDocuments)
+    ipcMain.handle('api:delete-document', (_, id) => apiService.deleteDocument(id))
+    ipcMain.handle('api:rename-document', (_, id, data) => apiService.updateDocument(id, data))
     ipcMain.on('auth:log-out', () => {
-      BrowserWindow.getAllWindows().forEach((window) => window.close())
+      BrowserWindow.getAllWindows().forEach(window => window.close())
       createLogoutWindow()
     })
     createWindow()

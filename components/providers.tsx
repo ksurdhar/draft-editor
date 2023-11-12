@@ -15,17 +15,29 @@ type mouseContextType = {
 const mouseContextDefaultValue: mouseContextType = {
   hoveringOverMenu: false,
   mouseMoved: false,
-  onMouseMove: () => {}
+  onMouseMove: () => {},
 }
 
 const MouseContext = createContext<mouseContextType>(mouseContextDefaultValue)
 
-export function useMouse() {
-  return useContext(MouseContext)
+type navContextType = {
+  navigateTo: (path: string) => void
+  getLocation: () => string
 }
 
-type Props = {
-  children: ReactNode
+const navContextDefaultValue: navContextType = {
+  navigateTo: () => {},
+  getLocation: () => '',
+}
+
+const NavigationContext = createContext<navContextType>(navContextDefaultValue)
+
+export function useNavigation() {
+  return useContext(NavigationContext)
+}
+
+export function useMouse() {
+  return useContext(MouseContext)
 }
 
 const useDebouncedEffect = (effect: () => void, deps: any[], delay: number) => {
@@ -35,46 +47,63 @@ const useDebouncedEffect = (effect: () => void, deps: any[], delay: number) => {
   }, [deps, delay, effect])
 }
 
-export function MouseProvider({ children }: Props) {
-  const [mouseMoved, setMouseMoved] = useState(false)
-  const [hoveringOverMenu, setHoveringOverMenu] = useState(false)
-
-  useDebouncedEffect(() => {
-    setMouseMoved(false)
-  }, [mouseMoved], 5000)
-
-  
-  const onMouseMove = (clientY: number) => {
-    setMouseMoved(true)
-    if (clientY < 45 && !hoveringOverMenu) {
-      setHoveringOverMenu(true)
-    } 
-    if (clientY >= 45 && hoveringOverMenu) {
-      setHoveringOverMenu(false)
-    } 
-  }
-
-  const value = {
-    mouseMoved, 
-    onMouseMove,
-    hoveringOverMenu
-  }
+export function NavigationProvider({
+  children,
+  navigateTo,
+  getLocation,
+}: {
+  children: ReactNode
+  navigateTo: (path: string) => void
+  getLocation: () => string
+}) {
+  const value = { navigateTo, getLocation }
 
   return (
     <>
-      <MouseContext.Provider value={value}>
-        {children}
-      </MouseContext.Provider>
+      <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>
     </>
   )
 }
 
-function Providers({ children }: {children: ReactNode}) {
+export function MouseProvider({ children }: { children: ReactNode }) {
+  const [mouseMoved, setMouseMoved] = useState(false)
+  const [hoveringOverMenu, setHoveringOverMenu] = useState(false)
+
+  useDebouncedEffect(
+    () => {
+      setMouseMoved(false)
+    },
+    [mouseMoved],
+    5000,
+  )
+
+  const onMouseMove = (clientY: number) => {
+    setMouseMoved(true)
+    if (clientY < 45 && !hoveringOverMenu) {
+      setHoveringOverMenu(true)
+    }
+    if (clientY >= 45 && hoveringOverMenu) {
+      setHoveringOverMenu(false)
+    }
+  }
+
+  const value = {
+    mouseMoved,
+    onMouseMove,
+    hoveringOverMenu,
+  }
+
+  return (
+    <>
+      <MouseContext.Provider value={value}>{children}</MouseContext.Provider>
+    </>
+  )
+}
+
+function Providers({ children }: { children: ReactNode }) {
   return (
     <MouseProvider>
-      <UserProvider>
-        { children }
-      </UserProvider>
+      <UserProvider>{children}</UserProvider>
     </MouseProvider>
   )
 }

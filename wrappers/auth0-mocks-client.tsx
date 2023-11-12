@@ -2,12 +2,11 @@ import { UserContext, UserProfile } from '@auth0/nextjs-auth0/client'
 import { NextApiRequest, NextApiResponse } from 'next'
 import { FC, ReactNode, createContext } from 'react'
 
-// Mock Data
 export const mockUser: UserProfile = {
-  name: "Mock User",
-  email: "mockuser@example.com",
-  picture: "https://mock.image.url",
-  sub: "mock|12345",
+  name: 'Mock User',
+  email: 'mockuser@example.com',
+  picture: 'https://mock.image.url',
+  sub: 'mock|12345',
 }
 
 const userContext: UserContext = {
@@ -17,8 +16,7 @@ const userContext: UserContext = {
   checkSession: async () => {},
 }
 
-// Mock Providers and Hooks
-export const useUser = () => { 
+export const useUser = () => {
   return userContext
 }
 
@@ -26,7 +24,6 @@ export const useUser = () => {
 // as well as handle redirects in the case of signout which relies on auth0 for navigation
 export const handleAuth = () => {
   return async (req: NextApiRequest, res: NextApiResponse) => {
-    
     if (req.url === '/api/auth/logout') {
       res.redirect('/')
     }
@@ -36,7 +33,7 @@ export const handleAuth = () => {
 }
 
 export const withPageAuthRequired = (WrappedComponent: React.FC) => {
-  const AuthWrapper: React.FC = (props) => {
+  const AuthWrapper: React.FC = props => {
     return <WrappedComponent {...props} />
   }
   return AuthWrapper
@@ -50,7 +47,5 @@ type Props = {
 }
 
 export const MockUserProvider: FC<Props> = ({ children }) => (
-  <MockUserContext.Provider value={userContext}>
-    {children}
-  </MockUserContext.Provider>
+  <MockUserContext.Provider value={userContext}>{children}</MockUserContext.Provider>
 )

@@ -1,10 +1,8 @@
 'use client'
-
 import SharedDocumentsPage from '@components/shared-documents-page'
 import API from '@lib/http-utils'
 import { DocumentData } from '@typez/globals'
 import { withPageAuthRequired } from '@wrappers/auth-wrapper-client'
-import { useRouter } from 'next/navigation'
 import { useCallback, useEffect } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 
@@ -20,11 +18,9 @@ const useDocSync = () => {
   return { docs, mutate, isLoading }
 }
 
-const DocumentsPage = () => {
+export const NextDocumentsPage = () => {
   const { docs, mutate, isLoading } = useDocSync()
   const { cache } = useSWRConfig()
-
-  const router = useRouter()
 
   const deleteDocument = useCallback(
     async (id: string) => {
@@ -59,22 +55,14 @@ const DocumentsPage = () => {
     [mutate, docs, cache],
   )
 
-  const navigateTo = useCallback(
-    (path: string) => {
-      router.push(path)
-    },
-    [router],
-  )
-
   return (
     <SharedDocumentsPage
       docs={docs}
       deleteDocument={deleteDocument}
       renameDocument={renameDocument}
-      navigateTo={navigateTo}
       isLoading={isLoading}
     />
   )
 }
 
-export default withPageAuthRequired(DocumentsPage)
+export default withPageAuthRequired(NextDocumentsPage)

@@ -1,5 +1,5 @@
-import { createDocument, createPermission, getDocuments } from "@lib/mongo-utils"
-import withHybridAuth, { ExtendedApiRequest } from "@lib/with-hybrid-auth"
+import { createDocument, createPermission, getDocuments } from '@lib/mongo-utils'
+import withHybridAuth, { ExtendedApiRequest } from '@lib/with-hybrid-auth'
 import { DocumentData } from '@typez/globals'
 import type { NextApiResponse } from 'next'
 
@@ -18,7 +18,7 @@ const handlers = {
       return doc
     })
     res.status(200).json(docsWithPermissions as DocumentData[])
-  }
+  },
 }
 
 export default withHybridAuth(async function documentsHandler(req: ExtendedApiRequest, res: NextApiResponse) {
