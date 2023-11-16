@@ -1,13 +1,13 @@
 'use client'
 
-import API, { fetcher } from '@lib/http-utils'
+import { fetcher } from '@lib/http-utils'
 import { DocumentData } from '@typez/globals'
 import { useUser } from '@wrappers/auth-wrapper-client'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { Fragment, useEffect, useState } from 'react'
 import useSWR, { mutate } from 'swr'
-import { useMouse, useNavigation } from './providers'
+import { useAPI, useMouse, useNavigation } from './providers'
 
 import { useSyncHybridDoc } from '@lib/hooks'
 import Box from '@mui/material/Box'
@@ -68,6 +68,8 @@ type HeaderProps = {
 const HeaderComponent = ({ documentId }: HeaderProps) => {
   const { user } = useUser()
   const { navigateTo } = useNavigation()
+  const { post } = useAPI()
+
   const [menuOpen, setMenuOpen] = useState(false)
   const toggleDrawer = (open: boolean) => (event: React.KeyboardEvent | React.MouseEvent) => {
     if (
@@ -134,7 +136,8 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
                     onClick={async () => {
                       setMenuOpen(!menuOpen)
                       try {
-                        const res = await API.post(`/api/documents`, { userId: user?.sub })
+                        console.log('kiran', user?.sub)
+                        const res = await post(`/api/documents`, { userId: user?.sub })
                         const documentId = res.data.id
                         navigateTo(`/documents/${documentId}`)
                       } catch (e) {

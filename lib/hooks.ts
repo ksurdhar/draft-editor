@@ -1,8 +1,9 @@
-import { Dispatch, SetStateAction, useEffect, useState } from 'react'
+import { Dispatch, SetStateAction, useCallback, useEffect, useState } from 'react'
+import useSWR from 'swr'
 import { DocumentData } from '../types/globals'
 
 export const useSpinner = (optionalCondition?: boolean) => {
-  const [ allowSpinner, setAllowSpinner ] = useState(false)
+  const [allowSpinner, setAllowSpinner] = useState(false)
   useEffect(() => {
     setTimeout(() => {
       setAllowSpinner(true)
@@ -16,7 +17,11 @@ export const useSpinner = (optionalCondition?: boolean) => {
   }
 }
 
-export const useSyncHybridDoc = (id: string, databaseDoc: DocumentData | undefined, setHybridDoc: Dispatch<SetStateAction<DocumentData | null | undefined>>) => {
+export const useSyncHybridDoc = (
+  id: string,
+  databaseDoc: DocumentData | undefined,
+  setHybridDoc: Dispatch<SetStateAction<DocumentData | null | undefined>>,
+) => {
   useEffect(() => {
     let cachedDoc: DocumentData | {} = {}
     if (typeof window !== 'undefined') {
@@ -32,4 +37,40 @@ export const useSyncHybridDoc = (id: string, databaseDoc: DocumentData | undefin
       setHybridDoc(cachedDoc as DocumentData)
     }
   }, [databaseDoc, setHybridDoc, id])
+}
+
+const fetcher = (url: string) => fetch(url).then(res => res.json())
+
+export const useDocSync = () => {
+  const { data: docs = [], mutate, isLoading } = useSWR<DocumentData[]>('/api/documents', fetcher)
+  useEffect(() => {
+    docs?.forEach(doc => {
+      sessionStorage.setItem(doc.id, JSON.stringify(doc))
+    })
+  }, [docs])
+  return { docs, mutate, isLoading }
+}
+
+export const useGetDocs = () => {
+  const { docs } = useDocSync()
+
+  const getDocs = useCallback(async () => {
+    return docs
+  }, [docs])
+
+  return getDocs
+}
+
+// this might need an update
+export const useGetDoc = (id: string) => {
+  const { data: databaseDoc } = useSWR<DocumentData, Error>(`/api/documents/${id}`, fetcher)
+
+  const getDoc = useCallback(
+    async (id: string) => {
+      return databaseDoc
+    },
+    [databaseDoc],
+  )
+
+  return getDoc
 }

@@ -2,10 +2,10 @@
 import Editor from '@components/editor'
 import Layout from '@components/layout'
 import { Loader } from '@components/loader'
-import { useNavigation } from '@components/providers'
+import { useAPI, useNavigation } from '@components/providers'
 import { CloudIcon } from '@heroicons/react/solid'
 import { useSpinner, useSyncHybridDoc } from '@lib/hooks'
-import API, { fetcher } from '@lib/http-utils'
+import { fetcher } from '@lib/http-utils'
 import {
   cancelComment,
   captureCommentRef,
@@ -30,24 +30,32 @@ const backdropStyles = `
   transition-opacity ease-in-out duration-[3000ms]
 `
 
-const save = async (data: Partial<DocumentData>, id: string, setRecentlySaved: (bool: boolean) => void) => {
-  const updatedData = {
-    ...data,
-    lastUpdated: Date.now(),
+const useSave = () => {
+  const { patch } = useAPI()
+
+  const save = async (data: Partial<DocumentData>, id: string, setRecentlySaved: (bool: boolean) => void) => {
+    const updatedData = {
+      ...data,
+      lastUpdated: Date.now(),
+    }
+
+    const cachedDoc = JSON.parse(sessionStorage.getItem(id) || '{}')
+    const documentCached = Object.keys(cachedDoc).length > 0
+    if (documentCached) {
+      sessionStorage.setItem(id, JSON.stringify({ ...cachedDoc, ...updatedData }))
+    }
+    const path = `/api/documents/${id}`
+    await patch(path, updatedData)
+
+    setRecentlySaved(true)
   }
 
-  const cachedDoc = JSON.parse(sessionStorage.getItem(id) || '{}')
-  const documentCached = Object.keys(cachedDoc).length > 0
-  if (documentCached) {
-    sessionStorage.setItem(id, JSON.stringify({ ...cachedDoc, ...updatedData }))
-  }
-  const path = `/api/documents/${id}`
-  await API.patch(path, updatedData)
-  setRecentlySaved(true)
+  return save
 }
 
 export default function DocumentPage() {
   const { getLocation } = useNavigation()
+  const save = useSave()
   const pathname = getLocation()
 
   const id = (pathname || '').split('/').pop() || ''
@@ -82,7 +90,7 @@ export default function DocumentPage() {
       await mutate(`/api/documents/${id}`)
       if (pendingCommentRef) commitComment(editor, pendingCommentRef[1], commentId)
     },
-    [hybridDoc, pendingCommentRef, editor, id],
+    [hybridDoc, pendingCommentRef, editor, id, save],
   )
 
   const deleteComment = async () => {
@@ -110,7 +118,7 @@ export default function DocumentPage() {
         commitComment(editor, pendingCommentRef[1], commentId)
       }
     },
-    [hybridDoc, pendingCommentRef, editor, id],
+    [hybridDoc, pendingCommentRef, editor, id, save],
   )
 
   const cleanCommentState = useCallback(() => {

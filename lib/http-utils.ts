@@ -1,3 +1,4 @@
+import { ApiResponse } from '@components/providers'
 import axios from 'axios'
 import env from './env'
 
@@ -17,6 +18,20 @@ export const fetcher = async (url: string) => {
 
 export async function updateDoc(url: string, { arg }: { arg: any }) {
   await API.patch(url, arg)
+}
+
+export async function post(url: string, body: any): ApiResponse {
+  const result = await API.post(url, body)
+  return result.data
+}
+
+export async function update(url: string, body: any): ApiResponse<void> {
+  const result = await API.patch(url, body)
+  return result.data
+}
+
+export async function destroy(url: string): ApiResponse {
+  return await API.delete(url)
 }
 
 export default API

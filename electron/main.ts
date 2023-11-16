@@ -32,6 +32,9 @@ app
     ipcMain.handle('api:get-documents', apiService.getDocuments)
     ipcMain.handle('api:delete-document', (_, id) => apiService.deleteDocument(id))
     ipcMain.handle('api:rename-document', (_, id, data) => apiService.updateDocument(id, data))
+    ipcMain.handle('api:post', (_, url, body) => apiService.post(url, body))
+    ipcMain.handle('api:patch', (_, url, body) => apiService.updateDocument(url, body))
+    ipcMain.handle('api:delete', (_, url) => apiService.destroy(url))
     ipcMain.on('auth:log-out', () => {
       BrowserWindow.getAllWindows().forEach(window => window.close())
       createLogoutWindow()

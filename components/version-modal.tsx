@@ -2,7 +2,15 @@
 import API, { fetcher } from '@lib/http-utils'
 import { countWords } from '@lib/slate-utils'
 import InsertDriveFileTwoToneIcon from '@mui/icons-material/InsertDriveFileTwoTone'
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@mui/material'
+import {
+  Box,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+} from '@mui/material'
 import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
 import TableCell from '@mui/material/TableCell'
@@ -25,9 +33,12 @@ interface VersionModalProps {
 
 const VersionModal = ({ open, onClose, document }: VersionModalProps) => {
   const { user } = useUser()
-  const [ editor ] = useState(() => withReact(withHistory(createEditor())))
+  const [editor] = useState(() => withReact(withHistory(createEditor())))
 
-  const { data, isLoading, mutate } = useSWR<VersionData[], Error>(`/api/documents/${document.id}/versions`, fetcher) 
+  const { data, isLoading, mutate } = useSWR<VersionData[], Error>(
+    `/api/documents/${document.id}/versions`,
+    fetcher,
+  )
   const [versions, setVersions] = useState<VersionData[]>([])
   const [selectedVersion, setSelectedVersion] = useState<VersionData | null>()
 
@@ -47,111 +58,111 @@ const VersionModal = ({ open, onClose, document }: VersionModalProps) => {
   return (
     <Dialog open={open} onClose={onClose}>
       <Box sx={{ minWidth: '576px' }} onClick={() => setSelectedVersion(null)}>
-      <DialogTitle>{`Versions`}</DialogTitle>
-      <DialogContent>
-        <DialogContentText>
-          Preview or restore to a previous version of a this document.
-        </DialogContentText>
-        <Box sx={{ padding: '16px'}}>
-          <TableContainer>
-            <Table size='small'>
-              <TableBody>
-                {versions.map((version) => (
-                  <TableRow
-                    hover
-                    key={version.id}
-                    sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setSelectedVersion(version)
-                    }}
-                    selected={version === selectedVersion}
-                  >
-                    <TableCell component="th" scope="row">
-                      <InsertDriveFileTwoToneIcon fontSize='medium'/>
-                    </TableCell>
+        <DialogTitle>{`Versions`}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>Preview or restore to a previous version of a this document.</DialogContentText>
+          <Box sx={{ padding: '16px' }}>
+            <TableContainer>
+              <Table size="small">
+                <TableBody>
+                  {versions.map(version => (
+                    <TableRow
+                      hover
+                      key={version.id}
+                      sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                      onClick={e => {
+                        e.stopPropagation()
+                        setSelectedVersion(version)
+                      }}
+                      selected={version === selectedVersion}>
+                      <TableCell component="th" scope="row">
+                        <InsertDriveFileTwoToneIcon fontSize="medium" />
+                      </TableCell>
 
-                    <TableCell component="th" scope="row">
-                      {new Date(version.createdAt).toDateString()}
-                    </TableCell>
-                    <TableCell>{`${version.wordCount} words`}</TableCell>
-                    <TableCell sx={{maxWidth: '160px'}}>{version.name}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Box>
-      </DialogContent>
-      <DialogActions>
-        { selectedVersion && 
-        <>
-          <Button onClick={async (e) => {
-            e.stopPropagation()
-            handleOpen()
-          }}>
-            Preview
+                      <TableCell component="th" scope="row">
+                        {new Date(version.createdAt).toDateString()}
+                      </TableCell>
+                      <TableCell>{`${version.wordCount} words`}</TableCell>
+                      <TableCell sx={{ maxWidth: '160px' }}>{version.name}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          {selectedVersion && (
+            <>
+              <Button
+                onClick={async e => {
+                  e.stopPropagation()
+                  handleOpen()
+                }}>
+                Preview
+              </Button>
+              <Button
+                onClick={async () => {
+                  onClose()
+                }}>
+                Restore
+              </Button>
+            </>
+          )}
+          {!selectedVersion && (
+            <Button
+              onClick={async () => {
+                try {
+                  const newVersion: Partial<VersionData> = {
+                    autoGenerated: false,
+                    content: document.content,
+                    createdAt: Date.now(),
+                    documentId: document.id,
+                    ownerId: document.userId,
+                    wordCount: countWords(JSON.parse(document.content)),
+                  }
+                  await API.post(`/api/documents/${document.id}/versions`, newVersion)
+                  mutate()
+                } catch (e) {
+                  console.log(e)
+                }
+              }}>
+              Create Version
+            </Button>
+          )}
+          <Button
+            onClick={async () => {
+              onClose()
+            }}>
+            Done
           </Button>
-          <Button onClick={async () => {
-            onClose()
-          }}>
-            Restore
-          </Button>
-        </>
-        }
-        {
-          !selectedVersion && 
-          <Button onClick={async () => {         
-            try {
-              const newVersion: Partial<VersionData> = {
-                autoGenerated: false,
-                content: document.content,
-                createdAt: Date.now(),
-                documentId: document.id,
-                ownerId: document.userId,
-                wordCount: countWords(JSON.parse(document.content)),
-              }
-              const version = await API.post(`/api/documents/${document.id}/versions`, newVersion)
-              mutate()
-            } catch (e) {
-              console.log(e)
-            }
-          }}>
-            Create Version
-          </Button>
-        }
-        <Button onClick={async () => {
-          onClose()
-        }}>Done</Button>
-      </DialogActions>
+        </DialogActions>
       </Box>
       {/* Preview Modal Below */}
-      { selectedVersion &&
-        <Dialog
-          fullScreen
-          open={previewOpen}
-          onClose={handleClose}>
-          <div className={`flex justify-center h-[calc(100vh)] overflow-y-scroll pb-10 p-[20px] text-black/[.79] font-editor2`}>
-            <div className={`flex relative max-w-[740px] min-w-[calc(100vw_-_40px)] md:min-w-[0px] pb-10`}>
-            <EditorComponent
-              id={'preview'} 
-              title={document.title} 
-              text={JSON.parse(selectedVersion.content)}
-              editor={editor}
-              canEdit={false}
-              hideFooter={true}
-              commentActive={false}
-              openCommentId={null}
-              openComment={() => {}}
-              onUpdate={() => {}}/>
+      {selectedVersion && (
+        <Dialog fullScreen open={previewOpen} onClose={handleClose}>
+          <div
+            className={`flex h-[calc(100vh)] justify-center overflow-y-scroll p-[20px] pb-10 font-editor2 text-black/[.79]`}>
+            <div className={`relative flex min-w-[calc(100vw_-_40px)] max-w-[740px] pb-10 md:min-w-[0px]`}>
+              <EditorComponent
+                id={'preview'}
+                title={document.title}
+                text={JSON.parse(selectedVersion.content)}
+                editor={editor}
+                canEdit={false}
+                hideFooter={true}
+                commentActive={false}
+                openCommentId={null}
+                openComment={() => {}}
+                onUpdate={() => {}}
+              />
             </div>
           </div>
           <DialogActions>
             <Button onClick={handleClose}>Close Preview</Button>
           </DialogActions>
         </Dialog>
-      }
-     
+      )}
     </Dialog>
   )
 }

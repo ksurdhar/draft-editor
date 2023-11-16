@@ -1,5 +1,6 @@
 import { Container } from '@components/landing-page'
-import Providers, { NavigationProvider } from '@components/providers'
+import Providers, { APIProvider, NavigationProvider } from '@components/providers'
+import { useGetDocs } from '@lib/hooks'
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation } from 'wouter'
 import DocumentsPage from './electron-documents-page'
@@ -13,6 +14,8 @@ interface Profile {
 function App() {
   const [location, setLocation] = useLocation()
   const [profile, setProfile] = useState({} as Profile)
+
+  const getDocs = useGetDocs()
 
   useEffect(() => {
     const getProfile = async () => {
@@ -29,16 +32,22 @@ function App() {
   return (
     <Container>
       <NavigationProvider getLocation={getLocation} navigateTo={setLocation}>
-        <Providers>
-          <div className="flex-col self-center">
-            <button onClick={() => window.electronAPI.logOut()}>logout</button>
-            <div className="flex flex-col">
-              <div>{profile?.name}</div>
+        <APIProvider
+          getDocs={getDocs}
+          destroy={window.electronAPI.destroy}
+          patch={window.electronAPI.patch}
+          post={window.electronAPI.post}>
+          <Providers>
+            <div className="flex-col self-center">
+              <button onClick={() => window.electronAPI.logOut()}>logout</button>
+              <div className="flex flex-col">
+                <div>{profile?.name}</div>
+              </div>
             </div>
-          </div>
-          {location === '/' && <LandingPage />}
-          {location === '/documents' && <DocumentsPage />}
-        </Providers>
+            {location === '/' && <LandingPage />}
+            {location === '/documents' && <DocumentsPage />}
+          </Providers>
+        </APIProvider>
       </NavigationProvider>
     </Container>
   )
