@@ -1,16 +1,16 @@
-import { deleteVersion, updateVersion } from "@lib/mongo-utils"
+import { deleteVersion, updateVersion } from '@lib/mongo-utils'
+import withHybridAuth from '@lib/with-hybrid-auth'
 import { VersionData } from '@typez/globals'
-import { withApiAuthRequired } from '@wrappers/auth-wrapper'
 import type { NextApiRequest, NextApiResponse } from 'next'
 
-export default withApiAuthRequired(async function versionHandler(req: NextApiRequest, res: NextApiResponse) {
+export default withHybridAuth(async function versionHandler(req: NextApiRequest, res: NextApiResponse) {
   const { query, method } = req
-  const versionId = (query.id?.toString() || '')
+  const versionId = query.id?.toString() || ''
 
   // apply access control via auth0's interface
   switch (method) {
     case 'PATCH':
-      const updatedVersion = await updateVersion(versionId, req.body) as VersionData
+      const updatedVersion = (await updateVersion(versionId, req.body)) as VersionData
       res.status(200).json(updatedVersion)
       break
 

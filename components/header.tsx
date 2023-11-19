@@ -1,24 +1,18 @@
 'use client'
 
-import API, { fetcher } from '@lib/http-utils'
 import { DocumentData } from '@typez/globals'
 import { useUser } from '@wrappers/auth-wrapper-client'
-import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 import useSWR, { mutate } from 'swr'
-import { useMouse, useNavigation } from './providers'
+import { useAPI, useMouse, useNavigation } from './providers'
 
 import { useSyncHybridDoc } from '@lib/hooks'
+import { Divider, List, ListItem, ListItemButton, ListItemText } from '@mui/material'
 import Box from '@mui/material/Box'
-import Divider from '@mui/material/Divider'
 import Drawer from '@mui/material/Drawer'
-import List from '@mui/material/List'
-import ListItem from '@mui/material/ListItem'
-import ListItemButton from '@mui/material/ListItemButton'
-import ListItemText from '@mui/material/ListItemText'
-const ShareModal = dynamic(() => import('./share-modal'))
-const VersionModal = dynamic(() => import('./version-modal'))
+import ShareModal from './share-modal'
+import VersionModal from './version-modal'
 
 const useScrollPosition = () => {
   const [scrollPosition, setScrollPosition] = useState(0)
@@ -62,12 +56,21 @@ export const useEditorFades = (isMouseStill: boolean) => {
 }
 
 type HeaderProps = {
-  documentId: string
+  id: string
 }
 
-const HeaderComponent = ({ documentId }: HeaderProps) => {
+const HeaderComponent = ({ id }: HeaderProps) => {
   const { user } = useUser()
   const { navigateTo } = useNavigation()
+  const { post, get } = useAPI()
+
+  const fetcher = useCallback(
+    async (path: string) => {
+      return await get(path)
+    },
+    [get],
+  )
+
   const [menuOpen, setMenuOpen] = useState(false)
   const toggleDrawer = (open: boolean) => (event: React.KeyboardEvent | React.MouseEvent) => {
     if (
@@ -85,7 +88,7 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
 
   const [isVersionModalOpen, setIsVersionModalOpen] = useState(false)
   const openVersionModal = () => {
-    mutate(`/api/documents/${documentId}/versions`)
+    mutate(`/documents/${id}/versions`)
     setIsVersionModalOpen(true)
   }
   const closeVersionModal = () => setIsVersionModalOpen(false)
@@ -93,9 +96,11 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
   const { mouseMoved, hoveringOverMenu } = useMouse()
   const [initFadeIn, fadeOut] = useEditorFades(!mouseMoved)
 
-  const { data: databaseDoc } = useSWR<DocumentData, Error>(`/api/documents/${documentId}`, fetcher)
+  const documentPath = `/documents/${id}`
+
+  const { data: databaseDoc } = useSWR<DocumentData, Error>(documentPath, fetcher)
   const [hybridDoc, setHybridDoc] = useState<DocumentData | null>()
-  useSyncHybridDoc(documentId, databaseDoc, setHybridDoc)
+  useSyncHybridDoc(id, databaseDoc, setHybridDoc)
 
   const isOwner = user && hybridDoc && hybridDoc.userId === user.sub
 
@@ -134,9 +139,9 @@ const HeaderComponent = ({ documentId }: HeaderProps) => {
                     onClick={async () => {
                       setMenuOpen(!menuOpen)
                       try {
-                        const res = await API.post(`/api/documents`, { userId: user?.sub })
-                        const documentId = res.data.id
-                        navigateTo(`/documents/${documentId}`)
+                        const res = await post(`/documents`, { userId: user?.sub })
+                        const id = res.data.id
+                        navigateTo(`/documents/${id}`)
                       } catch (e) {
                         console.log(e)
                       }
