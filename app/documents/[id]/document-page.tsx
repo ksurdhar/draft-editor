@@ -2,10 +2,9 @@
 import Editor from '@components/editor'
 import Layout from '@components/layout'
 import { Loader } from '@components/loader'
-import { useNavigation } from '@components/providers'
+import { useAPI, useNavigation } from '@components/providers'
 import { CloudIcon } from '@heroicons/react/solid'
 import { useSpinner, useSyncHybridDoc } from '@lib/hooks'
-import API, { fetcher } from '@lib/http-utils'
 import {
   cancelComment,
   captureCommentRef,
@@ -30,30 +29,48 @@ const backdropStyles = `
   transition-opacity ease-in-out duration-[3000ms]
 `
 
-const save = async (data: Partial<DocumentData>, id: string, setRecentlySaved: (bool: boolean) => void) => {
-  const updatedData = {
-    ...data,
-    lastUpdated: Date.now(),
+const useSave = () => {
+  const { patch } = useAPI()
+
+  const save = async (data: Partial<DocumentData>, id: string, setRecentlySaved: (bool: boolean) => void) => {
+    const updatedData = {
+      ...data,
+      lastUpdated: Date.now(),
+    }
+
+    const cachedDoc = JSON.parse(sessionStorage.getItem(id) || '{}')
+    const documentCached = Object.keys(cachedDoc).length > 0
+    if (documentCached) {
+      sessionStorage.setItem(id, JSON.stringify({ ...cachedDoc, ...updatedData }))
+    }
+
+    const path = `/documents/${id}`
+    await patch(path, updatedData)
+
+    setRecentlySaved(true)
   }
 
-  const cachedDoc = JSON.parse(sessionStorage.getItem(id) || '{}')
-  const documentCached = Object.keys(cachedDoc).length > 0
-  if (documentCached) {
-    sessionStorage.setItem(id, JSON.stringify({ ...cachedDoc, ...updatedData }))
-  }
-  const path = `/api/documents/${id}`
-  await API.patch(path, updatedData)
-  setRecentlySaved(true)
+  return save
 }
 
 export default function DocumentPage() {
   const { getLocation } = useNavigation()
+  const save = useSave()
   const pathname = getLocation()
+
+  const api = useAPI()
+  const fetcher = useCallback(
+    async (path: string) => {
+      return await api.get(path)
+    },
+    [api],
+  )
 
   const id = (pathname || '').split('/').pop() || ''
   const [editor] = useState(() => withReact(withHistory(createEditor())))
+  const documentPath = `/documents/${id}`
 
-  const { data: databaseDoc } = useSWR<DocumentData, Error>(`/api/documents/${id}`, fetcher)
+  const { data: databaseDoc } = useSWR<DocumentData, Error>(documentPath, fetcher)
   const [hybridDoc, setHybridDoc] = useState<DocumentData | null>()
   useSyncHybridDoc(id, databaseDoc, setHybridDoc)
 
@@ -79,10 +96,10 @@ export default function DocumentPage() {
       }
       const comments = hybridDoc?.comments.concat(comment)
       await save({ comments }, id, setRecentlySaved)
-      await mutate(`/api/documents/${id}`)
+      await mutate(documentPath)
       if (pendingCommentRef) commitComment(editor, pendingCommentRef[1], commentId)
     },
-    [hybridDoc, pendingCommentRef, editor, id],
+    [hybridDoc, pendingCommentRef, editor, id, save, documentPath],
   )
 
   const deleteComment = async () => {
@@ -91,7 +108,7 @@ export default function DocumentPage() {
 
     const comments = hybridDoc?.comments.filter(comment => comment.id !== openCommentId)
     await save({ comments }, id, setRecentlySaved)
-    await mutate(`/api/documents/${id}`)
+    await mutate(documentPath)
 
     cleanCommentState()
   }
@@ -105,12 +122,12 @@ export default function DocumentPage() {
         return comment
       })
       await save({ comments }, id, setRecentlySaved)
-      await mutate(`/api/documents/${id}`)
+      await mutate(documentPath)
       if (pendingCommentRef) {
         commitComment(editor, pendingCommentRef[1], commentId)
       }
     },
-    [hybridDoc, pendingCommentRef, editor, id],
+    [hybridDoc, pendingCommentRef, editor, id, save, documentPath],
   )
 
   const cleanCommentState = useCallback(() => {
@@ -139,9 +156,9 @@ export default function DocumentPage() {
   )
 
   const debouncedSave = useDebouncedCallback((data: Partial<DocumentData>) => {
-    mutate(`/api/documents/${id}/versions`)
+    mutate(`/documents/${id}/versions`)
     save(data, id, setRecentlySaved)
-    mutate(`/api/documents/${id}`)
+    mutate(documentPath)
   }, 1000)
 
   useEffect(() => {

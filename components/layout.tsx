@@ -10,11 +10,12 @@ type Props = {
 
 const Layout = ({ children, documentId }: Props): ReactNode => {
   const { onMouseMove } = useMouse()
-
   return (
-    <div className="h-screen w-screen absolute font-index lowercase" onMouseMove={(e) => onMouseMove(e.clientY)}>
-      <HeaderComponent documentId={documentId || ''}/>
-      { children }
+    <div
+      className="absolute h-screen w-screen font-index lowercase"
+      onMouseMove={e => onMouseMove(e.clientY)}>
+      <HeaderComponent id={documentId || ''} />
+      {children}
     </div>
   )
 }

@@ -2,6 +2,7 @@
 import '@styles/globals.css'
 import '@styles/hamburgers/hamburgers.scss'
 import '@styles/loading-indicator.css'
+import { DocumentData } from '@typez/globals'
 
 import { UserProvider } from '@wrappers/auth-wrapper-client'
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react'
@@ -32,6 +33,42 @@ const navContextDefaultValue: navContextType = {
 
 const NavigationContext = createContext<navContextType>(navContextDefaultValue)
 
+export type ApiResponse<T = any> = Promise<T>
+
+type apiContextType = {
+  post: (path: string, body: any) => ApiResponse
+  patch: (path: string, body: any) => ApiResponse
+  destroy: (path: string) => void
+  get: (path: string) => ApiResponse
+}
+
+const apiContextDefaultValue: apiContextType = {
+  post: async () => ({ data: {} }),
+  patch: async () => ({ data: {} }),
+  destroy: async () => {},
+  get: async () => ({ data: {} }),
+}
+
+const APIContext = createContext<apiContextType>(apiContextDefaultValue)
+
+export function useAPI() {
+  return useContext(APIContext)
+}
+
+type DocumentContextType = {
+  getDocument: (id: string) => Promise<DocumentData>
+}
+
+const documentContextDefaultValue: DocumentContextType = {
+  getDocument: async () => ({}) as DocumentData,
+}
+
+const DocumentContext = createContext<DocumentContextType>(documentContextDefaultValue)
+
+export function useDocument() {
+  return useContext(DocumentContext)
+}
+
 export function useNavigation() {
   return useContext(NavigationContext)
 }
@@ -47,6 +84,30 @@ const useDebouncedEffect = (effect: () => void, deps: any[], delay: number) => {
   }, [deps, delay, effect])
 }
 
+export function DocumentProvider({
+  children,
+  getDocument,
+}: DocumentContextType & {
+  children: React.ReactNode
+}) {
+  const value = { getDocument }
+
+  return <DocumentContext.Provider value={value}>{children}</DocumentContext.Provider>
+}
+
+export function APIProvider({
+  children,
+  post,
+  patch,
+  destroy,
+  get,
+}: apiContextType & {
+  children: React.ReactNode
+}) {
+  const value = { post, patch, destroy, get }
+  return <APIContext.Provider value={value}>{children}</APIContext.Provider>
+}
+
 export function NavigationProvider({
   children,
   navigateTo,
@@ -58,11 +119,7 @@ export function NavigationProvider({
 }) {
   const value = { navigateTo, getLocation }
 
-  return (
-    <>
-      <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>
-    </>
-  )
+  return <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>
 }
 
 export function MouseProvider({ children }: { children: ReactNode }) {

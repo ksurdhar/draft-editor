@@ -2,7 +2,8 @@
 import { Ibarra_Real_Nova, Mukta } from 'next/font/google'
 import { ReactNode, useCallback } from 'react'
 
-import Providers, { NavigationProvider } from '@components/providers'
+import Providers, { APIProvider, NavigationProvider } from '@components/providers'
+import { destroy, get, post, update } from '@lib/http-utils'
 import '@styles/globals.css'
 import '@styles/hamburgers/hamburgers.scss'
 import '@styles/loading-indicator.css'
@@ -32,7 +33,9 @@ export default function Layout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body className={`${ibarra.variable} ${mukta.variable}`}>
         <NavigationProvider getLocation={getLocation} navigateTo={navigateTo}>
-          <Providers>{children}</Providers>
+          <APIProvider destroy={destroy} patch={update} post={post} get={get}>
+            <Providers>{children}</Providers>
+          </APIProvider>
         </NavigationProvider>
       </body>
     </html>

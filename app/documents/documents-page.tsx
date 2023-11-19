@@ -1,22 +1,10 @@
 'use client'
 import SharedDocumentsPage from '@components/shared-documents-page'
+import { useDocSync } from '@lib/hooks'
 import API from '@lib/http-utils'
-import { DocumentData } from '@typez/globals'
 import { withPageAuthRequired } from '@wrappers/auth-wrapper-client'
-import { useCallback, useEffect } from 'react'
-import useSWR, { useSWRConfig } from 'swr'
-
-const fetcher = (url: string) => fetch(url).then(res => res.json())
-
-const useDocSync = () => {
-  const { data: docs = [], mutate, isLoading } = useSWR<DocumentData[]>('/api/documents', fetcher)
-  useEffect(() => {
-    docs?.forEach(doc => {
-      sessionStorage.setItem(doc.id, JSON.stringify(doc))
-    })
-  }, [docs])
-  return { docs, mutate, isLoading }
-}
+import { useCallback } from 'react'
+import { useSWRConfig } from 'swr'
 
 export const NextDocumentsPage = () => {
   const { docs, mutate, isLoading } = useDocSync()
@@ -27,7 +15,7 @@ export const NextDocumentsPage = () => {
       const updatedDocs = docs.filter(doc => doc.id !== id)
       mutate(updatedDocs, false)
       try {
-        await API.delete(`/api/documents/${id}`)
+        await API.delete(`documents/${id}`)
       } catch (e) {
         console.log(e)
         mutate()
@@ -41,7 +29,7 @@ export const NextDocumentsPage = () => {
       const updatedDocs = docs.map(doc => (doc.id === id ? { ...doc, title } : doc))
       mutate(updatedDocs, false)
       try {
-        await API.patch(`/api/documents/${id}`, {
+        await API.patch(`documents/${id}`, {
           title,
           lastUpdated: Date.now(),
         })
@@ -50,7 +38,7 @@ export const NextDocumentsPage = () => {
         mutate()
       }
 
-      cache.delete(`/api/documents/${id}`)
+      cache.delete(`documents/${id}`)
     },
     [mutate, docs, cache],
   )
