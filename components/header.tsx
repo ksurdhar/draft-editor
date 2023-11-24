@@ -139,8 +139,7 @@ const HeaderComponent = ({ id }: HeaderProps) => {
                     onClick={async () => {
                       setMenuOpen(!menuOpen)
                       try {
-                        const res = await post(`/documents`, { userId: user?.sub })
-                        const id = res.data.id
+                        const { id } = await post(`/documents`, { userId: user?.sub })
                         navigateTo(`/documents/${id}`)
                       } catch (e) {
                         console.log(e)
