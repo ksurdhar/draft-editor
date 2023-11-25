@@ -1,19 +1,22 @@
 import { getPermissionByDoc, updatePermissionByDoc } from '@lib/mongo-utils'
-import withHybridAuth from '@lib/with-hybrid-auth'
+import withHybridAuth, { ExtendedApiRequest } from '@lib/with-hybrid-auth'
 import { PermissionData } from '@typez/globals'
-import { getSession } from '@wrappers/auth-wrapper'
-import type { NextApiRequest, NextApiResponse } from 'next'
+import type { NextApiResponse } from 'next'
 
-export default withHybridAuth(async function permissionHandler(req: NextApiRequest, res: NextApiResponse) {
-  const { query, method } = req
-  const session = await getSession(req, res)
+export default withHybridAuth(async function permissionHandler(
+  req: ExtendedApiRequest,
+  res: NextApiResponse,
+) {
+  const { query, method, user } = req
+
+  if (!user) {
+    res.status(401).end('Unauthorized')
+    return
+  }
 
   const permissionId = query.id?.toString() || ''
-
   const permission = (await getPermissionByDoc(permissionId)) as PermissionData
-  console.log('permission owner', permission.ownerId)
-  console.log('session user', session?.user.sub)
-  const isOwner = permission.ownerId === session?.user.sub
+  const isOwner = permission.ownerId === user.sub
 
   switch (method) {
     case 'GET':

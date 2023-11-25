@@ -9,27 +9,22 @@ import {
 } from '@lib/mongo-utils'
 import withHybridAuth, { ExtendedApiRequest } from '@lib/with-hybrid-auth'
 import { DocumentData, PermissionData, UserPermission } from '@typez/globals'
-import { getSession } from '@wrappers/auth-wrapper'
 import type { NextApiResponse } from 'next'
 
 export default withHybridAuth(async function documentHandler(req: ExtendedApiRequest, res: NextApiResponse) {
   let { query, method, user } = req
-
-  const documentId = query.id?.toString() || ''
-
-  const session = await getSession(req, res)
-
-  user = user || session?.user
 
   if (!user) {
     res.status(401).end('Unauthorized')
     return
   }
 
+  const documentId = query.id?.toString() || ''
+
   let permissions = (await getPermissionByDoc(documentId)) as PermissionData
 
   if (permissions === null) {
-    permissions = await createPermission({ ownerId: user.sub, documentId: documentId })
+    permissions = await createPermission({ ownerId: user.sub, documentId })
   }
 
   const isOwner = permissions.ownerId === user.sub

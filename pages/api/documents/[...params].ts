@@ -1,25 +1,29 @@
 import { createVersion, getVersionsForDoc } from '@lib/mongo-utils'
+import withHybridAuth, { ExtendedApiRequest } from '@lib/with-hybrid-auth'
 import { VersionData } from '@typez/globals'
-import { getSession, withApiAuthRequired } from '@wrappers/auth-wrapper'
-import type { NextApiRequest, NextApiResponse } from 'next'
+import type { NextApiResponse } from 'next'
 
-export default withApiAuthRequired(async function nestedDocumentsHandler(req: NextApiRequest, res: NextApiResponse) {
-  const { query, method  } = req
-  const session = getSession(req, res)
+export default withHybridAuth(async function nestedDocumentsHandler(
+  req: ExtendedApiRequest,
+  res: NextApiResponse,
+) {
+  const { query, method, user } = req
   const documentId = query.params && query.params.length > 0 ? query.params[0] : ''
 
-  // /documents/123/versions GET
-  // /documents/123/versions POST
+  if (!user) {
+    res.status(401).end('Unauthorized')
+    return
+  }
+
+  // /documents/123/versions
   switch (method) {
-    case 'POST':  
+    case 'POST':
       const newVersion = await createVersion(req.body)
       res.status(200).json(newVersion)
       break
     case 'GET':
-      if (session) {
-        const versions = await getVersionsForDoc(documentId)
-        res.status(200).json(versions as VersionData[])
-      }
+      const versions = await getVersionsForDoc(documentId)
+      res.status(200).json(versions as VersionData[])
       break
     default:
       res.setHeader('Allow', ['GET', 'POST'])

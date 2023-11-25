@@ -1,9 +1,9 @@
 import { deleteVersion, updateVersion } from '@lib/mongo-utils'
-import withHybridAuth from '@lib/with-hybrid-auth'
+import withHybridAuth, { ExtendedApiRequest } from '@lib/with-hybrid-auth'
 import { VersionData } from '@typez/globals'
-import type { NextApiRequest, NextApiResponse } from 'next'
+import type { NextApiResponse } from 'next'
 
-export default withHybridAuth(async function versionHandler(req: NextApiRequest, res: NextApiResponse) {
+export default withHybridAuth(async function versionHandler(req: ExtendedApiRequest, res: NextApiResponse) {
   const { query, method } = req
   const versionId = query.id?.toString() || ''
 
