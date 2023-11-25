@@ -61,7 +61,7 @@ type HeaderProps = {
 
 const HeaderComponent = ({ id }: HeaderProps) => {
   const { user } = useUser()
-  const { navigateTo } = useNavigation()
+  const { navigateTo, signOut } = useNavigation()
   const { post, get } = useAPI()
 
   const fetcher = useCallback(
@@ -158,11 +158,9 @@ const HeaderComponent = ({ id }: HeaderProps) => {
                   </ListItemButton>
                 </ListItem>
                 <ListItem disablePadding>
-                  <Link href="/api/auth/logout">
-                    <ListItemButton>
-                      <ListItemText primary={'Sign Out'} />
-                    </ListItemButton>
-                  </Link>
+                  <ListItemButton onClick={() => signOut()}>
+                    <ListItemText primary={'Sign Out'} />
+                  </ListItemButton>
                 </ListItem>
               </List>
               <Divider />

@@ -1,3 +1,22 @@
 @import 'tailwindcss/base';
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';
+
+@font-face {
+  font-family: 'Ibarra Real Nova';
+  src: url('../styles/fonts/Ibarra_Real_Nova/IbarraRealNova-VariableFont_wght.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Mukta';
+  src: url('.styles/fonts/Mukta/Mukta-Light.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+:root {
+  --font-ibarra: 'Ibarra Real Nova', serif;
+  --font-mukta: 'Mukta', sans-serif;
+}

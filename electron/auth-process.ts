@@ -12,26 +12,25 @@ export const createAuthWindow = async () => {
     height: 600,
     webPreferences: {
       nodeIntegration: false,
-    }
+    },
   })
 
   win.loadURL(authService.getAuthenticationURL())
 
-  const { session: { webRequest } } = win.webContents
+  const {
+    session: { webRequest },
+  } = win.webContents
 
   const filter = {
-    urls: [
-      'http://localhost/callback*'
-    ]
+    urls: ['http://localhost/callback*'],
   }
 
   webRequest?.onBeforeRequest(filter, async ({ url }) => {
     await authService.loadTokens(url)
     createAppWindow()
     return destroyAuthWin()
-  });
-
-  (win as any).on('authenticated', () => {
+  })
+  ;(win as any).on('authenticated', () => {
     destroyAuthWin()
   })
 
@@ -56,6 +55,6 @@ export const createLogoutWindow = () => {
   logoutWindow.on('ready-to-show', async () => {
     await authService.logout()
     logoutWindow.close()
-    // optionally create window here
+    createAuthWindow()
   })
 }

@@ -35,7 +35,7 @@ const SharedDocumentsPage = ({
         className={`
           flex min-h-[40px] animate-fadein
           justify-between border-solid border-black/[.35] px-[10px]
-          text-[14px] font-semibold 
+          text-[14px] font-semibold
           uppercase transition duration-[250ms]
           hover:cursor-pointer hover:bg-white/[.30]
           ${id === selectedDocId ? 'border-black/[.14] bg-white/[.30]' : ''}

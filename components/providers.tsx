@@ -24,11 +24,13 @@ const MouseContext = createContext<mouseContextType>(mouseContextDefaultValue)
 type navContextType = {
   navigateTo: (path: string) => void
   getLocation: () => string
+  signOut: () => void
 }
 
 const navContextDefaultValue: navContextType = {
   navigateTo: () => {},
   getLocation: () => '',
+  signOut: () => {},
 }
 
 const NavigationContext = createContext<navContextType>(navContextDefaultValue)
@@ -112,12 +114,14 @@ export function NavigationProvider({
   children,
   navigateTo,
   getLocation,
+  signOut,
 }: {
   children: ReactNode
   navigateTo: (path: string) => void
   getLocation: () => string
+  signOut: () => void
 }) {
-  const value = { navigateTo, getLocation }
+  const value = { navigateTo, getLocation, signOut }
 
   return <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>
 }

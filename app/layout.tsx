@@ -28,11 +28,12 @@ export default function Layout({ children }: { children: ReactNode }) {
 
   const navigateTo = useCallback((path: string) => router.push(path), [router])
   const getLocation = useCallback(() => (pathname ? pathname : '/'), [pathname])
+  const signOut = useCallback(() => router.push('/api/auth/logout'), [router])
 
   return (
     <html lang="en">
       <body className={`${ibarra.variable} ${mukta.variable}`}>
-        <NavigationProvider getLocation={getLocation} navigateTo={navigateTo}>
+        <NavigationProvider getLocation={getLocation} navigateTo={navigateTo} signOut={signOut}>
           <APIProvider destroy={destroy} patch={update} post={post} get={get}>
             <Providers>{children}</Providers>
           </APIProvider>
