@@ -11,6 +11,8 @@ export default withHybridAuth(async function permissionHandler(req: NextApiReque
   const permissionId = query.id?.toString() || ''
 
   const permission = (await getPermissionByDoc(permissionId)) as PermissionData
+  console.log('permission owner', permission.ownerId)
+  console.log('session user', session?.user.sub)
   const isOwner = permission.ownerId === session?.user.sub
 
   switch (method) {
