@@ -7,7 +7,12 @@ const app = express()
 const server = http.createServer(app)
 
 // Initialize Socket.IO
-const io = socketIo(server)
+const io = socketIo(server, {
+  cors: {
+    origin: 'https://www.whetstone-writer.com',
+    methods: ['GET', 'POST'],
+  },
+})
 
 // Handle a client connection
 io.on('connection', socket => {
@@ -25,6 +30,13 @@ io.on('connection', socket => {
 
     // Broadcast the message to all clients in the same room
     socket.to(documentId).emit('message', msg)
+  })
+
+  socket.on('document-updated', msg => {
+    console.log(`Document in room ${documentId} updated:`, msg)
+
+    // Broadcast the message to all clients in the same room
+    socket.to(documentId).emit('document-updated', msg)
   })
 
   // Handle client disconnection

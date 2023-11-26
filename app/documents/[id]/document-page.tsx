@@ -21,6 +21,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Descendant, Node, NodeEntry, createEditor } from 'slate'
 import { withHistory } from 'slate-history'
 import { withReact } from 'slate-react'
+import io, { Socket } from 'socket.io-client'
 import useSWR, { mutate } from 'swr'
 import { useDebouncedCallback } from 'use-debounce'
 
@@ -84,6 +85,35 @@ export default function DocumentPage() {
   const [commentActive, setCommentActive] = useState<AnimationState>('Inactive')
   const [pendingCommentRef, setPendingCommentRef] = useState<NodeEntry<Node> | null>(null)
   const [openCommentId, setOpenCommentId] = useState<string | null>(null)
+  const [socket, setSocket] = useState<Socket | null>(null)
+
+  useEffect(() => {
+    if (!id) return
+
+    const socket = io('https://ws.whetstone-writer.com', { query: { documentId: id } })
+
+    setSocket(socket)
+
+    socket.on('message', msg => {
+      console.log('Message from server:', msg)
+    })
+
+    socket.on('joined', msg => {
+      console.log(msg)
+    })
+
+    socket.on('disconnect', msg => {
+      console.log(msg)
+    })
+
+    socket.on('document-updated', msg => {
+      console.log(msg)
+    })
+
+    return () => {
+      socket.disconnect()
+    }
+  }, [id])
 
   const addComment = useCallback(
     async (content: string) => {
@@ -159,6 +189,7 @@ export default function DocumentPage() {
     mutate(`/documents/${id}/versions`)
     save(data, id, setRecentlySaved)
     mutate(documentPath)
+    socket?.emit('document-updated', data)
   }, 1000)
 
   useEffect(() => {

@@ -6,8 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
-    "build": "echo 'No build step required'",
-    "package": "zip -r websocket-server.zip . -x '*.git*' -x 'node_modules/*'"
+    "build": "echo 'No build step required'"
   },
   "author": "",
   "license": "ISC",
