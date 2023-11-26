@@ -12,7 +12,8 @@
     "edev": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
-    "publish": "electron-forge publish"
+    "publish": "electron-forge publish",
+    "start-socket": "node websocket/server.js"
   },
   "engines": {
     "node": "^18.0.0"
