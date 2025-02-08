@@ -5,7 +5,7 @@ import { Loader } from '@components/loader'
 import { useSpinner } from '@lib/hooks'
 import { DocumentData } from '@typez/globals'
 import { format } from 'date-fns'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigation } from './providers'
 import { TreeView, TreeItem } from '@mui/x-tree-view'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
@@ -40,6 +40,10 @@ const SharedDocumentsPage = ({
   renameDocument,
 }: SharedDocumentsPageProps) => {
   const [selectedDocId, setSelectedDoc] = useState<string | null>(null)
+  const [editingDocId, setEditingDocId] = useState<string | null>(null)
+  const [editingTitle, setEditingTitle] = useState('')
+  const editInputRef = useRef<HTMLInputElement>(null)
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [renameModalOpen, setRenameModalOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
@@ -48,6 +52,58 @@ const SharedDocumentsPage = ({
 
   const selectedDoc = docs.find(doc => doc.id === selectedDocId)
   console.log('selected doc', JSON.stringify(selectedDoc, null, 2))
+
+  useEffect(() => {
+    if (editingDocId && editInputRef.current) {
+      editInputRef.current.focus()
+      const length = editInputRef.current.value.length
+      editInputRef.current.setSelectionRange(length, length)
+    }
+  }, [editingDocId])
+
+  const handleClick = (e: React.MouseEvent, doc: DocumentData) => {
+    e.stopPropagation()
+    
+    if (clickTimeoutRef.current !== null) {
+      // Double click occurred
+      clearTimeout(clickTimeoutRef.current)
+      clickTimeoutRef.current = null
+      handleDoubleClick(e, doc)
+    } else {
+      // Set timeout for single click
+      clickTimeoutRef.current = setTimeout(() => {
+        clickTimeoutRef.current = null
+        if (editingDocId !== doc.id) {
+          navigateTo(`/documents/${doc.id}`)
+        }
+      }, 250) // 250ms delay
+    }
+  }
+
+  const handleDoubleClick = (e: React.MouseEvent, doc: DocumentData) => {
+    e.stopPropagation()
+    setEditingDocId(doc.id)
+    setEditingTitle(doc.title)
+  }
+
+  const handleEditKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, docId: string) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      if (editingTitle.trim() !== '') {
+        renameDocument(docId, editingTitle)
+        setEditingDocId(null)
+      }
+    } else if (e.key === 'Escape') {
+      setEditingDocId(null)
+    }
+  }
+
+  const handleEditBlur = (docId: string) => {
+    if (editingTitle.trim() !== '') {
+      renameDocument(docId, editingTitle)
+    }
+    setEditingDocId(null)
+  }
 
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>, id: string) => {
     event.stopPropagation()
@@ -79,11 +135,28 @@ const SharedDocumentsPage = ({
     <TreeItem
       key={doc.id}
       nodeId={doc.id}
-      onClick={() => navigateTo(`/documents/${doc.id}`)}
+      onClick={(e) => handleClick(e, doc)}
       label={
         <div className="flex items-center justify-between py-2">
-          <div className="flex items-center">
-            <span className="uppercase text-black/[.70]">{doc.title}</span>
+          <div className="flex items-center min-w-[200px]">
+            {editingDocId === doc.id ? (
+              <input
+                ref={editInputRef}
+                type="text"
+                value={editingTitle}
+                onChange={(e) => setEditingTitle(e.target.value)}
+                onKeyDown={(e) => handleEditKeyDown(e, doc.id)}
+                onBlur={() => handleEditBlur(doc.id)}
+                className="bg-transparent border-none outline-none focus:outline-none focus:ring-0 uppercase text-black/[.70] w-full p-0 m-0 h-[24px] leading-[24px]"
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <span 
+                className="uppercase text-black/[.70] block h-[24px] leading-[24px]"
+              >
+                {doc.title}
+              </span>
+            )}
           </div>
           <div className="flex items-center">
             <span className="mr-4 text-black/[.65] capitalize">{formatDate(doc.lastUpdated)}</span>
@@ -119,7 +192,7 @@ const SharedDocumentsPage = ({
                     transition: 'all 0.2s ease',
                     fontFamily: 'inherit',
                     '&:hover': {
-                      backgroundColor: 'rgba(255, 255, 255, 0.4)',
+                      backgroundColor: 'rgba(255, 255, 255, 0.4) !important',
                     },
                   },
                   '& .MuiTreeItem-label': {
@@ -127,6 +200,11 @@ const SharedDocumentsPage = ({
                   },
                   '& .Mui-selected': {
                     backgroundColor: 'rgba(255, 255, 255, 0.15) !important',
+                  },
+                  '& .MuiTreeItem-root': {
+                    '&:hover > .MuiTreeItem-content': {
+                      backgroundColor: 'rgba(255, 255, 255, 0.4) !important',
+                    },
                   },
                 }}>
                 {docs.map(doc => renderTree(doc))}
