@@ -3,12 +3,26 @@ import SharedDocumentsPage from '@components/shared-documents-page'
 import { useDocSync } from '@lib/hooks'
 import API from '@lib/http-utils'
 import { withPageAuthRequired } from '@wrappers/auth-wrapper-client'
-import { useCallback } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { useSWRConfig } from 'swr'
+import { FolderData } from '@typez/globals'
 
 export const NextDocumentsPage = () => {
   const { docs, mutate, isLoading } = useDocSync()
   const { cache } = useSWRConfig()
+  const [folders, setFolders] = useState<FolderData[]>([])
+
+  useEffect(() => {
+    const fetchFolders = async () => {
+      try {
+        const response = await API.get('folders')
+        setFolders(response.data)
+      } catch (error) {
+        console.error('Error fetching folders:', error)
+      }
+    }
+    fetchFolders()
+  }, [])
 
   const deleteDocument = useCallback(
     async (id: string) => {
@@ -43,11 +57,59 @@ export const NextDocumentsPage = () => {
     [mutate, docs, cache],
   )
 
+  const createFolder = useCallback(
+    async (title: string, parentId?: string) => {
+      try {
+        const response = await API.post('folders', {
+          title,
+          parentId,
+          userId: 'current', // The server will use the authenticated user's ID
+          lastUpdated: Date.now()
+        })
+        setFolders(prev => [...prev, response.data])
+      } catch (error) {
+        console.error('Error creating folder:', error)
+      }
+    },
+    []
+  )
+
+  const deleteFolder = useCallback(
+    async (id: string) => {
+      try {
+        await API.delete(`folders/${id}`)
+        setFolders(prev => prev.filter(folder => folder.id !== id))
+      } catch (error) {
+        console.error('Error deleting folder:', error)
+      }
+    },
+    []
+  )
+
+  const renameFolder = useCallback(
+    async (id: string, title: string) => {
+      try {
+        const response = await API.put(`folders/${id}`, {
+          title,
+          lastUpdated: Date.now()
+        })
+        setFolders(prev => prev.map(folder => folder.id === id ? response.data : folder))
+      } catch (error) {
+        console.error('Error renaming folder:', error)
+      }
+    },
+    []
+  )
+
   return (
     <SharedDocumentsPage
       docs={docs}
+      folders={folders}
       deleteDocument={deleteDocument}
       renameDocument={renameDocument}
+      createFolder={createFolder}
+      deleteFolder={deleteFolder}
+      renameFolder={renameFolder}
       isLoading={isLoading}
     />
   )

@@ -3,15 +3,18 @@
 import Layout from '@components/layout'
 import { Loader } from '@components/loader'
 import { useSpinner } from '@lib/hooks'
-import { DocumentData } from '@typez/globals'
+import { DocumentData, FolderData } from '@typez/globals'
 import { format } from 'date-fns'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo, memo } from 'react'
 import { useNavigation } from './providers'
 import { TreeView, TreeItem } from '@mui/x-tree-view'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz'
-import { IconButton, Menu, MenuItem } from '@mui/material'
+import CreateNewFolderIcon from '@mui/icons-material/CreateNewFolder'
+import FolderIcon from '@mui/icons-material/Folder'
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
+import { IconButton, Menu, MenuItem, Tooltip } from '@mui/material'
 import RenameModal from './rename-modal'
 import DeleteModal from './delete-modal'
 
@@ -28,16 +31,82 @@ function formatDate(timestamp: number | undefined | null): string {
 
 export interface SharedDocumentsPageProps {
   docs: DocumentData[]
+  folders: FolderData[]
   isLoading: boolean
   deleteDocument: (id: string) => void
   renameDocument: (id: string, title: string) => void
+  createFolder: (title: string, parentId?: string) => void
+  deleteFolder: (id: string) => void
+  renameFolder: (id: string, title: string) => void
 }
 
+const TreeItemContent = memo(({ 
+  item, 
+  editingDocId, 
+  editingTitle, 
+  editInputRef,
+  handleEditKeyDown,
+  handleEditBlur,
+  setEditingTitle,
+  handleMenuClick,
+}: {
+  item: DocumentData | FolderData
+  editingDocId: string | null
+  editingTitle: string
+  editInputRef: React.RefObject<HTMLInputElement>
+  handleEditKeyDown: (e: React.KeyboardEvent<HTMLInputElement>, docId: string) => void
+  handleEditBlur: (docId: string) => void
+  setEditingTitle: (value: string) => void
+  handleMenuClick: (event: React.MouseEvent<HTMLElement>, id: string) => void
+}) => {
+  const isFolder = !('content' in item)
+  const icon = isFolder ? <FolderIcon /> : <InsertDriveFileIcon />
+
+  return (
+    <div className="flex items-center justify-between py-2">
+      <div className="flex items-center min-w-[200px] gap-2">
+        {icon}
+        {editingDocId === item.id ? (
+          <input
+            ref={editInputRef}
+            type="text"
+            value={editingTitle}
+            onChange={(e) => setEditingTitle(e.target.value)}
+            onKeyDown={(e) => handleEditKeyDown(e, item.id)}
+            onBlur={() => handleEditBlur(item.id)}
+            className="bg-transparent border-none outline-none focus:outline-none focus:ring-0 uppercase text-black/[.70] w-full p-0 m-0 h-[24px] leading-[24px]"
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <span className="uppercase text-black/[.70] block h-[24px] leading-[24px]">
+            {item.title}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center">
+        <span className="mr-4 text-black/[.65] capitalize">{formatDate(item.lastUpdated)}</span>
+        <IconButton
+          size="small"
+          onClick={e => handleMenuClick(e, item.id)}
+          className="hover:bg-black/[.10]">
+          <MoreHorizIcon fontSize="small" />
+        </IconButton>
+      </div>
+    </div>
+  )
+})
+
+TreeItemContent.displayName = 'TreeItemContent'
+
 const SharedDocumentsPage = ({
-  docs,
+  docs = [],
+  folders = [],
   isLoading,
   deleteDocument,
   renameDocument,
+  createFolder,
+  deleteFolder,
+  renameFolder,
 }: SharedDocumentsPageProps) => {
   const [selectedDocId, setSelectedDoc] = useState<string | null>(null)
   const [editingDocId, setEditingDocId] = useState<string | null>(null)
@@ -49,6 +118,7 @@ const SharedDocumentsPage = ({
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const showSpinner = useSpinner(isLoading)
   const { navigateTo } = useNavigation()
+  const [newFolderParentId, setNewFolderParentId] = useState<string | undefined>()
 
   const selectedDoc = docs.find(doc => doc.id === selectedDocId)
   console.log('selected doc', JSON.stringify(selectedDoc, null, 2))
@@ -125,62 +195,85 @@ const SharedDocumentsPage = ({
     handleMenuClose()
   }
 
+  const handleCreateFolder = () => {
+    const title = prompt('Enter folder name:')
+    if (title) {
+      createFolder(title, newFolderParentId)
+    }
+  }
+
   const emptyMessage = (
     <div className={'text-center text-[14px] font-semibold uppercase text-black/[.5]'}>
       Empty / Go create something of worth
     </div>
   )
 
-  const renderTree = (doc: DocumentData) => (
-    <TreeItem
-      key={doc.id}
-      nodeId={doc.id}
-      onClick={(e) => handleClick(e, doc)}
-      label={
-        <div className="flex items-center justify-between py-2">
-          <div className="flex items-center min-w-[200px]">
-            {editingDocId === doc.id ? (
-              <input
-                ref={editInputRef}
-                type="text"
-                value={editingTitle}
-                onChange={(e) => setEditingTitle(e.target.value)}
-                onKeyDown={(e) => handleEditKeyDown(e, doc.id)}
-                onBlur={() => handleEditBlur(doc.id)}
-                className="bg-transparent border-none outline-none focus:outline-none focus:ring-0 uppercase text-black/[.70] w-full p-0 m-0 h-[24px] leading-[24px]"
-                onClick={(e) => e.stopPropagation()}
-              />
-            ) : (
-              <span 
-                className="uppercase text-black/[.70] block h-[24px] leading-[24px]"
-              >
-                {doc.title}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center">
-            <span className="mr-4 text-black/[.65] capitalize">{formatDate(doc.lastUpdated)}</span>
-            <IconButton
-              size="small"
-              onClick={e => handleMenuClick(e, doc.id)}
-              className="hover:bg-black/[.10]">
-              <MoreHorizIcon fontSize="small" />
-            </IconButton>
-          </div>
-        </div>
-      }
-    />
-  )
+  // Memoize the combined items array
+  const allItems = useMemo(() => {
+    return [...docs, ...folders]
+  }, [docs, folders])
 
+  const renderTree = (parentId?: string, visited = new Set<string>()) => {
+    const filteredItems = allItems.filter(item => {
+      if ('content' in item) {
+        // DocumentData
+        return item.location === parentId
+      }
+      // FolderData – only include if not already visited
+      return item.parentId === parentId && !visited.has(item.id)
+    })
+  
+    return filteredItems.map(item => {
+      const isFolder = !('content' in item)
+      if (isFolder) {
+        visited.add(item.id)
+      }
+      return (
+        <TreeItem
+          key={item.id}
+          nodeId={item.id}
+          onClick={e =>
+            isFolder
+              ? setNewFolderParentId(item.id)
+              : handleClick(e, item as DocumentData)
+          }
+          label={
+            <TreeItemContent
+              item={item}
+              editingDocId={editingDocId}
+              editingTitle={editingTitle}
+              editInputRef={editInputRef}
+              handleEditKeyDown={handleEditKeyDown}
+              handleEditBlur={handleEditBlur}
+              setEditingTitle={setEditingTitle}
+              handleMenuClick={handleMenuClick}
+            />
+          }>
+          {isFolder && renderTree(item.id, visited)}
+        </TreeItem>
+      )
+    })
+  }
+  
   return (
     <Layout>
       <div className="gradient absolute left-0 top-0 z-[-1] h-screen w-screen" />
       <div className="relative top-[44px] flex h-[calc(100vh_-_44px)] justify-center pb-10">
         <div className="flex w-11/12 max-w-[740px] flex-col justify-center sm:w-9/12">
+          <div className="flex justify-end mb-4">
+            <Tooltip title="Create new folder">
+              <IconButton
+                onClick={handleCreateFolder}
+                className="hover:bg-black/[.10]"
+              >
+                <CreateNewFolderIcon />
+              </IconButton>
+            </Tooltip>
+          </div>
           <div className="max-h-[calc(100vh_-_100px)] overflow-y-auto rounded-lg bg-white/[.05] p-4">
             {showSpinner && <Loader />}
-            {!isLoading && docs.length === 0 && emptyMessage}
-            {docs.length > 0 && (
+            {!isLoading && (!docs || docs.length === 0) && (!folders || folders.length === 0) && emptyMessage}
+            {(!isLoading && docs && folders) && (docs.length > 0 || folders.length > 0) && (
               <TreeView
                 defaultCollapseIcon={<ExpandMoreIcon />}
                 defaultExpandIcon={<ChevronRightIcon />}
@@ -207,7 +300,7 @@ const SharedDocumentsPage = ({
                     },
                   },
                 }}>
-                {docs.map(doc => renderTree(doc))}
+                {renderTree()}
               </TreeView>
             )}
           </div>
