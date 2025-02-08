@@ -134,17 +134,28 @@ const SharedDocumentsPage = ({
         }
       }))
 
-      // Listen for drag and drop changes
-      provider.onDidChangeTreeData((changedItemIds) => {
-        console.log('Tree data changed:', changedItemIds)
-        // Refresh the tree data
-        provider.onDidChangeTreeDataEmitter.emit(['root'])
+      // Initialize the tree with all items expanded
+      const allIds = Object.keys(items)
+      provider.onDidChangeTreeData(() => {
+        allIds.forEach(id => {
+          provider.onDidChangeTreeDataEmitter.emit([id])
+        })
       })
 
       return provider
     },
     [items]
   )
+
+  // Log tree structure whenever it changes
+  useMemo(() => {
+    console.log('Current tree structure:', {
+      items,
+      expandedItems: ['root', ...folders.map(f => (f as any)._id || f.id)],
+      folderCount: folders.length,
+      docCount: docs.length
+    })
+  }, [items, folders, docs])
 
   const handleSelect = (selectedItems: TreeItemIndex[], _treeId: string) => {
     const selectedId = selectedItems[0]?.toString()
@@ -260,14 +271,14 @@ const SharedDocumentsPage = ({
                   getItemTitle={item => item.data?.title || ''}
                   viewState={{
                     ['tree-1']: {
-                      expandedItems: ['root'],
+                      expandedItems: ['root', ...folders.map(f => f._id || f.id)],
                     }
                   }}
                   canDragAndDrop={true}
                   canDropOnFolder={true}
                   canReorderItems={true}
                   renderItem={(props) => {
-                    const { item, depth, arrow } = props
+                    const { item, depth, arrow, context } = props
                     const isFolder = Boolean(item.isFolder)
                     const icon = isFolder ? <FolderIcon /> : <InsertDriveFileIcon />
                     const itemData = item.data
@@ -279,25 +290,39 @@ const SharedDocumentsPage = ({
                       >
                         <div 
                           {...props.context.itemContainerWithoutChildrenProps}
-                          className="flex items-center justify-between py-2 px-2 hover:bg-white/[.1] rounded cursor-pointer"
+                          {...context.interactiveElementProps}
+                          className={`flex items-center justify-between py-2 px-2 hover:bg-white/[.1] rounded cursor-pointer ${
+                            context.isSelected ? 'bg-white/[.1]' : ''
+                          }`}
+                          style={{
+                            paddingLeft: `${(depth + 1) * 20}px`,
+                            backgroundColor: item.index === 'root' ? 'transparent' : undefined
+                          }}
                         >
-                          <div className="flex items-center min-w-[200px] gap-2" style={{ marginLeft: depth * 20 }}>
+                          <div className="flex items-center min-w-[200px] gap-2">
                             <div className="flex items-center gap-1">
-                              {isFolder && arrow}
+                              {isFolder && (
+                                <div className="w-4 h-4 flex items-center justify-center">
+                                  {arrow}
+                                </div>
+                              )}
                               {icon}
                             </div>
                             <span className="uppercase text-black/[.70] block h-[24px] leading-[24px]">
                               {itemData?.title || ''}
                             </span>
                           </div>
-                          {itemData && (
+                          {itemData && item.index !== 'root' && (
                             <div className="flex items-center">
                               <span className="mr-4 text-black/[.65] capitalize">
                                 {formatDate(itemData.lastUpdated)}
                               </span>
                               <IconButton
                                 size="small"
-                                onClick={e => handleMenuClick(e, item.index.toString())}
+                                onClick={e => {
+                                  e.stopPropagation()
+                                  handleMenuClick(e, item.index.toString())
+                                }}
                                 className="hover:bg-black/[.10]">
                                 <MoreHorizIcon fontSize="small" />
                               </IconButton>
