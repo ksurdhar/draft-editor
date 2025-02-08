@@ -5,11 +5,8 @@ import { Loader } from '@components/loader'
 import { useSpinner } from '@lib/hooks'
 import { DocumentData, FolderData } from '@typez/globals'
 import { format } from 'date-fns'
-import { useState, useRef, useEffect, useMemo, memo } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigation } from './providers'
-import { TreeView, TreeItem } from '@mui/x-tree-view'
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
-import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz'
 import CreateNewFolderIcon from '@mui/icons-material/CreateNewFolder'
 import FolderIcon from '@mui/icons-material/Folder'
@@ -17,29 +14,9 @@ import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
 import { IconButton, Menu, MenuItem, Tooltip } from '@mui/material'
 import RenameModal from './rename-modal'
 import DeleteModal from './delete-modal'
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-  DragOverlay,
-  DragStartEvent,
-  DragOverEvent,
-  useDroppable,
-  pointerWithin,
-  rectIntersection,
-} from '@dnd-kit/core'
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
+import { UncontrolledTreeEnvironment, Tree, StaticTreeDataProvider, TreeItemIndex, TreeItemRenderContext, TreeItem, TreeInformation, DraggingPosition } from 'react-complex-tree'
+import 'react-complex-tree/lib/style.css'
+import { ReactNode } from 'react'
 
 // Helper function to safely format dates
 function formatDate(timestamp: number | undefined | null): string {
@@ -63,120 +40,6 @@ export interface SharedDocumentsPageProps {
   renameFolder: (id: string, title: string) => void
 }
 
-const TreeItemContent = memo(({ 
-  item, 
-  editingDocId, 
-  editingTitle, 
-  editInputRef,
-  handleEditKeyDown,
-  handleEditBlur,
-  setEditingTitle,
-  handleMenuClick,
-}: {
-  item: DocumentData | FolderData
-  editingDocId: string | null
-  editingTitle: string
-  editInputRef: React.RefObject<HTMLInputElement>
-  handleEditKeyDown: (e: React.KeyboardEvent<HTMLInputElement>, docId: string) => void
-  handleEditBlur: (docId: string) => void
-  setEditingTitle: (value: string) => void
-  handleMenuClick: (event: React.MouseEvent<HTMLElement>, id: string) => void
-}) => {
-  const isFolder = !('content' in item)
-  const icon = isFolder ? <FolderIcon /> : <InsertDriveFileIcon />
-  
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-    over,
-  } = useSortable({
-    id: item.id,
-    data: {
-      type: isFolder ? 'folder' : 'document',
-      item,
-    }
-  })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-    backgroundColor: over ? 'rgba(255, 255, 255, 0.2)' : undefined,
-  }
-
-  return (
-    <div 
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className="flex items-center justify-between py-2"
-      data-type={isFolder ? 'folder' : 'document'}
-    >
-      <div className="flex items-center min-w-[200px] gap-2">
-        {icon}
-        {editingDocId === item.id ? (
-          <input
-            ref={editInputRef}
-            type="text"
-            value={editingTitle}
-            onChange={(e) => setEditingTitle(e.target.value)}
-            onKeyDown={(e) => handleEditKeyDown(e, item.id)}
-            onBlur={() => handleEditBlur(item.id)}
-            className="bg-transparent border-none outline-none focus:outline-none focus:ring-0 uppercase text-black/[.70] w-full p-0 m-0 h-[24px] leading-[24px]"
-            onClick={(e) => e.stopPropagation()}
-          />
-        ) : (
-          <span className="uppercase text-black/[.70] block h-[24px] leading-[24px]">
-            {item.title}
-          </span>
-        )}
-      </div>
-      <div className="flex items-center">
-        <span className="mr-4 text-black/[.65] capitalize">{formatDate(item.lastUpdated)}</span>
-        <IconButton
-          size="small"
-          onClick={e => handleMenuClick(e, item.id)}
-          className="hover:bg-black/[.10]">
-          <MoreHorizIcon fontSize="small" />
-        </IconButton>
-      </div>
-    </div>
-  )
-})
-
-TreeItemContent.displayName = 'TreeItemContent'
-
-const DroppableTreeItem = memo(({ 
-  nodeId, 
-  label, 
-  children, 
-  onClick,
-  item,
-}: { 
-  nodeId: string
-  label: React.ReactNode
-  children?: React.ReactNode
-  onClick: (e: React.MouseEvent) => void
-  item: DocumentData | FolderData
-}) => {
-  return (
-    <TreeItem
-      nodeId={nodeId}
-      onClick={onClick}
-      label={label}
-    >
-      {children}
-    </TreeItem>
-  )
-})
-
-DroppableTreeItem.displayName = 'DroppableTreeItem'
-
 const SharedDocumentsPage = ({
   docs = [],
   folders = [],
@@ -188,77 +51,111 @@ const SharedDocumentsPage = ({
   renameFolder,
 }: SharedDocumentsPageProps) => {
   const [selectedDocId, setSelectedDoc] = useState<string | null>(null)
-  const [editingDocId, setEditingDocId] = useState<string | null>(null)
-  const [editingTitle, setEditingTitle] = useState('')
-  const editInputRef = useRef<HTMLInputElement>(null)
-  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [renameModalOpen, setRenameModalOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const showSpinner = useSpinner(isLoading)
   const { navigateTo } = useNavigation()
   const [newFolderParentId, setNewFolderParentId] = useState<string | undefined>()
-  const [activeId, setActiveId] = useState<string | null>(null)
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
+
+  const items = useMemo(() => {
+    console.log('Folders:', folders)
+    console.log('Docs:', docs)
+    
+    const treeItems: Record<string, any> = {
+      root: {
+        index: 'root',
+        canMove: false,
+        canRename: false,
+        data: {
+          title: 'Root',
+          lastUpdated: null
+        },
+        children: [],
+        isFolder: true,
+      }
+    }
+
+    // Add folders first
+    folders.forEach(folder => {
+      const folderId = (folder as any)._id || folder.id
+      treeItems[folderId] = {
+        index: folderId,
+        canMove: true,
+        canRename: true,
+        data: folder,
+        children: [],
+        isFolder: true,
+      }
     })
+
+    // Add documents
+    docs.forEach(doc => {
+      const docId = (doc as any)._id || doc.id
+      treeItems[docId] = {
+        index: docId,
+        canMove: true,
+        canRename: true,
+        data: doc,
+        children: [],
+        isFolder: false,
+      }
+    })
+
+    // Build tree structure
+    folders.forEach(folder => {
+      const folderId = (folder as any)._id || folder.id
+      const parentId = folder.parentId || 'root'
+      if (treeItems[parentId]) {
+        treeItems[parentId].children.push(folderId)
+        console.log('Added folder to parent:', { folderId, parentId, children: treeItems[parentId].children })
+      }
+    })
+
+    docs.forEach(doc => {
+      const docId = (doc as any)._id || doc.id
+      const parentId = doc.location || 'root'
+      if (treeItems[parentId]) {
+        treeItems[parentId].children.push(docId)
+      }
+    })
+
+    console.log('Tree Items:', treeItems)
+    return treeItems
+  }, [docs, folders])
+
+  const dataProvider = useMemo(
+    () => {
+      const provider = new StaticTreeDataProvider(items, (item, data) => ({
+        ...item,
+        data: {
+          ...item.data,
+          title: data
+        }
+      }))
+
+      // Listen for drag and drop changes
+      provider.onDidChangeTreeData((changedItemIds) => {
+        console.log('Tree data changed:', changedItemIds)
+        // Refresh the tree data
+        provider.onDidChangeTreeDataEmitter.emit(['root'])
+      })
+
+      return provider
+    },
+    [items]
   )
 
-  const selectedDoc = docs.find(doc => doc.id === selectedDocId)
-  console.log('selected doc', JSON.stringify(selectedDoc, null, 2))
-
-  useEffect(() => {
-    if (editingDocId && editInputRef.current) {
-      editInputRef.current.focus()
-      const length = editInputRef.current.value.length
-      editInputRef.current.setSelectionRange(length, length)
-    }
-  }, [editingDocId])
-
-  const handleClick = (e: React.MouseEvent, doc: DocumentData) => {
-    e.stopPropagation()
-    
-    if (clickTimeoutRef.current !== null) {
-      // Double click occurred
-      clearTimeout(clickTimeoutRef.current)
-      clickTimeoutRef.current = null
-      handleDoubleClick(e, doc)
-    } else {
-      // Set timeout for single click
-      clickTimeoutRef.current = setTimeout(() => {
-        clickTimeoutRef.current = null
-        if (editingDocId !== doc.id) {
-          navigateTo(`/documents/${doc.id}`)
-        }
-      }, 250) // 250ms delay
-    }
-  }
-
-  const handleDoubleClick = (e: React.MouseEvent, doc: DocumentData) => {
-    e.stopPropagation()
-    setEditingDocId(doc.id)
-    setEditingTitle(doc.title)
-  }
-
-  const handleEditKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, docId: string) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      if (editingTitle.trim() !== '') {
-        renameDocument(docId, editingTitle)
-        setEditingDocId(null)
+  const handleSelect = (selectedItems: TreeItemIndex[], _treeId: string) => {
+    const selectedId = selectedItems[0]?.toString()
+    if (selectedId && items[selectedId]) {
+      const item = items[selectedId]
+      if (item && !item.isFolder) {
+        navigateTo(`/documents/${selectedId}`)
+      } else if (item) {
+        setNewFolderParentId(selectedId)
       }
-    } else if (e.key === 'Escape') {
-      setEditingDocId(null)
     }
-  }
-
-  const handleEditBlur = (docId: string) => {
-    if (editingTitle.trim() !== '') {
-      renameDocument(docId, editingTitle)
-    }
-    setEditingDocId(null)
   }
 
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>, id: string) => {
@@ -288,123 +185,55 @@ const SharedDocumentsPage = ({
     }
   }
 
+  const handleDrop = (draggedItems: TreeItem<any>[], position: DraggingPosition) => {
+    console.log('Drop items:', draggedItems, 'onto position:', position)
+    
+    if (position.targetType === 'between-items') return
+    const targetId = position.targetItem
+    const targetItem = items[targetId]
+    if (!targetItem?.isFolder) return
+
+    // Update the parent references in the backend
+    draggedItems.forEach(async (item) => {
+      const itemData = item.data
+      if (!itemData) return
+
+      if ('parentId' in itemData) {
+        // Update folder parent
+        await fetch(`/api/folders/${itemData._id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ parentId: targetItem.data._id || null })
+        })
+      } else {
+        // Update document location
+        await fetch(`/api/documents/${itemData._id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ location: targetItem.data._id || null })
+        })
+      }
+    })
+
+    // Update local tree data
+    draggedItems.forEach(item => {
+      const sourceParentId = item.data.parentId || item.data.location || 'root'
+      const sourceParent = items[sourceParentId]
+      if (sourceParent) {
+        sourceParent.children = sourceParent.children.filter((id: string) => id !== item.index)
+      }
+      targetItem.children.push(item.index)
+    })
+
+    // Notify the tree of changes
+    dataProvider.onDidChangeTreeDataEmitter.emit(['root'])
+  }
+
   const emptyMessage = (
     <div className={'text-center text-[14px] font-semibold uppercase text-black/[.5]'}>
       Empty / Go create something of worth
     </div>
   )
-
-  // Memoize the combined items array
-  const allItems = useMemo(() => {
-    return [...docs, ...folders]
-  }, [docs, folders])
-
-  const renderTree = (parentId?: string, visited = new Set<string>()) => {
-    const filteredItems = allItems.filter(item => {
-      if ('content' in item) {
-        // DocumentData
-        return item.location === parentId
-      }
-      // FolderData – only include if not already visited
-      return item.parentId === parentId && !visited.has(item.id)
-    })
-  
-    return filteredItems.map(item => {
-      const isFolder = !('content' in item)
-      if (isFolder) {
-        visited.add(item.id)
-      }
-      return (
-        <DroppableTreeItem
-          key={item.id}
-          nodeId={item.id}
-          item={item}
-          onClick={e =>
-            isFolder
-              ? setNewFolderParentId(item.id)
-              : handleClick(e, item as DocumentData)
-          }
-          label={
-            <TreeItemContent
-              item={item}
-              editingDocId={editingDocId}
-              editingTitle={editingTitle}
-              editInputRef={editInputRef}
-              handleEditKeyDown={handleEditKeyDown}
-              handleEditBlur={handleEditBlur}
-              setEditingTitle={setEditingTitle}
-              handleMenuClick={handleMenuClick}
-            />
-          }
-        >
-          {isFolder && renderTree(item.id, visited)}
-        </DroppableTreeItem>
-      )
-    })
-  }
-  
-  const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event
-    console.log('Drag start:', {
-      id: active.id,
-      type: active.data.current?.type,
-      rect: active.rect
-    })
-    setActiveId(active.id as string)
-  }
-
-  const handleDragOver = (event: DragOverEvent) => {
-    const { active, over } = event
-    console.log('Drag event:', {
-      activeId: active.id,
-      activeType: active.data.current?.type,
-      overId: over?.id,
-      overType: over?.data.current?.type,
-      overRect: over?.rect
-    })
-  }
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event
-    console.log('Drag end:', {
-      activeId: active.id,
-      activeType: active.data.current?.type,
-      overId: over?.id,
-      overType: over?.data.current?.type,
-      delta: event.delta
-    })
-
-    if (!over) {
-      setActiveId(null)
-      return
-    }
-
-    if (active.id !== over.id) {
-      const activeData = active.data.current
-      const overData = over.data.current
-      
-      if (activeData?.type === 'document') {
-        // Handle document move
-        const doc = docs.find(d => d.id === active.id)
-        if (doc) {
-          // If over a folder, move document to that folder
-          if (overData?.type === 'folder') {
-            const updatedDoc = { ...doc, location: over.id as string }
-            console.log('Moving document to folder:', updatedDoc)
-          }
-        }
-      } else if (activeData?.type === 'folder') {
-        // Handle folder move
-        const folder = folders.find(f => f.id === active.id)
-        if (folder && overData?.type === 'folder') {
-          const updatedFolder = { ...folder, parentId: over.id as string }
-          console.log('Moving folder to new parent:', updatedFolder)
-        }
-      }
-    }
-
-    setActiveId(null)
-  }
 
   return (
     <Layout>
@@ -425,63 +254,69 @@ const SharedDocumentsPage = ({
             {showSpinner && <Loader />}
             {!isLoading && (!docs || docs.length === 0) && (!folders || folders.length === 0) && emptyMessage}
             {(!isLoading && docs && folders) && (docs.length > 0 || folders.length > 0) && (
-              <DndContext
-                sensors={sensors}
-                collisionDetection={rectIntersection}
-                onDragStart={handleDragStart}
-                onDragOver={handleDragOver}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext
-                  items={allItems.map(item => item.id)}
-                  strategy={verticalListSortingStrategy}
+              <>
+                <UncontrolledTreeEnvironment
+                  dataProvider={dataProvider}
+                  getItemTitle={item => item.data?.title || ''}
+                  viewState={{
+                    ['tree-1']: {
+                      expandedItems: ['root'],
+                    }
+                  }}
+                  canDragAndDrop={true}
+                  canDropOnFolder={true}
+                  canReorderItems={true}
+                  renderItem={(props) => {
+                    const { item, depth, arrow } = props
+                    const isFolder = Boolean(item.isFolder)
+                    const icon = isFolder ? <FolderIcon /> : <InsertDriveFileIcon />
+                    const itemData = item.data
+
+                    return (
+                      <li 
+                        {...props.context.itemContainerWithChildrenProps}
+                        className="list-none"
+                      >
+                        <div 
+                          {...props.context.itemContainerWithoutChildrenProps}
+                          className="flex items-center justify-between py-2 px-2 hover:bg-white/[.1] rounded cursor-pointer"
+                        >
+                          <div className="flex items-center min-w-[200px] gap-2" style={{ marginLeft: depth * 20 }}>
+                            <div className="flex items-center gap-1">
+                              {isFolder && arrow}
+                              {icon}
+                            </div>
+                            <span className="uppercase text-black/[.70] block h-[24px] leading-[24px]">
+                              {itemData?.title || ''}
+                            </span>
+                          </div>
+                          {itemData && (
+                            <div className="flex items-center">
+                              <span className="mr-4 text-black/[.65] capitalize">
+                                {formatDate(itemData.lastUpdated)}
+                              </span>
+                              <IconButton
+                                size="small"
+                                onClick={e => handleMenuClick(e, item.index.toString())}
+                                className="hover:bg-black/[.10]">
+                                <MoreHorizIcon fontSize="small" />
+                              </IconButton>
+                            </div>
+                          )}
+                        </div>
+                        {props.children}
+                      </li>
+                    )
+                  }}
+                  onSelectItems={handleSelect}
+                  onDrop={handleDrop}
                 >
-                  <TreeView
-                    defaultCollapseIcon={<ExpandMoreIcon />}
-                    defaultExpandIcon={<ChevronRightIcon />}
-                    sx={{
-                      fontFamily: 'Mukta, sans-serif',
-                      '& .MuiTreeItem-content': {
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        transition: 'all 0.2s ease',
-                        fontFamily: 'inherit',
-                        '&:hover': {
-                          backgroundColor: 'rgba(255, 255, 255, 0.4) !important',
-                        },
-                      },
-                      '& .MuiTreeItem-label': {
-                        fontFamily: 'inherit',
-                      },
-                      '& .Mui-selected': {
-                        backgroundColor: 'rgba(255, 255, 255, 0.15) !important',
-                      },
-                      '& .MuiTreeItem-root': {
-                        '&:hover > .MuiTreeItem-content': {
-                          backgroundColor: 'rgba(255, 255, 255, 0.4) !important',
-                        },
-                      },
-                    }}>
-                    {renderTree()}
-                  </TreeView>
-                </SortableContext>
-                <DragOverlay>
-                  {activeId ? (
-                    <div className="opacity-50">
-                      <TreeItemContent
-                        item={allItems.find(item => item.id === activeId)!}
-                        editingDocId={null}
-                        editingTitle=""
-                        editInputRef={editInputRef}
-                        handleEditKeyDown={handleEditKeyDown}
-                        handleEditBlur={handleEditBlur}
-                        setEditingTitle={setEditingTitle}
-                        handleMenuClick={handleMenuClick}
-                      />
-                    </div>
-                  ) : null}
-                </DragOverlay>
-              </DndContext>
+                  <Tree 
+                    treeId="tree-1" 
+                    rootItem="root"
+                  />
+                </UncontrolledTreeEnvironment>
+              </>
             )}
           </div>
         </div>
@@ -539,11 +374,18 @@ const SharedDocumentsPage = ({
         }}
         onConfirm={(newName) => {
           if (selectedDocId) {
-            renameDocument(selectedDocId, newName)
+            const item = items[selectedDocId]
+            if (item && item.data) {
+              if ('parentId' in item.data) {
+                renameFolder(selectedDocId, newName)
+              } else {
+                renameDocument(selectedDocId, newName)
+              }
+            }
           }
           setSelectedDoc(null)
         }}
-        initialValue={selectedDoc?.title || ''}
+        initialValue={selectedDocId ? (items[selectedDocId]?.data?.title || '') : ''}
       />
 
       <DeleteModal
@@ -554,11 +396,18 @@ const SharedDocumentsPage = ({
         }}
         onConfirm={() => {
           if (selectedDocId) {
-            deleteDocument(selectedDocId)
+            const item = items[selectedDocId]
+            if (item && item.data) {
+              if ('parentId' in item.data) {
+                deleteFolder(selectedDocId)
+              } else {
+                deleteDocument(selectedDocId)
+              }
+            }
           }
           setSelectedDoc(null)
         }}
-        documentTitle={selectedDoc?.title?.toUpperCase() || 'UNTITLED'}
+        documentTitle={selectedDocId ? (items[selectedDocId]?.data?.title?.toUpperCase() || 'UNTITLED') : 'UNTITLED'}
       />
     </Layout>
   )
