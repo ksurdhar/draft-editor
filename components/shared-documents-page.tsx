@@ -12,12 +12,14 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz'
 import { IconButton, Menu, MenuItem } from '@mui/material'
+import RenameModal from './rename-modal'
+import DeleteModal from './delete-modal'
 
 // Helper function to safely format dates
 function formatDate(timestamp: number | undefined | null): string {
   if (!timestamp) return 'Never'
   try {
-    return format(new Date(timestamp), 'PP')
+    return format(new Date(timestamp), 'MMM d, yyyy')
   } catch (error) {
     console.error('Error formatting date:', error)
     return 'Invalid date'
@@ -39,10 +41,13 @@ const SharedDocumentsPage = ({
 }: SharedDocumentsPageProps) => {
   const [selectedDocId, setSelectedDoc] = useState<string | null>(null)
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
-  const [renameActive, setRenameActive] = useState(false)
-  const [newName, setNewName] = useState('')
+  const [renameModalOpen, setRenameModalOpen] = useState(false)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const showSpinner = useSpinner(isLoading)
   const { navigateTo } = useNavigation()
+
+  const selectedDoc = docs.find(doc => doc.id === selectedDocId)
+  console.log('selected doc', JSON.stringify(selectedDoc, null, 2))
 
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>, id: string) => {
     event.stopPropagation()
@@ -52,18 +57,15 @@ const SharedDocumentsPage = ({
 
   const handleMenuClose = () => {
     setAnchorEl(null)
-    setSelectedDoc(null)
   }
 
   const handleRename = () => {
-    setRenameActive(true)
+    setRenameModalOpen(true)
     handleMenuClose()
   }
 
   const handleDelete = () => {
-    if (selectedDocId) {
-      deleteDocument(selectedDocId)
-    }
+    setDeleteModalOpen(true)
     handleMenuClose()
   }
 
@@ -81,30 +83,10 @@ const SharedDocumentsPage = ({
       label={
         <div className="flex items-center justify-between py-2">
           <div className="flex items-center">
-            {renameActive && selectedDocId === doc.id ? (
-              <form
-                onSubmit={e => {
-                  e.preventDefault()
-                  if (selectedDocId) {
-                    renameDocument(selectedDocId, newName)
-                  }
-                  setRenameActive(false)
-                }}>
-                <input
-                  autoFocus
-                  value={newName}
-                  onChange={e => setNewName(e.target.value)}
-                  onBlur={() => setRenameActive(false)}
-                  className="bg-transparent px-2 font-semibold uppercase"
-                  placeholder="New Title"
-                />
-              </form>
-            ) : (
-              <span className="font-semibold uppercase">{doc.title}</span>
-            )}
+            <span className="uppercase text-black/[.70]">{doc.title}</span>
           </div>
           <div className="flex items-center">
-            <span className="mr-4 text-black/[.65]">{formatDate(doc.lastUpdated)}</span>
+            <span className="mr-4 text-black/[.65] capitalize">{formatDate(doc.lastUpdated)}</span>
             <IconButton
               size="small"
               onClick={e => handleMenuClick(e, doc.id)}
@@ -130,12 +112,18 @@ const SharedDocumentsPage = ({
                 defaultCollapseIcon={<ExpandMoreIcon />}
                 defaultExpandIcon={<ChevronRightIcon />}
                 sx={{
+                  fontFamily: 'Mukta, sans-serif',
                   '& .MuiTreeItem-content': {
                     padding: '4px 8px',
                     borderRadius: '4px',
+                    transition: 'all 0.2s ease',
+                    fontFamily: 'inherit',
                     '&:hover': {
-                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                      backgroundColor: 'rgba(255, 255, 255, 0.4)',
                     },
+                  },
+                  '& .MuiTreeItem-label': {
+                    fontFamily: 'inherit',
                   },
                   '& .Mui-selected': {
                     backgroundColor: 'rgba(255, 255, 255, 0.15) !important',
@@ -159,12 +147,68 @@ const SharedDocumentsPage = ({
         transformOrigin={{
           vertical: 'top',
           horizontal: 'right',
+        }}
+        transitionDuration={250}
+        slotProps={{
+          paper: {
+            style: {
+              transformOrigin: 'top'
+            }
+          }
+        }}
+        sx={{
+          '& .MuiPaper-root': {
+            backgroundColor: 'rgba(255, 255, 255, 0.3)',
+            backdropFilter: 'blur(10px)',
+            fontFamily: 'Mukta, sans-serif',
+            boxShadow: 'none',
+            border: '1px solid rgba(0, 0, 0, 0.1)',
+            borderRadius: '6px',
+            elevation: 0,
+            transition: 'opacity 150ms ease, transform 150ms ease',
+          },
+          '& .MuiMenuItem-root': {
+            fontFamily: 'inherit',
+            color: 'rgba(0, 0, 0, 0.7)',
+            textTransform: 'uppercase',
+            '&:hover': {
+              backgroundColor: 'rgba(255, 255, 255, 0.3)',
+            },
+          }
         }}>
-        <MenuItem onClick={handleRename}>Rename</MenuItem>
-        <MenuItem onClick={handleDelete} className="text-red-500">
-          Delete
-        </MenuItem>
+        <MenuItem onClick={handleRename}>RENAME</MenuItem>
+        <MenuItem onClick={handleDelete}>DELETE</MenuItem>
       </Menu>
+
+      <RenameModal
+        open={renameModalOpen}
+        onClose={() => {
+          setRenameModalOpen(false)
+          setSelectedDoc(null)
+        }}
+        onConfirm={(newName) => {
+          if (selectedDocId) {
+            renameDocument(selectedDocId, newName)
+          }
+          setSelectedDoc(null)
+        }}
+        initialValue={selectedDoc?.title || ''}
+      />
+
+      <DeleteModal
+        open={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false)
+          setSelectedDoc(null)
+        }}
+        onConfirm={() => {
+          if (selectedDocId) {
+            deleteDocument(selectedDocId)
+          }
+          setSelectedDoc(null)
+        }}
+        documentTitle={selectedDoc?.title?.toUpperCase() || 'UNTITLED'}
+      />
     </Layout>
   )
 }
