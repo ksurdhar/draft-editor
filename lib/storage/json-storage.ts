@@ -12,16 +12,18 @@ interface DatabaseSchema {
 export class JsonStorageAdapter implements StorageAdapter {
   private db!: Low<DatabaseSchema>
   private storagePath: string
+  private initPromise: Promise<void>
 
   constructor() {
+    this.storagePath = process.env.JSON_STORAGE_PATH || './data'
+    this.initPromise = this.initialize()
+  }
+
+  private async initialize() {
     try {
-      this.storagePath = process.env.JSON_STORAGE_PATH || './data'
       fs.ensureDirSync(this.storagePath)
-      
       const file = path.join(this.storagePath, 'db.json')
-      JSONPreset<DatabaseSchema>(file, {}).then(db => {
-        this.db = db
-      })
+      this.db = await JSONPreset<DatabaseSchema>(file, {})
     } catch (error) {
       console.error('Error initializing JsonStorageAdapter:', error)
       throw error
@@ -30,6 +32,7 @@ export class JsonStorageAdapter implements StorageAdapter {
 
   private async ensureCollection(collection: string) {
     try {
+      await this.initPromise
       const data = this.db.data
       if (!data[collection]) {
         data[collection] = []
@@ -62,6 +65,7 @@ export class JsonStorageAdapter implements StorageAdapter {
 
   async create(collection: string, data: Omit<Document, '_id'>): Promise<Document> {
     try {
+      await this.initPromise
       await this.ensureCollection(collection)
       
       const jsonDoc = {
@@ -83,6 +87,7 @@ export class JsonStorageAdapter implements StorageAdapter {
 
   async findById(collection: string, id: string): Promise<Document | null> {
     try {
+      await this.initPromise
       await this.ensureCollection(collection)
       const doc = this.db.data[collection].find(doc => doc._id === id)
       return doc ? this.toDocument(doc) : null
@@ -94,6 +99,7 @@ export class JsonStorageAdapter implements StorageAdapter {
 
   async find(collection: string, query: object = {}): Promise<Document[]> {
     try {
+      await this.initPromise
       await this.ensureCollection(collection)
       return this.db.data[collection]
         .filter(doc => {
@@ -108,6 +114,7 @@ export class JsonStorageAdapter implements StorageAdapter {
 
   async update(collection: string, id: string, data: Partial<Document>): Promise<Document | null> {
     try {
+      await this.initPromise
       await this.ensureCollection(collection)
       const index = this.db.data[collection].findIndex(doc => doc._id === id)
       if (index === -1) return null
@@ -129,11 +136,14 @@ export class JsonStorageAdapter implements StorageAdapter {
     }
   }
 
-  async delete(collection: string, id: string): Promise<boolean> {
+  async delete(collection: string, query: Record<string, any>): Promise<boolean> {
     try {
+      await this.initPromise
       await this.ensureCollection(collection)
       const initialLength = this.db.data[collection].length
-      this.db.data[collection] = this.db.data[collection].filter(doc => doc._id !== id)
+      this.db.data[collection] = this.db.data[collection].filter(doc => 
+        !(doc._id === query._id && doc.userId === query.userId)
+      )
       const deleted = initialLength !== this.db.data[collection].length
       
       if (deleted) {

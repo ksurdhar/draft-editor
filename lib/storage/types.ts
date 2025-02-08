@@ -30,9 +30,9 @@ export interface Document extends BaseDocument {
 
 // Generic storage adapter interface
 export interface StorageAdapter {
-  create(collection: string, data: Omit<Document, '_id'>): Promise<Document>
-  findById(collection: string, id: string): Promise<Document | null>
-  find(collection: string, query?: object): Promise<Document[]>
-  update(collection: string, id: string, data: Partial<Document>): Promise<Document | null>
-  delete(collection: string, id: string): Promise<boolean>
+  create(collection: string, data: any): Promise<any>
+  find(collection: string, query: any): Promise<any[]>
+  findById(collection: string, id: string): Promise<any>
+  update(collection: string, id: string, data: any): Promise<any>
+  delete(collection: string, query: Record<string, any>): Promise<boolean>
 } 
