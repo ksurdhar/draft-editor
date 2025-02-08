@@ -6,16 +6,13 @@ import { DocumentData } from '../types/globals'
 export const useSpinner = (optionalCondition?: boolean) => {
   const [allowSpinner, setAllowSpinner] = useState(false)
   useEffect(() => {
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       setAllowSpinner(true)
     }, 333)
-  }, [allowSpinner])
+    return () => clearTimeout(timer)
+  }, [])
 
-  if (typeof optionalCondition === undefined) {
-    return allowSpinner
-  } else {
-    return allowSpinner && optionalCondition
-  }
+  return optionalCondition === undefined ? allowSpinner : allowSpinner && optionalCondition
 }
 
 export const useSyncHybridDoc = (
