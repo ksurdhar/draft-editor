@@ -17,6 +17,29 @@ import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
 import { IconButton, Menu, MenuItem, Tooltip } from '@mui/material'
 import RenameModal from './rename-modal'
 import DeleteModal from './delete-modal'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  DragOverEvent,
+  useDroppable,
+  pointerWithin,
+  rectIntersection,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 // Helper function to safely format dates
 function formatDate(timestamp: number | undefined | null): string {
@@ -61,9 +84,39 @@ const TreeItemContent = memo(({
 }) => {
   const isFolder = !('content' in item)
   const icon = isFolder ? <FolderIcon /> : <InsertDriveFileIcon />
+  
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+    over,
+  } = useSortable({
+    id: item.id,
+    data: {
+      type: isFolder ? 'folder' : 'document',
+      item,
+    }
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    backgroundColor: over ? 'rgba(255, 255, 255, 0.2)' : undefined,
+  }
 
   return (
-    <div className="flex items-center justify-between py-2">
+    <div 
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className="flex items-center justify-between py-2"
+      data-type={isFolder ? 'folder' : 'document'}
+    >
       <div className="flex items-center min-w-[200px] gap-2">
         {icon}
         {editingDocId === item.id ? (
@@ -98,6 +151,32 @@ const TreeItemContent = memo(({
 
 TreeItemContent.displayName = 'TreeItemContent'
 
+const DroppableTreeItem = memo(({ 
+  nodeId, 
+  label, 
+  children, 
+  onClick,
+  item,
+}: { 
+  nodeId: string
+  label: React.ReactNode
+  children?: React.ReactNode
+  onClick: (e: React.MouseEvent) => void
+  item: DocumentData | FolderData
+}) => {
+  return (
+    <TreeItem
+      nodeId={nodeId}
+      onClick={onClick}
+      label={label}
+    >
+      {children}
+    </TreeItem>
+  )
+})
+
+DroppableTreeItem.displayName = 'DroppableTreeItem'
+
 const SharedDocumentsPage = ({
   docs = [],
   folders = [],
@@ -119,6 +198,13 @@ const SharedDocumentsPage = ({
   const showSpinner = useSpinner(isLoading)
   const { navigateTo } = useNavigation()
   const [newFolderParentId, setNewFolderParentId] = useState<string | undefined>()
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   const selectedDoc = docs.find(doc => doc.id === selectedDocId)
   console.log('selected doc', JSON.stringify(selectedDoc, null, 2))
@@ -229,9 +315,10 @@ const SharedDocumentsPage = ({
         visited.add(item.id)
       }
       return (
-        <TreeItem
+        <DroppableTreeItem
           key={item.id}
           nodeId={item.id}
+          item={item}
           onClick={e =>
             isFolder
               ? setNewFolderParentId(item.id)
@@ -248,13 +335,77 @@ const SharedDocumentsPage = ({
               setEditingTitle={setEditingTitle}
               handleMenuClick={handleMenuClick}
             />
-          }>
+          }
+        >
           {isFolder && renderTree(item.id, visited)}
-        </TreeItem>
+        </DroppableTreeItem>
       )
     })
   }
   
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event
+    console.log('Drag start:', {
+      id: active.id,
+      type: active.data.current?.type,
+      rect: active.rect
+    })
+    setActiveId(active.id as string)
+  }
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const { active, over } = event
+    console.log('Drag event:', {
+      activeId: active.id,
+      activeType: active.data.current?.type,
+      overId: over?.id,
+      overType: over?.data.current?.type,
+      overRect: over?.rect
+    })
+  }
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    console.log('Drag end:', {
+      activeId: active.id,
+      activeType: active.data.current?.type,
+      overId: over?.id,
+      overType: over?.data.current?.type,
+      delta: event.delta
+    })
+
+    if (!over) {
+      setActiveId(null)
+      return
+    }
+
+    if (active.id !== over.id) {
+      const activeData = active.data.current
+      const overData = over.data.current
+      
+      if (activeData?.type === 'document') {
+        // Handle document move
+        const doc = docs.find(d => d.id === active.id)
+        if (doc) {
+          // If over a folder, move document to that folder
+          if (overData?.type === 'folder') {
+            const updatedDoc = { ...doc, location: over.id as string }
+            console.log('Moving document to folder:', updatedDoc)
+          }
+        }
+      } else if (activeData?.type === 'folder') {
+        // Handle folder move
+        const folder = folders.find(f => f.id === active.id)
+        if (folder && overData?.type === 'folder') {
+          const updatedFolder = { ...folder, parentId: over.id as string }
+          console.log('Moving folder to new parent:', updatedFolder)
+        }
+      }
+    }
+
+    setActiveId(null)
+  }
+
   return (
     <Layout>
       <div className="gradient absolute left-0 top-0 z-[-1] h-screen w-screen" />
@@ -274,34 +425,63 @@ const SharedDocumentsPage = ({
             {showSpinner && <Loader />}
             {!isLoading && (!docs || docs.length === 0) && (!folders || folders.length === 0) && emptyMessage}
             {(!isLoading && docs && folders) && (docs.length > 0 || folders.length > 0) && (
-              <TreeView
-                defaultCollapseIcon={<ExpandMoreIcon />}
-                defaultExpandIcon={<ChevronRightIcon />}
-                sx={{
-                  fontFamily: 'Mukta, sans-serif',
-                  '& .MuiTreeItem-content': {
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    transition: 'all 0.2s ease',
-                    fontFamily: 'inherit',
-                    '&:hover': {
-                      backgroundColor: 'rgba(255, 255, 255, 0.4) !important',
-                    },
-                  },
-                  '& .MuiTreeItem-label': {
-                    fontFamily: 'inherit',
-                  },
-                  '& .Mui-selected': {
-                    backgroundColor: 'rgba(255, 255, 255, 0.15) !important',
-                  },
-                  '& .MuiTreeItem-root': {
-                    '&:hover > .MuiTreeItem-content': {
-                      backgroundColor: 'rgba(255, 255, 255, 0.4) !important',
-                    },
-                  },
-                }}>
-                {renderTree()}
-              </TreeView>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={rectIntersection}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={allItems.map(item => item.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <TreeView
+                    defaultCollapseIcon={<ExpandMoreIcon />}
+                    defaultExpandIcon={<ChevronRightIcon />}
+                    sx={{
+                      fontFamily: 'Mukta, sans-serif',
+                      '& .MuiTreeItem-content': {
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        transition: 'all 0.2s ease',
+                        fontFamily: 'inherit',
+                        '&:hover': {
+                          backgroundColor: 'rgba(255, 255, 255, 0.4) !important',
+                        },
+                      },
+                      '& .MuiTreeItem-label': {
+                        fontFamily: 'inherit',
+                      },
+                      '& .Mui-selected': {
+                        backgroundColor: 'rgba(255, 255, 255, 0.15) !important',
+                      },
+                      '& .MuiTreeItem-root': {
+                        '&:hover > .MuiTreeItem-content': {
+                          backgroundColor: 'rgba(255, 255, 255, 0.4) !important',
+                        },
+                      },
+                    }}>
+                    {renderTree()}
+                  </TreeView>
+                </SortableContext>
+                <DragOverlay>
+                  {activeId ? (
+                    <div className="opacity-50">
+                      <TreeItemContent
+                        item={allItems.find(item => item.id === activeId)!}
+                        editingDocId={null}
+                        editingTitle=""
+                        editInputRef={editInputRef}
+                        handleEditKeyDown={handleEditKeyDown}
+                        handleEditBlur={handleEditBlur}
+                        setEditingTitle={setEditingTitle}
+                        handleMenuClick={handleMenuClick}
+                      />
+                    </div>
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
             )}
           </div>
         </div>
