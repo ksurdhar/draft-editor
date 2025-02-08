@@ -111,7 +111,11 @@ const HeaderComponent = ({ id }: HeaderProps) => {
           fadeOut && !menuOpen ? 'opacity-0' : 'opacity-100'
         } fixed top-0 z-[39] flex w-[100vw] flex-row justify-between p-5 pb-[30px] transition-opacity duration-700 hover:opacity-100`}>
         <h1 className="lowercase">
-          <Link href={'/'}>Whetstone</Link>
+          {user ? (
+            <Link href={'/documents'}>Whetstone</Link>
+          ) : (
+            <Link href={'/'}>Whetstone</Link>
+          )}
         </h1>
       </header>
 
@@ -139,10 +143,15 @@ const HeaderComponent = ({ id }: HeaderProps) => {
                     onClick={async () => {
                       setMenuOpen(!menuOpen)
                       try {
-                        const { id } = await post(`/documents`, { userId: user?.sub })
-                        navigateTo(`/documents/${id}`)
+                        const response = await post(`/documents`, { userId: user?.sub })
+                        const docId = response._id || response.id
+                        if (!docId) {
+                          console.error('No document ID in response:', response)
+                          return
+                        }
+                        navigateTo(`/documents/${docId}`)
                       } catch (e) {
-                        console.log(e)
+                        console.error('Error creating document:', e)
                       }
                     }}>
                     <ListItemText primary={'Create Document'} sx={{ fontFamily: 'Mukta' }} />

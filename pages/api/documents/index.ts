@@ -9,6 +9,7 @@ const handlers = {
     const newDocument = await storage.create('documents', {
       ...req.body,
       userId: req.user!.sub,
+      title: req.body.title || 'Untitled Document',
       content: JSON.stringify([{ type: 'default', children: [{ text: '', highlight: 'none' }] }]),
       comments: [],
       lastUpdated: now
