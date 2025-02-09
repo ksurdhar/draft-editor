@@ -21,6 +21,18 @@ export const NextDocumentsPage = () => {
 
         // If we're moving an item to a specific position
         if (movedItemId && typeof targetIndex === 'number') {
+          // Find the current index of the item
+          const currentIndex = folderItems.findIndex(item => item._id === movedItemId)
+          const roundedTargetIndex = Math.round(targetIndex)
+
+          // If the rounded target index is the same as current index, or
+          // if the target is between current and next position, skip the move
+          if (currentIndex === roundedTargetIndex || 
+              (currentIndex > 0 && targetIndex > folderItems[currentIndex - 1]?.folderIndex && 
+               targetIndex < folderItems[currentIndex]?.folderIndex)) {
+            return []
+          }
+
           // First remove the moved item if it's already in this folder
           folderItems = folderItems.filter(item => item._id !== movedItemId)
           
@@ -31,28 +43,16 @@ export const NextDocumentsPage = () => {
           
           if (movedItem) {
             // Insert at the target position
-            folderItems.splice(targetIndex, 0, { ...movedItem, folderIndex: targetIndex })
+            folderItems.splice(roundedTargetIndex, 0, { ...movedItem, folderIndex: roundedTargetIndex })
           }
         }
         
-        // Reindex with sequential numbers, but preserve the moved item's index
-        const updates = folderItems.map((item, index) => {
-          // If this is the moved item, keep its exact index
-          if (item._id === movedItemId) {
-            return {
-              id: item._id,
-              isDocument: 'content' in item,
-              folderIndex: targetIndex
-            }
-          }
-          // Otherwise use sequential numbers, skipping the target index
-          const newIndex = index >= targetIndex ? index + 1 : index
-          return {
-            id: item._id,
-            isDocument: 'content' in item,
-            folderIndex: newIndex
-          }
-        })
+        // Reindex with sequential numbers
+        const updates = folderItems.map((item, index) => ({
+          id: item._id,
+          isDocument: 'content' in item,
+          folderIndex: index
+        }))
 
         // Update all items in parallel
         await Promise.all(updates.map(async ({ id, isDocument, folderIndex }) => {
