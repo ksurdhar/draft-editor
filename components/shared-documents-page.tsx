@@ -7,6 +7,8 @@ import { DocumentData, FolderData } from '@typez/globals'
 import { useState, useMemo, useEffect } from 'react'
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz'
 import CreateNewFolderIcon from '@mui/icons-material/CreateNewFolder'
+import ExpandLessIcon from '@mui/icons-material/ExpandLess'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import { IconButton, Menu, MenuItem, Tooltip } from '@mui/material'
 import RenameModal from './rename-modal'
 import DeleteModal from './delete-modal'
@@ -259,6 +261,18 @@ const SharedDocumentsPage = ({
     setCreateFolderModalOpen(true)
   }
 
+  const handleCollapseAll = () => {
+    setExpandedItems([])
+  }
+
+  const handleExpandAll = () => {
+    // Get all folder IDs
+    const folderIds = Object.values(items)
+      .filter(item => item.isFolder)
+      .map(item => item.index)
+    setExpandedItems(folderIds)
+  }
+
   const handleDrop = async (draggedItems: TreeItem<any>[], position: DraggingPosition) => {
     console.log('=== handleDrop ===')
     console.log('Dragged items:', draggedItems)
@@ -352,7 +366,39 @@ const SharedDocumentsPage = ({
       <div className="gradient absolute left-0 top-0 z-[-1] h-screen w-screen" />
       <div className="relative top-[44px] flex h-[calc(100vh_-_44px)] justify-center pb-10">
         <div className="flex w-11/12 max-w-[740px] flex-col justify-center sm:w-9/12">
-          <div className="flex justify-end mb-4">
+          <div className="flex justify-end mb-4 gap-2">
+            <div className="flex gap-0.5 bg-white/[.05] rounded-lg p-0.5">
+              <Tooltip title="Collapse all">
+                <IconButton
+                  onClick={handleCollapseAll}
+                  className="hover:bg-black/[.10] rounded-md"
+                  size="small"
+                  sx={{
+                    '&:hover': {
+                      backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                    },
+                    padding: '4px'
+                  }}
+                >
+                  <ExpandLessIcon />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Expand all">
+                <IconButton
+                  onClick={handleExpandAll}
+                  className="hover:bg-black/[.10] rounded-md"
+                  size="small"
+                  sx={{
+                    '&:hover': {
+                      backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                    },
+                    padding: '4px'
+                  }}
+                >
+                  <ExpandMoreIcon />
+                </IconButton>
+              </Tooltip>
+            </div>
             <Tooltip title="Create new folder">
               <IconButton
                 onClick={handleCreateFolder}
