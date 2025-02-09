@@ -26,7 +26,7 @@ export interface SharedDocumentsPageProps {
   createFolder: (title: string, parentId?: string) => void
   deleteFolder: (id: string) => void
   renameFolder: (id: string, title: string) => void
-  onMove?: (itemId: string, targetFolderId?: string) => Promise<void>
+  onMove?: (itemId: string, targetFolderId?: string, dropIndex?: number) => Promise<void>
 }
 
 const SharedDocumentsPage = ({
@@ -74,7 +74,8 @@ const SharedDocumentsPage = ({
         canRename: true,
         isFolder: true,
         children: [],
-        data: folder.title
+        data: folder.title,
+        folderIndex: folder.folderIndex
       }
     })
 
@@ -86,15 +87,17 @@ const SharedDocumentsPage = ({
         canMove: true,
         canRename: true,
         isFolder: false,
-        data: doc.title
+        data: doc.title,
+        folderIndex: doc.folderIndex
       }
     })
 
-    // Build tree structure
+    // Build tree structure with sorted children
     folders.forEach(folder => {
       const folderId = folder._id
       const parentId = folder.parentId || 'root'
       if (treeItems[parentId]) {
+        treeItems[parentId].children = treeItems[parentId].children || []
         treeItems[parentId].children.push(folderId)
       }
     })
@@ -103,14 +106,19 @@ const SharedDocumentsPage = ({
       const docId = doc._id
       const parentId = doc.parentId || 'root'
       if (treeItems[parentId]) {
+        treeItems[parentId].children = treeItems[parentId].children || []
         treeItems[parentId].children.push(docId)
       }
     })
 
-    // Remove empty children arrays
+    // Sort children by folderIndex
     Object.values(treeItems).forEach(item => {
-      if (!item.isFolder || item.children.length === 0) {
-        delete item.children
+      if (item.children) {
+        item.children.sort((a: string, b: string) => {
+          const itemA = treeItems[a]
+          const itemB = treeItems[b]
+          return (itemA.folderIndex || 0) - (itemB.folderIndex || 0)
+        })
       }
     })
 
@@ -168,6 +176,7 @@ const SharedDocumentsPage = ({
   const handleDrop = async (draggedItems: TreeItem<any>[], position: DraggingPosition) => {
     // Handle both direct folder drops and root level drops
     let targetId = 'root'
+    let dropIndex = 0
     
     if (position.targetType === 'item') {
       const targetItem = items[position.targetItem]
@@ -175,8 +184,22 @@ const SharedDocumentsPage = ({
         return
       }
       targetId = position.targetItem.toString()
-    } else if (position.targetType === 'between-items' && position.parentItem === 'root') {
-      targetId = 'root'
+    } else if (position.targetType === 'between-items') {
+      targetId = position.parentItem || 'root'
+      
+      // Calculate new index based on drop position
+      const parentItem = items[targetId]
+      if (parentItem?.children) {
+        if (position.childIndex === 0) {
+          dropIndex = 0
+        } else if (position.childIndex >= parentItem.children.length) {
+          dropIndex = parentItem.children.length
+        } else {
+          const prevItem = items[parentItem.children[position.childIndex - 1]]
+          const nextItem = items[parentItem.children[position.childIndex]]
+          dropIndex = ((prevItem?.folderIndex || 0) + (nextItem?.folderIndex || 0)) / 2
+        }
+      }
     } else {
       return
     }
@@ -184,11 +207,11 @@ const SharedDocumentsPage = ({
     // Update items through parent callback
     for (const item of draggedItems) {
       const itemId = item.index.toString()
-      const targetFolderId = targetId
+      const targetFolderId = targetId === 'root' ? undefined : targetId
 
       if (onMove) {
         try {
-          await onMove(itemId, targetFolderId)
+          await onMove(itemId, targetFolderId, dropIndex)
         } catch (error) {
           console.error('Error moving item:', error)
         }

@@ -25,21 +25,89 @@ export const NextDocumentsPage = () => {
   }, [])
 
   const moveItem = useCallback(
-    async (itemId: string, targetFolderId?: string) => {
+    async (itemId: string, targetFolderId?: string, newFolderIndex?: number) => {
+
+      // Helper function to reindex items in a folder
+      const reindexItemsInFolder = async (folderId: string | undefined, movedItemId?: string, targetIndex?: number) => {
+        let folderItems = [...docs.filter(d => d.parentId === folderId), ...folders.filter(f => f.parentId === folderId)]
+          .sort((a, b) => (a.folderIndex || 0) - (b.folderIndex || 0))
+        
+        // If we're moving an item to a specific position
+        if (movedItemId && typeof targetIndex === 'number') {
+          // Remove the moved item from its current position
+          const movedItem = folderItems.find(item => item._id === movedItemId)
+          folderItems = folderItems.filter(item => item._id !== movedItemId)
+          
+          // Insert it at the target position
+          if (movedItem) {
+            folderItems.splice(targetIndex, 0, movedItem)
+          }
+        }
+        
+        // Reindex with simple incremental numbers
+        const updates = folderItems.map((item, index) => ({
+          id: item._id,
+          isDocument: 'content' in item,
+          folderIndex: index
+        }))
+
+        // Update all items in parallel
+        await Promise.all(updates.map(async ({ id, isDocument, folderIndex }) => {
+          try {
+            const endpoint = isDocument ? 'documents' : 'folders'
+            await API.patch(`${endpoint}/${id}`, {
+              folderIndex,
+              lastUpdated: Date.now()
+            })
+          } catch (e) {
+            console.error(`Error updating index for ${id}:`, e)
+          }
+        }))
+
+        return updates
+      }
+
       // First check if it's a document
       const docIndex = docs.findIndex(d => d._id === itemId)
       if (docIndex !== -1) {
-        const updatedDocs = docs.map(doc => 
-          doc._id === itemId ? { ...doc, parentId: targetFolderId || 'root' } : doc
-        )
-        mutate(updatedDocs, false)
+        const oldParentId = docs[docIndex].parentId
+        
         try {
+          // First update the moved item
           await API.patch(`documents/${itemId}`, {
             parentId: targetFolderId || 'root',
+            folderIndex: newFolderIndex || 0,
             lastUpdated: Date.now()
           })
+          
+          let oldFolderUpdates: any[] = []
+          let newFolderUpdates: any[] = []
+
+          // Reindex items in both old and new folders
+          if (oldParentId !== targetFolderId) {
+            oldFolderUpdates = await reindexItemsInFolder(oldParentId)
+          }
+          newFolderUpdates = await reindexItemsInFolder(targetFolderId, itemId, newFolderIndex)
+
+          // Combine all updates and apply to local state
+          const allUpdates = [...oldFolderUpdates, ...newFolderUpdates]
+          const updatedDocs = docs.map(doc => {
+            const update = allUpdates.find(u => u.id === doc._id && u.isDocument)
+            if (doc._id === itemId) {
+              return { ...doc, parentId: targetFolderId || 'root', folderIndex: newFolderIndex || 0 }
+            }
+            return update ? { ...doc, folderIndex: update.folderIndex } : doc
+          })
+
+          const updatedFolders = folders.map(folder => {
+            const update = allUpdates.find(u => u.id === folder._id && !u.isDocument)
+            return update ? { ...folder, folderIndex: update.folderIndex } : folder
+          })
+
+          mutate(updatedDocs, false)
+          setFolders(updatedFolders)
         } catch (e) {
-          console.error(e)
+          console.error('Error moving document:', e)
           mutate() // Revert on error
         }
         return
@@ -48,19 +116,45 @@ export const NextDocumentsPage = () => {
       // If not a document, check if it's a folder
       const folderIndex = folders.findIndex(f => f._id === itemId)
       if (folderIndex !== -1) {
-        const updatedFolders = folders.map(folder =>
-          folder._id === itemId ? { ...folder, parentId: targetFolderId || 'root' } : folder
-        )
-        setFolders(updatedFolders)
+        const oldParentId = folders[folderIndex].parentId
+        
         try {
+          // First update the moved item
           await API.patch(`folders/${itemId}`, {
             parentId: targetFolderId || 'root',
+            folderIndex: newFolderIndex || 0,
             lastUpdated: Date.now()
           })
+
+          let oldFolderUpdates: any[] = []
+          let newFolderUpdates: any[] = []
+
+          // Reindex items in both old and new folders
+          if (oldParentId !== targetFolderId) {
+            oldFolderUpdates = await reindexItemsInFolder(oldParentId)
+          }
+          newFolderUpdates = await reindexItemsInFolder(targetFolderId, itemId, newFolderIndex)
+
+          // Combine all updates and apply to local state
+          const allUpdates = [...oldFolderUpdates, ...newFolderUpdates]
+          const updatedDocs = docs.map(doc => {
+            const update = allUpdates.find(u => u.id === doc._id && u.isDocument)
+            return update ? { ...doc, folderIndex: update.folderIndex } : doc
+          })
+
+          const updatedFolders = folders.map(folder => {
+            const update = allUpdates.find(u => u.id === folder._id && !u.isDocument)
+            if (folder._id === itemId) {
+              return { ...folder, parentId: targetFolderId || 'root', folderIndex: newFolderIndex || 0 }
+            }
+            return update ? { ...folder, folderIndex: update.folderIndex } : folder
+          })
+
+          mutate(updatedDocs, false)
+          setFolders(updatedFolders)
         } catch (e) {
-          console.error(e)
-          // Revert on error
-          setFolders(folders)
+          console.error('Error moving folder:', e)
+          setFolders(folders) // Revert on error
         }
       }
     },

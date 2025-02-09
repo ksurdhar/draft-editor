@@ -21,6 +21,7 @@ export type DocumentData = {
   canEdit?: boolean
   canComment?: boolean
   parentId?: string | 'root' // ID of the parent folder, 'root' means root level
+  folderIndex: number // Position within the parent folder, lower numbers appear first
 }
 
 export type CommentData = {
@@ -69,4 +70,5 @@ export type FolderData = {
   parentId?: string | 'root' // ID of the parent folder, 'root' means root level
   userId: string
   lastUpdated: number
+  folderIndex: number // Position within the parent folder, lower numbers appear first
 }
