@@ -1,4 +1,4 @@
-import { BrowserWindow, app, ipcMain } from 'electron'
+import { BrowserWindow, app, ipcMain, dialog } from 'electron'
 import apiService from './api-service'
 import { createAppWindow } from './app'
 import { createAuthWindow, createLogoutWindow } from './auth-process'
@@ -36,6 +36,12 @@ app
     ipcMain.handle('api:patch', (_, url, body) => apiService.patch(url, body))
     ipcMain.handle('api:delete', (_, url) => apiService.destroy(url))
     ipcMain.handle('api:get', (_, url) => apiService.get(url))
+    ipcMain.handle('dialog:open-folder', async () => {
+      const result = await dialog.showOpenDialog({
+        properties: ['openDirectory', 'multiSelections']
+      })
+      return result.filePaths
+    })
     ipcMain.on('auth:log-out', () => {
       BrowserWindow.getAllWindows().forEach(window => window.close())
       createLogoutWindow()

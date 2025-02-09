@@ -3,7 +3,7 @@
 import { DocumentData } from '@typez/globals'
 import { useUser } from '@wrappers/auth-wrapper-client'
 import Link from 'next/link'
-import { Fragment, useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState, useRef } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useAPI, useMouse, useNavigation } from './providers'
 
@@ -13,6 +13,11 @@ import Box from '@mui/material/Box'
 import Drawer from '@mui/material/Drawer'
 import ShareModal from './share-modal'
 import VersionModal from './version-modal'
+
+interface DirectoryInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  webkitdirectory?: string
+  directory?: string
+}
 
 const useScrollPosition = () => {
   const [scrollPosition, setScrollPosition] = useState(0)
@@ -104,8 +109,116 @@ const HeaderComponent = ({ id }: HeaderProps) => {
 
   const isOwner = user && hybridDoc && hybridDoc.userId === user.sub
 
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleImport = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click()
+    }
+  }
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files) return
+
+    // Group files by their directory structure
+    const filesByDirectory: { [key: string]: File[] } = {}
+    
+    Array.from(files).forEach(file => {
+      // Skip .DS_Store files
+      if (file.name === '.DS_Store') return
+      
+      const path = file.webkitRelativePath
+      // Get the directory path without the filename
+      const dirPath = path.split('/').slice(0, -1).join('/')
+      
+      if (!filesByDirectory[dirPath]) {
+        filesByDirectory[dirPath] = []
+      }
+      filesByDirectory[dirPath].push(file)
+    })
+
+    try {
+      // Create folders first
+      const folderPaths = Object.keys(filesByDirectory)
+      const folderMap = new Map<string, string>() // Maps path to folder ID
+      
+      for (const fullPath of folderPaths) {
+        const pathParts = fullPath.split('/')
+        // Skip the root folder (usually the selected folder name)
+        pathParts.shift()
+        
+        let parentId: string | undefined = undefined
+        let currentPath = ''
+        
+        // Create each folder in the path if it doesn't exist
+        for (const part of pathParts) {
+          currentPath = currentPath ? `${currentPath}/${part}` : part
+          
+          if (!folderMap.has(currentPath)) {
+            const response = await post('/folders', {
+              title: part,
+              parentId,
+              userId: user?.sub,
+              lastUpdated: Date.now()
+            })
+            folderMap.set(currentPath, response._id)
+          }
+          parentId = folderMap.get(currentPath)
+        }
+      }
+
+      // Create documents
+      for (const [dirPath, files] of Object.entries(filesByDirectory)) {
+        const pathParts = dirPath.split('/')
+        pathParts.shift() // Remove root folder
+        const folderPath = pathParts.join('/')
+        const parentId = folderMap.get(folderPath)
+
+        for (const file of files) {
+          const content = await file.text()
+          const transformedContent = JSON.stringify([{
+            type: 'default',
+            children: content.split('\n').map(line => ({
+              text: line,
+              highlight: 'none'
+            }))
+          }])
+
+          await post('/documents', {
+            title: file.name.replace('.txt', ''),
+            content: transformedContent,
+            parentId,
+            userId: user?.sub,
+            lastUpdated: Date.now()
+          })
+        }
+      }
+
+      // Refresh the documents list
+      mutate('/documents')
+    } catch (error) {
+      console.error('Error importing files:', error)
+    }
+    
+    setMenuOpen(false)
+    // Reset input so the same file can be selected again
+    event.target.value = ''
+  }
+
   return (
     <>
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileSelect}
+        style={{ display: 'none' }}
+        {...({
+          webkitdirectory: '',
+          directory: '',
+          multiple: true
+        } as DirectoryInputProps)}
+      />
       <header
         className={`${initFadeIn ? 'header-gradient' : 'bg-transparent'} ${
           fadeOut && !menuOpen ? 'opacity-0' : 'opacity-100'
@@ -155,6 +268,11 @@ const HeaderComponent = ({ id }: HeaderProps) => {
                       }
                     }}>
                     <ListItemText primary={'Create Document'} sx={{ fontFamily: 'Mukta' }} />
+                  </ListItemButton>
+                </ListItem>
+                <ListItem disablePadding>
+                  <ListItemButton onClick={handleImport}>
+                    <ListItemText primary={'Import Folder'} />
                   </ListItemButton>
                 </ListItem>
                 <ListItem disablePadding>
