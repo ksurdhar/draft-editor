@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Fragment, useCallback, useEffect, useState, useRef } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useAPI, useMouse, useNavigation } from './providers'
+import { transformTextToSlate } from '@lib/transforms/text-to-slate'
 
 import { useSyncHybridDoc } from '@lib/hooks'
 import { Divider, List, ListItem, ListItemButton, ListItemText } from '@mui/material'
@@ -176,14 +177,10 @@ const HeaderComponent = ({ id }: HeaderProps) => {
         const parentId = folderMap.get(folderPath)
 
         for (const file of files) {
+
           const content = await file.text()
-          const transformedContent = JSON.stringify([{
-            type: 'default',
-            children: content.split('\n').map(line => ({
-              text: line,
-              highlight: 'none'
-            }))
-          }])
+          console.log('Kiran, content:', content)
+          const transformedContent = JSON.stringify(transformTextToSlate(content))
 
           await post('/documents', {
             title: file.name.replace('.txt', ''),

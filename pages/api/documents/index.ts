@@ -6,11 +6,12 @@ import { storage } from '@lib/storage'
 const handlers = {
   async POST(req: ExtendedApiRequest, res: NextApiResponse) {
     const now = Date.now()
+    const defaultContent = JSON.stringify([{ type: 'default', children: [{ text: '', highlight: 'none' }] }])
     const newDocument = await storage.create('documents', {
       ...req.body,
       userId: req.user!.sub,
       title: req.body.title || 'Untitled Document',
-      content: JSON.stringify([{ type: 'default', children: [{ text: '', highlight: 'none' }] }]),
+      content: req.body.content || defaultContent,
       comments: [],
       lastUpdated: now
     })
