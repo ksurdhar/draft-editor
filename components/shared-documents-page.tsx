@@ -14,6 +14,7 @@ import RenameModal from './rename-modal'
 import DeleteModal from './delete-modal'
 import { UncontrolledTreeEnvironment, Tree, StaticTreeDataProvider, TreeItemIndex, TreeItem, DraggingPosition } from 'react-complex-tree'
 import 'react-complex-tree/lib/style.css'
+import { useNavigation } from '@components/providers'
 
 export interface SharedDocumentsPageProps {
   docs: DocumentData[]
@@ -36,6 +37,7 @@ const SharedDocumentsPage = ({
   deleteFolder,
   renameFolder,
 }: SharedDocumentsPageProps) => {
+  const { navigateTo } = useNavigation()
   const [selectedDocId, setSelectedDoc] = useState<string | null>(null)
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [renameModalOpen, setRenameModalOpen] = useState(false)
@@ -124,11 +126,21 @@ const SharedDocumentsPage = ({
 
   const handleSelect = (selectedItems: TreeItemIndex[], _treeId: string) => {
     const selectedId = selectedItems[0]?.toString()
-    if (selectedId && items.items[selectedId]) {
-      const item = items.items[selectedId]
-      if (item && item.isFolder) {
-        setNewFolderParentId(selectedId)
-      }
+    if (!selectedId || !items.items[selectedId]) return
+
+    const item = items.items[selectedId]
+    if (item.isFolder) {
+      setNewFolderParentId(selectedId)
+    }
+  }
+
+  const handlePrimaryAction = (item: TreeItem<any>, treeId: string) => {
+    const selectedId = item.index.toString()
+    if (!selectedId || !items.items[selectedId]) return
+
+    const treeItem = items.items[selectedId]
+    if (!treeItem.isFolder) {
+      navigateTo(`/documents/${selectedId}`)
     }
   }
 
@@ -269,6 +281,9 @@ const SharedDocumentsPage = ({
                   canDragAndDrop={true}
                   canDropOnFolder={true}
                   canReorderItems={true}
+                  onSelectItems={handleSelect}
+                  onPrimaryAction={handlePrimaryAction}
+                  onDrop={handleDrop}
                   renderItem={(props) => {
                     const { item, depth, arrow, context } = props
                     const isFolder = Boolean(item.isFolder)
@@ -321,8 +336,6 @@ const SharedDocumentsPage = ({
                       </li>
                     )
                   }}
-                  onSelectItems={handleSelect}
-                  onDrop={handleDrop}
                 >
                   <Tree 
                     treeId="tree-1" 
