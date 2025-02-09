@@ -193,6 +193,7 @@ const SharedDocumentsPage = ({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ parentId: targetFolderId })
           })
+          // Update local document state
           docs[docIndex] = { ...docs[docIndex], parentId: targetFolderId }
           console.log(`Updated document ${itemId} to have parent ${targetFolderId}`)
         }
@@ -205,29 +206,18 @@ const SharedDocumentsPage = ({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ parentId: targetFolderId })
           })
+          // Update local folder state
           folders[folderIndex] = { ...folders[folderIndex], parentId: targetFolderId }
           console.log(`Updated folder ${itemId} to have parent ${targetFolderId}`)
         }
 
-        // Update the visual tree structure
-        const sourceParentId = item.data.parentId || item.data.location || 'root'
-        const sourceParent = items.items[sourceParentId]
-        if (sourceParent && sourceParent.children) {
-          sourceParent.children = sourceParent.children.filter((id: string) => id !== item.index)
-        }
-        if (!targetItem.children) {
-          targetItem.children = []
-        }
-        targetItem.children.push(item.index)
-
       } catch (error) {
         console.error('Error updating item location:', error)
-        // You might want to show a user-friendly error message here
       }
     }
 
-    // Notify the tree of changes
-    dataProvider.onDidChangeTreeDataEmitter.emit(['root'])
+    // Let the parent component's state update handle the tree structure
+    // instead of manually updating it here
   }
 
   const emptyMessage = (
