@@ -211,6 +211,7 @@ const SharedDocumentsPage = ({
     event.stopPropagation()
     setAnchorEl(event.currentTarget)
     setSelectedDoc(id)
+    setSelectedItems([id])
   }
 
   const handleMenuClose = () => {
@@ -305,7 +306,6 @@ const SharedDocumentsPage = ({
       }
     }
 
-    // Update items through parent callback
     for (const item of draggedItems) {
       const itemId = item.index.toString()
       const targetFolderId = targetId === 'root' ? undefined : targetId
@@ -568,7 +568,6 @@ const SharedDocumentsPage = ({
           if (selectedDocId) {
             const item = items[selectedDocId]
             if (item) {
-              // Check if it's a folder by looking at the isFolder property
               if (item.isFolder) {
                 renameFolder(selectedDocId, newName)
               } else {
