@@ -174,6 +174,10 @@ const SharedDocumentsPage = ({
   }
 
   const handleDrop = async (draggedItems: TreeItem<any>[], position: DraggingPosition) => {
+    console.log('=== handleDrop ===')
+    console.log('Dragged items:', draggedItems)
+    console.log('Position:', position)
+
     // Handle both direct folder drops and root level drops
     let targetId = 'root'
     let dropIndex = 0
@@ -184,26 +188,58 @@ const SharedDocumentsPage = ({
         return
       }
       targetId = position.targetItem.toString()
+      console.log('Dropping onto folder:', targetId)
+      
+      // When dropping directly on a folder, add to the end of its children
+      const folderItems = [...docs.filter(d => d.parentId === targetId), ...folders.filter(f => f.parentId === targetId)]
+        .sort((a, b) => (a.folderIndex || 0) - (b.folderIndex || 0))
+      console.log('Current folder items:', folderItems.map(item => ({
+        id: item._id,
+        title: item.title,
+        index: item.folderIndex
+      })))
+      dropIndex = folderItems.length
+      console.log('Setting drop index to end:', dropIndex)
     } else if (position.targetType === 'between-items') {
       targetId = position.parentItem || 'root'
+      console.log('Dropping between items in folder:', targetId)
+      console.log('Child index:', position.childIndex)
       
       // Calculate new index based on drop position
       const parentItem = items[targetId]
       if (parentItem?.children) {
+        console.log('Parent children:', parentItem.children.map((id: string) => ({
+          id,
+          index: items[id]?.folderIndex
+        })))
+
         if (position.childIndex === 0) {
           dropIndex = 0
+          console.log('Dropping at start, index:', dropIndex)
         } else if (position.childIndex >= parentItem.children.length) {
-          dropIndex = parentItem.children.length
+          const lastChild = items[parentItem.children[parentItem.children.length - 1]]
+          dropIndex = (lastChild?.folderIndex || 0) + 1
+          console.log('Dropping at end, index:', dropIndex)
         } else {
           const prevItem = items[parentItem.children[position.childIndex - 1]]
           const nextItem = items[parentItem.children[position.childIndex]]
           dropIndex = ((prevItem?.folderIndex || 0) + (nextItem?.folderIndex || 0)) / 2
+          console.log('Dropping between items:', {
+            prevIndex: prevItem?.folderIndex,
+            nextIndex: nextItem?.folderIndex,
+            newIndex: dropIndex
+          })
         }
       }
     } else {
       return
     }
     
+    console.log('Final drop parameters:', {
+      targetId,
+      dropIndex
+    })
+
     // Update items through parent callback
     for (const item of draggedItems) {
       const itemId = item.index.toString()
