@@ -5,7 +5,7 @@ import { Loader } from '@components/loader'
 import { useSpinner } from '@lib/hooks'
 import { DocumentData, FolderData } from '@typez/globals'
 import { format } from 'date-fns'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigation } from './providers'
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz'
 import CreateNewFolderIcon from '@mui/icons-material/CreateNewFolder'
@@ -14,9 +14,8 @@ import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
 import { IconButton, Menu, MenuItem, Tooltip } from '@mui/material'
 import RenameModal from './rename-modal'
 import DeleteModal from './delete-modal'
-import { UncontrolledTreeEnvironment, Tree, StaticTreeDataProvider, TreeItemIndex, TreeItemRenderContext, TreeItem, TreeInformation, DraggingPosition } from 'react-complex-tree'
+import { UncontrolledTreeEnvironment, Tree, StaticTreeDataProvider, TreeItemIndex, TreeItem, DraggingPosition } from 'react-complex-tree'
 import 'react-complex-tree/lib/style.css'
-import { ReactNode } from 'react'
 
 // Helper function to safely format dates
 function formatDate(timestamp: number | undefined | null): string {
@@ -67,100 +66,94 @@ const SharedDocumentsPage = ({
         index: 'root',
         canMove: false,
         canRename: false,
-        data: {
-          title: 'Root',
-          lastUpdated: null
-        },
-        children: [],
         isFolder: true,
+        children: [],
+        data: 'Root'
       }
     }
 
     // Add folders first
     folders.forEach(folder => {
-      const folderId = (folder as any)._id || folder.id
+      const folderId = folder._id
       treeItems[folderId] = {
         index: folderId,
         canMove: true,
         canRename: true,
-        data: folder,
-        children: [],
         isFolder: true,
+        children: [],
+        data: folder.title
       }
     })
 
     // Add documents
     docs.forEach(doc => {
-      const docId = (doc as any)._id || doc.id
+      const docId = doc._id
       treeItems[docId] = {
         index: docId,
         canMove: true,
         canRename: true,
-        data: doc,
-        children: [],
         isFolder: false,
+        data: doc.title
       }
     })
 
     // Build tree structure
     folders.forEach(folder => {
-      const folderId = (folder as any)._id || folder.id
+      const folderId = folder._id
       const parentId = folder.parentId || 'root'
       if (treeItems[parentId]) {
         treeItems[parentId].children.push(folderId)
-        console.log('Added folder to parent:', { folderId, parentId, children: treeItems[parentId].children })
       }
     })
 
     docs.forEach(doc => {
-      const docId = (doc as any)._id || doc.id
-      const parentId = doc.location || 'root'
+      const docId = doc._id
+      const parentId = doc.parentId || 'root'
       if (treeItems[parentId]) {
         treeItems[parentId].children.push(docId)
       }
     })
 
+    // Remove empty children arrays
+    Object.values(treeItems).forEach(item => {
+      if (!item.isFolder || item.children.length === 0) {
+        delete item.children
+      }
+    })
+
     console.log('Tree Items:', treeItems)
-    return treeItems
+    return { items: treeItems }
   }, [docs, folders])
 
+  // console.log('KIRAN Items:', items)
+
   const dataProvider = useMemo(
-    () => {
-      const provider = new StaticTreeDataProvider(items, (item, data) => ({
+    () => 
+      new StaticTreeDataProvider(items.items, (item, data) => ({
         ...item,
-        data: {
-          ...item.data,
-          title: data
-        }
-      }))
-
-      // Initialize the tree with all items expanded
-      const allIds = Object.keys(items)
-      provider.onDidChangeTreeData(() => {
-        allIds.forEach(id => {
-          provider.onDidChangeTreeDataEmitter.emit([id])
-        })
-      })
-
-      return provider
-    },
+        data
+      })),
     [items]
   )
 
   // Log tree structure whenever it changes
   useMemo(() => {
     console.log('Current tree structure:', {
-      items,
-      expandedItems: ['root', ...folders.map(f => (f as any)._id || f.id)],
+      items: items.items,
+      expandedItems: ['root', ...folders.map(f => f._id)],
       folderCount: folders.length,
       docCount: docs.length
     })
   }, [items, folders, docs])
 
+  useEffect(() => {
+    dataProvider.onDidChangeTreeDataEmitter.emit(['root'])
+  }, [items, dataProvider])
+
   const handleSelect = (selectedItems: TreeItemIndex[], _treeId: string) => {
     const selectedId = selectedItems[0]?.toString()
-    if (selectedId && items[selectedId]) {
-      const item = items[selectedId]
+    if (selectedId && items.items[selectedId]) {
+      const item = items.items[selectedId]
       if (item && !item.isFolder) {
         navigateTo(`/documents/${selectedId}`)
       } else if (item) {
@@ -201,7 +194,7 @@ const SharedDocumentsPage = ({
     
     if (position.targetType === 'between-items') return
     const targetId = position.targetItem
-    const targetItem = items[targetId]
+    const targetItem = items.items[targetId]
     if (!targetItem?.isFolder) return
 
     // Update the parent references in the backend
@@ -229,7 +222,7 @@ const SharedDocumentsPage = ({
     // Update local tree data
     draggedItems.forEach(item => {
       const sourceParentId = item.data.parentId || item.data.location || 'root'
-      const sourceParent = items[sourceParentId]
+      const sourceParent = items.items[sourceParentId]
       if (sourceParent) {
         sourceParent.children = sourceParent.children.filter((id: string) => id !== item.index)
       }
@@ -268,10 +261,10 @@ const SharedDocumentsPage = ({
               <>
                 <UncontrolledTreeEnvironment
                   dataProvider={dataProvider}
-                  getItemTitle={item => item.data?.title || ''}
+                  getItemTitle={item => item.data}
                   viewState={{
-                    ['tree-1']: {
-                      expandedItems: ['root', ...folders.map(f => f._id || f.id)],
+                    'tree-1': {
+                      expandedItems: []
                     }
                   }}
                   canDragAndDrop={true}
@@ -281,7 +274,6 @@ const SharedDocumentsPage = ({
                     const { item, depth, arrow, context } = props
                     const isFolder = Boolean(item.isFolder)
                     const icon = isFolder ? <FolderIcon /> : <InsertDriveFileIcon />
-                    const itemData = item.data
 
                     return (
                       <li 
@@ -309,14 +301,11 @@ const SharedDocumentsPage = ({
                               {icon}
                             </div>
                             <span className="uppercase text-black/[.70] block h-[24px] leading-[24px]">
-                              {itemData?.title || ''}
+                              {item.data}
                             </span>
                           </div>
-                          {itemData && item.index !== 'root' && (
+                          {item.index !== 'root' && (
                             <div className="flex items-center">
-                              <span className="mr-4 text-black/[.65] capitalize">
-                                {formatDate(itemData.lastUpdated)}
-                              </span>
                               <IconButton
                                 size="small"
                                 onClick={e => {
@@ -399,7 +388,7 @@ const SharedDocumentsPage = ({
         }}
         onConfirm={(newName) => {
           if (selectedDocId) {
-            const item = items[selectedDocId]
+            const item = items.items[selectedDocId]
             if (item && item.data) {
               if ('parentId' in item.data) {
                 renameFolder(selectedDocId, newName)
@@ -410,7 +399,7 @@ const SharedDocumentsPage = ({
           }
           setSelectedDoc(null)
         }}
-        initialValue={selectedDocId ? (items[selectedDocId]?.data?.title || '') : ''}
+        initialValue={selectedDocId ? (items.items[selectedDocId]?.data?.title || '') : ''}
       />
 
       <DeleteModal
@@ -421,7 +410,7 @@ const SharedDocumentsPage = ({
         }}
         onConfirm={() => {
           if (selectedDocId) {
-            const item = items[selectedDocId]
+            const item = items.items[selectedDocId]
             if (item && item.data) {
               if ('parentId' in item.data) {
                 deleteFolder(selectedDocId)
@@ -432,7 +421,7 @@ const SharedDocumentsPage = ({
           }
           setSelectedDoc(null)
         }}
-        documentTitle={selectedDocId ? (items[selectedDocId]?.data?.title?.toUpperCase() || 'UNTITLED') : 'UNTITLED'}
+        documentTitle={selectedDocId ? (items.items[selectedDocId]?.data?.title?.toUpperCase() || 'UNTITLED') : 'UNTITLED'}
       />
     </Layout>
   )

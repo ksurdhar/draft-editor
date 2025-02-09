@@ -26,7 +26,7 @@ export const NextDocumentsPage = () => {
 
   const deleteDocument = useCallback(
     async (id: string) => {
-      const updatedDocs = docs.filter(doc => doc.id !== id)
+      const updatedDocs = docs.filter(doc => doc._id !== id)
       mutate(updatedDocs, false)
       try {
         await API.delete(`documents/${id}`)
@@ -40,7 +40,7 @@ export const NextDocumentsPage = () => {
 
   const renameDocument = useCallback(
     async (id: string, title: string) => {
-      const updatedDocs = docs.map(doc => (doc.id === id ? { ...doc, title } : doc))
+      const updatedDocs = docs.map(doc => (doc._id === id ? { ...doc, title } : doc))
       mutate(updatedDocs, false)
       try {
         await API.patch(`documents/${id}`, {
@@ -78,7 +78,7 @@ export const NextDocumentsPage = () => {
     async (id: string) => {
       try {
         await API.delete(`folders/${id}`)
-        setFolders(prev => prev.filter(folder => folder.id !== id))
+        setFolders(prev => prev.filter(folder => folder._id !== id))
       } catch (error) {
         console.error('Error deleting folder:', error)
       }
@@ -93,7 +93,7 @@ export const NextDocumentsPage = () => {
           title,
           lastUpdated: Date.now()
         })
-        setFolders(prev => prev.map(folder => folder.id === id ? response.data : folder))
+        setFolders(prev => prev.map(folder => folder._id === id ? response.data : folder))
       } catch (error) {
         console.error('Error renaming folder:', error)
       }

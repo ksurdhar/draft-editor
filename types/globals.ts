@@ -12,7 +12,7 @@ declare global {
 export {}
 
 export type DocumentData = {
-  id: string
+  _id: string
   title: string
   content: string
   comments: CommentData[]
@@ -20,7 +20,7 @@ export type DocumentData = {
   userId: string
   canEdit?: boolean
   canComment?: boolean
-  location?: string // ID of the parent folder, null/undefined means root
+  parentId?: string // ID of the parent folder, null/undefined means root
 }
 
 export type CommentData = {
@@ -64,7 +64,7 @@ export type AnimationState = 'Active' | 'Complete' | 'Inactive'
 export type WhetstoneEditor = BaseEditor & ReactEditor & HistoryEditor
 
 export type FolderData = {
-  id: string
+  _id: string
   title: string
   parentId?: string // ID of the parent folder, null/undefined means root
   userId: string
