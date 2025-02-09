@@ -49,9 +49,13 @@ export const useDocSync = () => {
   const { data: docs = [], mutate, isLoading } = useSWR<DocumentData[]>('/documents', fetcher)
 
   useEffect(() => {
-    docs?.forEach(doc => {
-      sessionStorage.setItem(doc.id, JSON.stringify(doc))
-    })
+    // Only store in sessionStorage if we're not using JSON storage
+    if (process.env.NEXT_PUBLIC_STORAGE_TYPE !== 'json') {
+      console.log('Storing docs in sessionStorage', process.env.NEXT_PUBLIC_STORAGE_TYPE)
+      docs?.forEach(doc => {
+        sessionStorage.setItem(doc._id, JSON.stringify(doc))
+      })
+    }
   }, [docs])
   return { docs, mutate, isLoading }
 }
