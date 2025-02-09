@@ -314,7 +314,6 @@ const SharedDocumentsPage = ({
                     renderItem={(props) => {
                       const { item, depth, arrow, context } = props
                       const isFolder = Boolean(item.isFolder)
-                      const icon = isFolder ? <FolderIcon /> : <InsertDriveFileIcon />
 
                       return (
                         <li 
@@ -324,8 +323,8 @@ const SharedDocumentsPage = ({
                           <div 
                             {...props.context.itemContainerWithoutChildrenProps}
                             {...context.interactiveElementProps}
-                            className={`flex items-center justify-between py-2 px-2 hover:bg-white/[.1] rounded cursor-pointer ${
-                              context.isSelected ? 'bg-white/[.1]' : ''
+                            className={`flex items-center justify-between py-1.5 px-2 hover:bg-white/[.2] rounded-lg cursor-pointer ${
+                              context.isSelected ? 'bg-white/[.2]' : ''
                             }`}
                             style={{
                               paddingLeft: `${(depth + 1) * 20}px`,
@@ -335,13 +334,12 @@ const SharedDocumentsPage = ({
                             <div className="flex items-center min-w-[200px] gap-2">
                               <div className="flex items-center gap-1">
                                 {isFolder && (
-                                  <div className="w-4 h-4 flex items-center justify-center">
+                                  <div className="w-3.5 h-3.5 flex items-center justify-center">
                                     {arrow}
                                   </div>
                                 )}
-                                {icon}
                               </div>
-                              <span className="uppercase text-black/[.70] block h-[24px] leading-[24px]">
+                              <span className="uppercase text-black/[.70] text-sm font-semibold block h-[20px] leading-[20px]">
                                 {item.data}
                               </span>
                             </div>
