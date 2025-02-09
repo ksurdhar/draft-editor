@@ -184,7 +184,7 @@ const SharedDocumentsPage = ({
     // Update items through parent callback
     for (const item of draggedItems) {
       const itemId = item.index.toString()
-      const targetFolderId = targetId === 'root' ? undefined : targetId
+      const targetFolderId = targetId
 
       if (onMove) {
         try {
@@ -225,6 +225,7 @@ const SharedDocumentsPage = ({
                 <style>{`
                   :root {
                     --rct-color-tree-bg: rgba(255, 255, 255, 0.05);
+                    --rct-color-drag-between-line-bg: rgba(0, 0, 0, 0.3);
                   }
                   .rct-tree-items-container {
                     transition: all 0.2s ease-out;

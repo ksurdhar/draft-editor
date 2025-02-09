@@ -20,7 +20,7 @@ export type DocumentData = {
   userId: string
   canEdit?: boolean
   canComment?: boolean
-  parentId?: string // ID of the parent folder, null/undefined means root
+  parentId?: string | 'root' // ID of the parent folder, 'root' means root level
 }
 
 export type CommentData = {
@@ -66,7 +66,7 @@ export type WhetstoneEditor = BaseEditor & ReactEditor & HistoryEditor
 export type FolderData = {
   _id: string
   title: string
-  parentId?: string // ID of the parent folder, null/undefined means root
+  parentId?: string | 'root' // ID of the parent folder, 'root' means root level
   userId: string
   lastUpdated: number
 }

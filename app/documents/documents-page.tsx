@@ -30,12 +30,12 @@ export const NextDocumentsPage = () => {
       const docIndex = docs.findIndex(d => d._id === itemId)
       if (docIndex !== -1) {
         const updatedDocs = docs.map(doc => 
-          doc._id === itemId ? { ...doc, parentId: targetFolderId } : doc
+          doc._id === itemId ? { ...doc, parentId: targetFolderId || 'root' } : doc
         )
         mutate(updatedDocs, false)
         try {
           await API.patch(`documents/${itemId}`, {
-            parentId: targetFolderId,
+            parentId: targetFolderId || 'root',
             lastUpdated: Date.now()
           })
         } catch (e) {
@@ -49,12 +49,12 @@ export const NextDocumentsPage = () => {
       const folderIndex = folders.findIndex(f => f._id === itemId)
       if (folderIndex !== -1) {
         const updatedFolders = folders.map(folder =>
-          folder._id === itemId ? { ...folder, parentId: targetFolderId } : folder
+          folder._id === itemId ? { ...folder, parentId: targetFolderId || 'root' } : folder
         )
         setFolders(updatedFolders)
         try {
           await API.patch(`folders/${itemId}`, {
-            parentId: targetFolderId,
+            parentId: targetFolderId || 'root',
             lastUpdated: Date.now()
           })
         } catch (e) {
