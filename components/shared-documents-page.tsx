@@ -47,7 +47,6 @@ const SharedDocumentsPage = ({
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const showSpinner = useSpinner(isLoading)
   const [newFolderParentId, setNewFolderParentId] = useState<string | undefined>()
-  const [treeVersion, setTreeVersion] = useState(0)
 
   // Tree view state
   const [focusedItem, setFocusedItem] = useState<TreeItemIndex>()
@@ -237,6 +236,13 @@ const SharedDocumentsPage = ({
                   .rct-tree-item-li-expanded > .rct-tree-items-container {
                     animation: expandIn 0.2s ease-out;
                   }
+                  .rct-tree-item-title-container {
+                    outline: none !important;
+                  }
+                  .rct-tree-item-button:focus {
+                    outline: none !important;
+                    background-color: rgba(255, 255, 255, 0.2) !important;
+                  }
                   @keyframes expandIn {
                     from {
                       opacity: 0;
@@ -249,7 +255,6 @@ const SharedDocumentsPage = ({
                   }
                 `}</style>
                 <ControlledTreeEnvironment
-                  key={`tree-${treeVersion}`}
                   items={items}
                   getItemTitle={item => item.data}
                   viewState={{
@@ -430,8 +435,8 @@ const SharedDocumentsPage = ({
         onConfirm={() => {
           if (selectedDocId) {
             const item = items[selectedDocId]
-            if (item && item.data) {
-              if ('parentId' in item.data) {
+            if (item) {
+              if (item.isFolder) {
                 deleteFolder(selectedDocId)
               } else {
                 deleteDocument(selectedDocId)
@@ -440,7 +445,7 @@ const SharedDocumentsPage = ({
           }
           setSelectedDoc(null)
         }}
-        documentTitle={selectedDocId ? (items[selectedDocId]?.data?.title?.toUpperCase() || 'UNTITLED') : 'UNTITLED'}
+        documentTitle={selectedDocId && items[selectedDocId] ? items[selectedDocId].data.toString().toUpperCase() : 'UNTITLED'}
       />
     </Layout>
   )

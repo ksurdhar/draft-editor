@@ -22,6 +22,20 @@ const RenameModal = ({ open, onClose, onConfirm, initialValue }: RenameModalProp
     }
   }, [open, initialValue])
 
+  const handleSubmit = () => {
+    onConfirm(value)
+    onClose()
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleSubmit()
+    } else if (e.key === 'Escape') {
+      onClose()
+    }
+  }
+
   return (
     <BaseModal
       open={open}
@@ -34,10 +48,7 @@ const RenameModal = ({ open, onClose, onConfirm, initialValue }: RenameModalProp
         },
         {
           label: 'RENAME',
-          onClick: () => {
-            onConfirm(value)
-            onClose()
-          }
+          onClick: handleSubmit
         }
       ]}
     >
@@ -46,7 +57,8 @@ const RenameModal = ({ open, onClose, onConfirm, initialValue }: RenameModalProp
         autoFocus
         value={value}
         onChange={e => setValue(e.target.value.toUpperCase())}
-        className="mb-4 w-full rounded border-0 bg-white/[.20] p-2 uppercase text-black/[.70] outline-none"
+        onKeyDown={handleKeyDown}
+        className="mb-4 w-full rounded border border-black/[.10] bg-white/[.20] p-2 uppercase text-black/[.70] outline-none focus:ring-0 focus:border-black/[.10] focus:bg-white/[.25]"
         placeholder="DOCUMENT NAME"
       />
     </BaseModal>
