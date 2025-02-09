@@ -67,6 +67,11 @@ const SharedDocumentsPage = ({
   const [expandedItems, setExpandedItems] = useState<TreeItemIndex[]>([])
   const [selectedItems, setSelectedItems] = useState<TreeItemIndex[]>([])
 
+  // Add effect to monitor selectedItems changes
+  useEffect(() => {
+    console.log('selectedItems changed:', selectedItems)
+  }, [selectedItems])
+
   // Add focus monitoring
   useEffect(() => {
     const handleFocusChange = () => {
@@ -184,14 +189,21 @@ const SharedDocumentsPage = ({
   }, [docs, folders])
 
   const handleSelect = (items: TreeItemIndex[]) => {
-    setSelectedItems(items)
+    console.log('handleSelect called with items:', items)
+    
+    // Ensure we're passing a new array reference to trigger re-render
+    const newSelectedItems = [...items]
+    setSelectedItems(newSelectedItems)
+    
     // Only set folder parent when a single folder is selected
     if (items.length === 1) {
       const selectedId = items[0]?.toString()
+      console.log('Single item selected, selectedId:', selectedId)
       const selectedItem = selectedId ? items[selectedId] : null
       if (!selectedId || !selectedItem) return
 
       if (selectedItem.isFolder) {
+        console.log('Selected item is a folder, setting newFolderParentId:', selectedId)
         setNewFolderParentId(selectedId)
       }
     }
@@ -208,10 +220,12 @@ const SharedDocumentsPage = ({
   }
 
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>, id: string) => {
+    console.log('handleMenuClick called with id:', id)
     event.stopPropagation()
     setAnchorEl(event.currentTarget)
     setSelectedDoc(id)
     setSelectedItems([id])
+    console.log('Updated selectedItems in menu click:', [id])
   }
 
   const handleMenuClose = () => {
@@ -413,7 +427,7 @@ const SharedDocumentsPage = ({
                     'tree-1': {
                       focusedItem,
                       expandedItems,
-                      selectedItems
+                      selectedItems,
                     }
                   }}
                   onFocusItem={item => {
@@ -433,6 +447,7 @@ const SharedDocumentsPage = ({
                   renderItem={props => {
                     const { item, depth, arrow, context } = props
                     const isFolder = Boolean(item.isFolder)
+                    console.log('Rendering item:', item.index, 'isSelected:', context.isSelected)
 
                     return (
                       <li 
@@ -442,12 +457,13 @@ const SharedDocumentsPage = ({
                         <div 
                           {...props.context.itemContainerWithoutChildrenProps}
                           {...context.interactiveElementProps}
-                          className={`flex items-center justify-between py-1.5 px-2 hover:bg-white/[.2] rounded-lg cursor-pointer transition-all duration-200 ${
-                            context.isSelected ? 'bg-white/[.25]' : ''
-                          } focus:bg-transparent`}
+                          className={`flex items-center justify-between py-1.5 px-2 hover:bg-white/[.2] rounded-lg cursor-pointer ${
+                            context.isSelected ? '!bg-white/[.25]' : ''
+                          }`}
                           style={{
                             paddingLeft: `${(depth + 1) * 20}px`,
-                            backgroundColor: item.index === 'root' ? 'transparent' : undefined
+                            backgroundColor: item.index === 'root' ? 'transparent' : undefined,
+                            transition: 'background-color 0s'  // Force immediate background color change
                           }}
                         >
                           <div className="flex items-center min-w-[200px] gap-2">
