@@ -20,6 +20,7 @@ type EditorProps = {
   onUpdate: (data: Partial<DocumentData>) => void
   canEdit: boolean
   hideFooter?: boolean
+  shouldFocusTitle?: boolean
 }
 
 const getWordCountAtPosition = (nodes: Descendant[], rangeIdx: number, offset: number) => {
@@ -48,15 +49,25 @@ const setHighlight = (editor: WhetstoneEditor, color: HighlightColor) => {
   )
 }
 
-const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, commentActive, openCommentId, canEdit, hideFooter }: EditorProps) => {
+const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, commentActive, openCommentId, canEdit, hideFooter, shouldFocusTitle }: EditorProps) => {
   const [ wordCount, setWordCount ] = useState(countWords(text))
   const [ wordCountAtPos, setWordCountAtPos ] = useState(0)
-  const titleState = useRef(title)
-  const titleRef = useRef<HTMLDivElement>(null)
+  const [ inputValue, setInputValue ] = useState(title === 'Untitled' ? '' : title)
+  const titleRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const { mouseMoved } = useMouse()
   const [ initFadeIn, fadeOut ] = useEditorFades(!mouseMoved)
+
+  // Only focus once on mount for new documents
+  useEffect(() => {
+    if (shouldFocusTitle || title === 'Untitled') {
+      titleRef?.current?.focus()
+      if (titleRef.current) {
+        titleRef.current.selectionStart = titleRef.current.selectionEnd = titleRef.current.value.length
+      }
+    }
+  }, []) // Empty dependency array for mount only
 
   useEffect(() => {
     setTimeout(() => {
@@ -65,18 +76,17 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, comme
     }, 200) // timeout is a hack, doesn't trigger onChange without a wait
   }, [editor])
 
-  useEffect(() => {
-    if (title.length === 0) {
-      titleRef?.current?.focus()
-    }
-  }, [titleRef, title.length])
-
   return (
     <div className='flex-grow normal-case animate-fadein'>
       <div className='mb-[20px] mt-[44px]'>
-        <div contentEditable={true} placeholder='New Title' ref={titleRef}
-          className="editable mb-2 text-3xl md:text-4xl uppercase border-b border-transparent focus:outline-none active:outline-none" 
-          spellCheck={false} 
+        <input
+          type="text"
+          ref={titleRef}
+          value={inputValue}
+          placeholder='Untitled'
+          className="editable mb-2 text-3xl md:text-4xl uppercase border-b border-transparent focus:outline-none active:outline-none focus:ring-0 focus:ring-offset-0 focus:border-transparent w-full bg-transparent placeholder:text-black/[.3] [appearance:none] [-webkit-appearance:none]"
+          style={{ outline: 'none', boxShadow: 'none' }}
+          spellCheck={false}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault()
@@ -85,14 +95,12 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, comme
               documentNode?.focus()
             }
           }}
-          onInput={(e) => {
-            e.preventDefault()
-            onUpdate({ title: `${e.currentTarget.textContent}` })
+          onChange={(e) => {
+            const newValue = e.target.value
+            setInputValue(newValue)
+            onUpdate({ title: newValue || 'Untitled' })
           }}
-          suppressContentEditableWarning={true}
-        >
-        { titleState.current }
-        </div>
+        />
       </div>
       <div ref={containerRef}>
         <Slate editor={editor} key={id} value={text} 

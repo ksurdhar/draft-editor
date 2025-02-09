@@ -67,7 +67,9 @@ export default function DocumentPage() {
     [api],
   )
 
-  const id = (pathname || '').split('/').pop() || ''
+  const id = (pathname || '').split('/').pop()?.split('?')[0] || ''
+  const searchParams = new URLSearchParams(pathname?.split('?')[1] || '')
+  const shouldFocusTitle = searchParams.get('focus') === 'title'
   const [editor] = useState(() => withReact(withHistory(createEditor())))
   const documentPath = `/documents/${id}`
 
@@ -239,6 +241,7 @@ export default function DocumentPage() {
                 debouncedSave(data)
               }}
               canEdit={!!hybridDoc.canEdit}
+              shouldFocusTitle={shouldFocusTitle}
             />
           )}
         </div>

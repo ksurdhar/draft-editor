@@ -9,13 +9,15 @@ import MoreHorizIcon from '@mui/icons-material/MoreHoriz'
 import CreateNewFolderIcon from '@mui/icons-material/CreateNewFolder'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+import NoteAddIcon from '@mui/icons-material/NoteAdd'
 import { IconButton, Menu, MenuItem, Tooltip } from '@mui/material'
 import RenameModal from './rename-modal'
 import DeleteModal from './delete-modal'
 import CreateFolderModal from './create-folder-modal'
 import { ControlledTreeEnvironment, Tree, TreeItemIndex, TreeItem, DraggingPosition } from 'react-complex-tree'
 import 'react-complex-tree/lib/style.css'
-import { useNavigation } from '@components/providers'
+import { useNavigation, useAPI } from '@components/providers'
+import { useUser } from '@wrappers/auth-wrapper-client'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface TreeItemData {
@@ -54,6 +56,8 @@ const SharedDocumentsPage = ({
   bulkDelete,
 }: SharedDocumentsPageProps) => {
   const { navigateTo } = useNavigation()
+  const { post } = useAPI()
+  const { user } = useUser()
   const [selectedDocId, setSelectedDoc] = useState<string | null>(null)
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [renameModalOpen, setRenameModalOpen] = useState(false)
@@ -330,6 +334,23 @@ const SharedDocumentsPage = ({
     }
   }
 
+  const handleCreateDocument = async () => {
+    try {
+      const response = await post('/documents', { 
+        userId: user?.sub,
+        title: 'Untitled'
+      })
+      const docId = response._id || response.id
+      if (!docId) {
+        console.error('No document ID in response:', response)
+        return
+      }
+      navigateTo(`/documents/${docId}?focus=title`)
+    } catch (error) {
+      console.error('Error creating document:', error)
+    }
+  }
+
   const emptyMessage = (
     <div className={'text-center text-[14px] font-semibold uppercase text-black/[.5]'}>
       Empty / Go create something of worth
@@ -362,19 +383,31 @@ const SharedDocumentsPage = ({
                 </IconButton>
               </Tooltip>
             </div>
-            <Tooltip title="Create new folder">
-              <IconButton
-                onClick={handleCreateFolder}
-                className="hover:bg-black/[.10]"
-              >
-                <CreateNewFolderIcon />
-              </IconButton>
-            </Tooltip>
+            <div className="flex gap-0.5 bg-white/[.05] rounded-lg">
+              <Tooltip title="Create new document">
+                <IconButton
+                  onClick={handleCreateDocument}
+                  className="hover:bg-black/[.10]"
+                  size="small"
+                >
+                  <NoteAddIcon />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Create new folder">
+                <IconButton
+                  onClick={handleCreateFolder}
+                  className="hover:bg-black/[.10]"
+                  size="small"
+                >
+                  <CreateNewFolderIcon />
+                </IconButton>
+              </Tooltip>
+            </div>
           </div>
           <div className="max-h-[calc(100vh_-_100px)] overflow-y-auto rounded-lg bg-white/[.05] p-4">
             {showSpinner && <Loader />}
-            {!isLoading && (!docs || docs.length === 0) && (!folders || folders.length === 0) && emptyMessage}
-            {(!isLoading && docs && folders) && (docs.length > 0 || folders.length > 0) && (
+            {!isLoading && (!docs?.length && !folders?.length) && emptyMessage}
+            {(!isLoading && (docs?.length > 0 || folders?.length > 0)) && (
               <div className="[&_.rct-tree-root-focus]:!outline-none">
                 <style>{`
                   :root {
