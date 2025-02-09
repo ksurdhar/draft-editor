@@ -121,6 +121,32 @@ const SharedDocumentsPage = ({
     [items]
   )
 
+  // Helper function to find parent ID of an item
+  const findParentId = (itemId: string): string => {
+    // Default to root if no parent found
+    let parentId = 'root'
+    
+    // Check folders first
+    for (const folder of folders) {
+      if (folder._id === itemId) {
+        parentId = folder.parentId || 'root'
+        break
+      }
+    }
+    
+    // Check documents if not found in folders
+    if (parentId === 'root') {
+      for (const doc of docs) {
+        if (doc._id === itemId) {
+          parentId = doc.parentId || 'root'
+          break
+        }
+      }
+    }
+    
+    return parentId
+  }
+
   useEffect(() => {
     dataProvider.onDidChangeTreeDataEmitter.emit(['root'])
   }, [items, dataProvider])
@@ -449,17 +475,26 @@ const SharedDocumentsPage = ({
         onConfirm={(newName) => {
           if (selectedDocId) {
             const item = items.items[selectedDocId]
-            if (item && item.data) {
-              if ('parentId' in item.data) {
+            if (item) {
+              // Check if it's a folder by looking at the isFolder property
+              if (item.isFolder) {
                 renameFolder(selectedDocId, newName)
               } else {
                 renameDocument(selectedDocId, newName)
               }
+              
+              // Update the item's data directly
+              item.data = newName
+              
+              // Find and emit change for parent
+              const parentId = findParentId(selectedDocId)
+              console.log('KIRAN Parent ID:', parentId)
+              dataProvider.onDidChangeTreeDataEmitter.emit([parentId])
             }
           }
           setSelectedDoc(null)
         }}
-        initialValue={selectedDocId ? (items.items[selectedDocId]?.data?.title || '') : ''}
+        initialValue={selectedDocId ? (items.items[selectedDocId]?.data || '') : ''}
       />
 
       <DeleteModal
