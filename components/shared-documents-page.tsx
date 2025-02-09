@@ -12,7 +12,7 @@ import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
 import { IconButton, Menu, MenuItem, Tooltip } from '@mui/material'
 import RenameModal from './rename-modal'
 import DeleteModal from './delete-modal'
-import { UncontrolledTreeEnvironment, Tree, StaticTreeDataProvider, TreeItemIndex, TreeItem, DraggingPosition } from 'react-complex-tree'
+import { ControlledTreeEnvironment, Tree, TreeItemIndex, TreeItem, DraggingPosition } from 'react-complex-tree'
 import 'react-complex-tree/lib/style.css'
 import { useNavigation } from '@components/providers'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -46,6 +46,11 @@ const SharedDocumentsPage = ({
   const showSpinner = useSpinner(isLoading)
   const [newFolderParentId, setNewFolderParentId] = useState<string | undefined>()
 
+  // Tree view state
+  const [focusedItem, setFocusedItem] = useState<TreeItemIndex>()
+  const [expandedItems, setExpandedItems] = useState<TreeItemIndex[]>([])
+  const [selectedItems, setSelectedItems] = useState<TreeItemIndex[]>([])
+
   const items = useMemo(() => {
     const treeItems: Record<string, any> = {
       root: {
@@ -54,7 +59,7 @@ const SharedDocumentsPage = ({
         canRename: false,
         isFolder: true,
         children: [],
-        data: 'Root'
+        data: 'root'
       }
     }
 
@@ -107,65 +112,25 @@ const SharedDocumentsPage = ({
       }
     })
 
-    return { items: treeItems }
+    return treeItems
   }, [docs, folders])
 
-  // console.log('KIRAN Items:', items)
+  const handleSelect = (items: TreeItemIndex[]) => {
+    setSelectedItems(items)
+    const selectedId = items[0]?.toString()
+    if (!selectedId || !items[selectedId]) return
 
-  const dataProvider = useMemo(
-    () => 
-      new StaticTreeDataProvider(items.items, (item, data) => ({
-        ...item,
-        data
-      })),
-    [items]
-  )
-
-  // Helper function to find parent ID of an item
-  const findParentId = (itemId: string): string => {
-    // Default to root if no parent found
-    let parentId = 'root'
-    
-    // Check folders first
-    for (const folder of folders) {
-      if (folder._id === itemId) {
-        parentId = folder.parentId || 'root'
-        break
-      }
-    }
-    
-    // Check documents if not found in folders
-    if (parentId === 'root') {
-      for (const doc of docs) {
-        if (doc._id === itemId) {
-          parentId = doc.parentId || 'root'
-          break
-        }
-      }
-    }
-    
-    return parentId
-  }
-
-  useEffect(() => {
-    dataProvider.onDidChangeTreeDataEmitter.emit(['root'])
-  }, [items, dataProvider])
-
-  const handleSelect = (selectedItems: TreeItemIndex[], _treeId: string) => {
-    const selectedId = selectedItems[0]?.toString()
-    if (!selectedId || !items.items[selectedId]) return
-
-    const item = items.items[selectedId]
+    const item = items[selectedId]
     if (item.isFolder) {
       setNewFolderParentId(selectedId)
     }
   }
 
-  const handlePrimaryAction = (item: TreeItem<any>, treeId: string) => {
+  const handlePrimaryAction = (item: TreeItem) => {
     const selectedId = item.index.toString()
-    if (!selectedId || !items.items[selectedId]) return
+    if (!selectedId || !items[selectedId]) return
 
-    const treeItem = items.items[selectedId]
+    const treeItem = items[selectedId]
     if (!treeItem.isFolder) {
       navigateTo(`/documents/${selectedId}`)
     }
@@ -206,7 +171,7 @@ const SharedDocumentsPage = ({
     let targetId = 'root'
     
     if (position.targetType === 'item') {
-      const targetItem = items.items[position.targetItem]
+      const targetItem = items[position.targetItem]
       if (!targetItem?.isFolder) {
         console.log('Target is not a folder - drop canceled')
         return
@@ -220,7 +185,7 @@ const SharedDocumentsPage = ({
       return
     }
 
-    console.log('Successfully dropped onto:', targetId === 'root' ? 'Root' : items.items[targetId].data)
+    console.log('Successfully dropped onto:', targetId === 'root' ? 'root' : items[targetId].data)
     
     // Update the underlying data structures and server
     for (const item of draggedItems) {
@@ -296,127 +261,132 @@ const SharedDocumentsPage = ({
             {showSpinner && <Loader />}
             {!isLoading && (!docs || docs.length === 0) && (!folders || folders.length === 0) && emptyMessage}
             {(!isLoading && docs && folders) && (docs.length > 0 || folders.length > 0) && (
-              <>
-                <div className="[&_.rct-tree-root-focus]:!outline-none">
-                  <style>{`
-                    :root {
-                      --rct-color-tree-bg: rgba(255, 255, 255, 0.05);
+              <div className="[&_.rct-tree-root-focus]:!outline-none">
+                <style>{`
+                  :root {
+                    --rct-color-tree-bg: rgba(255, 255, 255, 0.05);
+                  }
+                  .rct-tree-items-container {
+                    transition: all 0.2s ease-out;
+                    transform-origin: top;
+                  }
+                  .rct-tree-item-li {
+                    transition: all 0.2s ease-out;
+                  }
+                  .rct-tree-item-li-expanded > .rct-tree-items-container {
+                    animation: expandIn 0.2s ease-out;
+                  }
+                  @keyframes expandIn {
+                    from {
+                      opacity: 0;
+                      transform: translateY(-10px);
                     }
-                    .rct-tree-items-container {
-                      transition: all 0.2s ease-out;
-                      transform-origin: top;
+                    to {
+                      opacity: 1;
+                      transform: translateY(0);
                     }
-                    .rct-tree-item-li {
-                      transition: all 0.2s ease-out;
+                  }
+                `}</style>
+                <ControlledTreeEnvironment
+                  items={items}
+                  getItemTitle={item => item.data}
+                  viewState={{
+                    'tree-1': {
+                      focusedItem,
+                      expandedItems,
+                      selectedItems
                     }
-                    .rct-tree-item-li-expanded > .rct-tree-items-container {
-                      animation: expandIn 0.2s ease-out;
-                    }
-                    @keyframes expandIn {
-                      from {
-                        opacity: 0;
-                        transform: translateY(-10px);
-                      }
-                      to {
-                        opacity: 1;
-                        transform: translateY(0);
-                      }
-                    }
-                  `}</style>
-                  <UncontrolledTreeEnvironment
-                    dataProvider={dataProvider}
-                    getItemTitle={item => item.data}
-                    viewState={{
-                      'tree-1': {
-                        expandedItems: []
-                      }
-                    }}
-                    canDragAndDrop={true}
-                    canDropOnFolder={true}
-                    canReorderItems={true}
-                    onSelectItems={handleSelect}
-                    onPrimaryAction={handlePrimaryAction}
-                    onDrop={handleDrop}
-                    renderItem={(props) => {
-                      const { item, depth, arrow, context } = props
-                      const isFolder = Boolean(item.isFolder)
+                  }}
+                  onFocusItem={item => setFocusedItem(item.index)}
+                  onExpandItem={item => setExpandedItems([...expandedItems, item.index])}
+                  onCollapseItem={item => 
+                    setExpandedItems(expandedItems.filter(expandedItemIndex => expandedItemIndex !== item.index))
+                  }
+                  onSelectItems={handleSelect}
+                  onPrimaryAction={handlePrimaryAction}
+                  onDrop={handleDrop}
+                  canDragAndDrop={true}
+                  canDropOnFolder={true}
+                  canReorderItems={true}
+                  renderItem={props => {
+                    const { item, depth, arrow, context } = props
+                    const isFolder = Boolean(item.isFolder)
 
-                      return (
-                        <li 
-                          {...props.context.itemContainerWithChildrenProps}
-                          className="list-none [&_.rct-tree-item-button-focus]:!outline-none"
+                    return (
+                      <li 
+                        {...props.context.itemContainerWithChildrenProps}
+                        className="list-none [&_.rct-tree-item-button-focus]:!outline-none"
+                      >
+                        <div 
+                          {...props.context.itemContainerWithoutChildrenProps}
+                          {...context.interactiveElementProps}
+                          className={`flex items-center justify-between py-1.5 px-2 hover:bg-white/[.2] rounded-lg cursor-pointer ${
+                            context.isSelected ? 'bg-white/[.2]' : ''
+                          }`}
+                          style={{
+                            paddingLeft: `${(depth + 1) * 20}px`,
+                            backgroundColor: item.index === 'root' ? 'transparent' : undefined
+                          }}
                         >
-                          <div 
-                            {...props.context.itemContainerWithoutChildrenProps}
-                            {...context.interactiveElementProps}
-                            className={`flex items-center justify-between py-1.5 px-2 hover:bg-white/[.2] rounded-lg cursor-pointer ${
-                              context.isSelected ? 'bg-white/[.2]' : ''
-                            }`}
-                            style={{
-                              paddingLeft: `${(depth + 1) * 20}px`,
-                              backgroundColor: item.index === 'root' ? 'transparent' : undefined
-                            }}
-                          >
-                            <div className="flex items-center min-w-[200px] gap-2">
-                              <div className="flex items-center gap-1">
-                                {isFolder && (
-                                  <div className="w-3.5 h-3.5 flex items-center justify-center">
-                                    {arrow}
-                                  </div>
-                                )}
-                              </div>
-                              <span className="uppercase text-black/[.70] text-sm font-semibold block h-[20px] leading-[20px]">
-                                {item.data}
-                              </span>
+                          <div className="flex items-center min-w-[200px] gap-2">
+                            <div className="flex items-center gap-1">
+                              {isFolder && (
+                                <div className="w-3.5 h-3.5 flex items-center justify-center">
+                                  {arrow}
+                                </div>
+                              )}
                             </div>
-                            {item.index !== 'root' && (
-                              <div className="flex items-center">
-                                <IconButton
-                                  size="small"
-                                  onClick={e => {
-                                    e.stopPropagation()
-                                    handleMenuClick(e, item.index.toString())
-                                  }}
-                                  className="hover:bg-black/[.10]">
-                                  <MoreHorizIcon fontSize="small" />
-                                </IconButton>
-                              </div>
-                            )}
+                            <span className="uppercase text-black/[.70] text-sm font-semibold block h-[20px] leading-[20px]">
+                              {item.data}
+                            </span>
                           </div>
-                          <AnimatePresence initial={false} mode="wait">
-                            {props.children && (
-                              <motion.div
-                                initial={{ opacity: 0, height: 0, y: -5 }}
-                                animate={{ 
-                                  opacity: context.isExpanded ? 1 : 0,
-                                  height: context.isExpanded ? 'auto' : 0,
-                                  y: context.isExpanded ? 0 : -5,
-                                  transitionEnd: {
-                                    overflow: context.isExpanded ? 'visible' : 'hidden'
-                                  }
+                          {item.index !== 'root' && (
+                            <div className="flex items-center">
+                              <IconButton
+                                size="small"
+                                onClick={e => {
+                                  e.stopPropagation()
+                                  handleMenuClick(e, item.index.toString())
                                 }}
-                                exit={{ opacity: 0, height: 0, y: -5, overflow: 'hidden' }}
-                                transition={{ 
-                                  duration: 0.3,
-                                  ease: [0.2, 0.8, 0.2, 1.0],
-                                  opacity: { duration: 0.35 }
-                                }}
-                              >
-                                {props.children}
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </li>
-                      )
-                    }}
-                  >
-                    <Tree 
-                      treeId="tree-1" 
-                      rootItem="root"
-                    />
-                  </UncontrolledTreeEnvironment>
-                </div>
-              </>
+                                className="hover:bg-black/[.10]">
+                                <MoreHorizIcon fontSize="small" />
+                              </IconButton>
+                            </div>
+                          )}
+                        </div>
+                        <AnimatePresence initial={false} mode="wait">
+                          {props.children && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0, y: -5 }}
+                              animate={{ 
+                                opacity: context.isExpanded ? 1 : 0,
+                                height: context.isExpanded ? 'auto' : 0,
+                                y: context.isExpanded ? 0 : -5,
+                                transitionEnd: {
+                                  overflow: context.isExpanded ? 'visible' : 'hidden'
+                                }
+                              }}
+                              exit={{ opacity: 0, height: 0, y: -5, overflow: 'hidden' }}
+                              transition={{ 
+                                duration: 0.3,
+                                ease: [0.2, 0.8, 0.2, 1.0],
+                                opacity: { duration: 0.35 }
+                              }}
+                            >
+                              {props.children}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </li>
+                    )
+                  }}
+                >
+                  <Tree 
+                    treeId="tree-1" 
+                    rootItem="root"
+                  />
+                </ControlledTreeEnvironment>
+              </div>
             )}
           </div>
         </div>
@@ -474,7 +444,7 @@ const SharedDocumentsPage = ({
         }}
         onConfirm={(newName) => {
           if (selectedDocId) {
-            const item = items.items[selectedDocId]
+            const item = items[selectedDocId]
             if (item) {
               // Check if it's a folder by looking at the isFolder property
               if (item.isFolder) {
@@ -482,19 +452,11 @@ const SharedDocumentsPage = ({
               } else {
                 renameDocument(selectedDocId, newName)
               }
-              
-              // Update the item's data directly
-              item.data = newName
-              
-              // Find and emit change for parent
-              const parentId = findParentId(selectedDocId)
-              console.log('KIRAN Parent ID:', parentId)
-              dataProvider.onDidChangeTreeDataEmitter.emit([parentId])
             }
           }
           setSelectedDoc(null)
         }}
-        initialValue={selectedDocId ? (items.items[selectedDocId]?.data || '') : ''}
+        initialValue={selectedDocId ? (items[selectedDocId]?.data || '') : ''}
       />
 
       <DeleteModal
@@ -505,7 +467,7 @@ const SharedDocumentsPage = ({
         }}
         onConfirm={() => {
           if (selectedDocId) {
-            const item = items.items[selectedDocId]
+            const item = items[selectedDocId]
             if (item && item.data) {
               if ('parentId' in item.data) {
                 deleteFolder(selectedDocId)
@@ -516,7 +478,7 @@ const SharedDocumentsPage = ({
           }
           setSelectedDoc(null)
         }}
-        documentTitle={selectedDocId ? (items.items[selectedDocId]?.data?.title?.toUpperCase() || 'UNTITLED') : 'UNTITLED'}
+        documentTitle={selectedDocId ? (items[selectedDocId]?.data?.title?.toUpperCase() || 'UNTITLED') : 'UNTITLED'}
       />
     </Layout>
   )
