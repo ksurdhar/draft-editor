@@ -1,7 +1,8 @@
 import { useAPI } from '@components/providers'
-import { Dispatch, SetStateAction, useCallback, useEffect, useState } from 'react'
+import { Dispatch, SetStateAction, useCallback, useEffect, useState, createContext, useContext } from 'react'
 import useSWR from 'swr'
 import { DocumentData } from '../types/globals'
+import { FolderData } from '@typez/globals'
 
 export const useSpinner = (optionalCondition?: boolean) => {
   const [allowSpinner, setAllowSpinner] = useState(false)
@@ -58,4 +59,37 @@ export const useDocSync = () => {
     }
   }, [docs])
   return { docs, mutate, isLoading }
+}
+
+export const useFolderSync = () => {
+  const api = useAPI()
+  const fetcher = useCallback(
+    async (path: string) => {
+      return await api.get(path)
+    },
+    [api],
+  )
+
+  const { data: folders = [], mutate, isLoading } = useSWR<FolderData[]>('folders', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 0 // Disable deduping to ensure we always fetch fresh data
+  })
+
+  return { folders, mutate, isLoading }
+}
+
+// Add folders context and hook
+interface FoldersContextType {
+  folders: FolderData[]
+  mutateFolders: () => Promise<any>
+}
+
+export const FoldersContext = createContext<FoldersContextType | null>(null)
+
+export const useFolders = () => {
+  const context = useContext(FoldersContext)
+  if (!context) {
+    throw new Error('useFolders must be used within a FoldersProvider')
+  }
+  return context
 }

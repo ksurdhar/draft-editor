@@ -1,28 +1,15 @@
 'use client'
 import SharedDocumentsPage from '@components/shared-documents-page'
-import { useDocSync } from '@lib/hooks'
+import { useDocSync, useFolderSync } from '@lib/hooks'
 import API from '@lib/http-utils'
 import { withPageAuthRequired } from '@wrappers/auth-wrapper-client'
-import { useCallback, useState, useEffect } from 'react'
+import { useCallback } from 'react'
 import { useSWRConfig } from 'swr'
-import { FolderData } from '@typez/globals'
 
 export const NextDocumentsPage = () => {
-  const { docs, mutate, isLoading } = useDocSync()
+  const { docs, mutate: mutateDocuments, isLoading: docsLoading } = useDocSync()
+  const { folders, mutate: mutateFolders, isLoading: foldersLoading } = useFolderSync()
   const { cache } = useSWRConfig()
-  const [folders, setFolders] = useState<FolderData[]>([])
-
-  useEffect(() => {
-    const fetchFolders = async () => {
-      try {
-        const response = await API.get('folders')
-        setFolders(response.data)
-      } catch (error) {
-        console.error('Error fetching folders:', error)
-      }
-    }
-    fetchFolders()
-  }, [])
 
   const moveItem = useCallback(
     async (itemId: string, targetFolderId?: string, newFolderIndex?: number) => {
@@ -120,11 +107,12 @@ export const NextDocumentsPage = () => {
             return update ? { ...folder, folderIndex: update.folderIndex } : folder
           })
 
-          mutate(updatedDocs, false)
-          setFolders(updatedFolders)
+          mutateDocuments(updatedDocs, false)
+          mutateFolders(updatedFolders, false)
         } catch (e) {
           // Handle error silently
-          mutate() // Revert on error
+          mutateDocuments() // Revert on error
+          mutateFolders() // Revert on error
         }
         return
       }
@@ -166,29 +154,29 @@ export const NextDocumentsPage = () => {
             return update ? { ...folder, folderIndex: update.folderIndex } : folder
           })
 
-          mutate(updatedDocs, false)
-          setFolders(updatedFolders)
+          mutateDocuments(updatedDocs, false)
+          mutateFolders(updatedFolders, false)
         } catch (e) {
           // Handle error silently
-          setFolders(folders) // Revert on error
+          mutateFolders() // Revert on error
         }
       }
     },
-    [docs, folders, mutate]
+    [docs, folders, mutateDocuments, mutateFolders]
   )
 
   const deleteDocument = useCallback(
     async (id: string) => {
       const updatedDocs = docs.filter(doc => doc._id !== id)
-      mutate(updatedDocs, false)
+      mutateDocuments(updatedDocs, false)
       try {
         await API.delete(`documents/${id}`)
       } catch (e) {
         console.log(e)
-        mutate()
+        mutateDocuments()
       }
     },
-    [mutate, docs],
+    [mutateDocuments, docs],
   )
 
   const bulkDelete = useCallback(
@@ -198,8 +186,8 @@ export const NextDocumentsPage = () => {
         const updatedDocs = docs.filter(doc => !documentIds.includes(doc._id))
         const updatedFolders = folders.filter(folder => !folderIds.includes(folder._id))
         
-        mutate(updatedDocs, false)
-        setFolders(updatedFolders)
+        mutateDocuments(updatedDocs, false)
+        mutateFolders(updatedFolders, false)
 
         // Make API call
         await API.post('documents/bulk-delete', {
@@ -209,18 +197,17 @@ export const NextDocumentsPage = () => {
       } catch (error) {
         console.error('Error in bulk delete:', error)
         // Revert on error
-        mutate()
-        const response = await API.get('folders')
-        setFolders(response.data)
+        mutateDocuments()
+        mutateFolders()
       }
     },
-    [docs, folders, mutate]
+    [docs, folders, mutateDocuments, mutateFolders]
   )
 
   const renameDocument = useCallback(
     async (id: string, title: string) => {
       const updatedDocs = docs.map(doc => (doc._id === id ? { ...doc, title } : doc))
-      mutate(updatedDocs, false)
+      mutateDocuments(updatedDocs, false)
       try {
         await API.patch(`documents/${id}`, {
           title,
@@ -228,12 +215,12 @@ export const NextDocumentsPage = () => {
         })
       } catch (e) {
         console.log(e)
-        mutate()
+        mutateDocuments()
       }
 
       cache.delete(`documents/${id}`)
     },
-    [mutate, docs, cache],
+    [mutateDocuments, docs, cache],
   )
 
   const createFolder = useCallback(
@@ -245,24 +232,26 @@ export const NextDocumentsPage = () => {
           userId: 'current', // The server will use the authenticated user's ID
           lastUpdated: Date.now()
         })
-        setFolders(prev => [...prev, response.data])
+        mutateFolders([...folders, response.data], false)
       } catch (error) {
         console.error('Error creating folder:', error)
+        mutateFolders()
       }
     },
-    []
+    [folders, mutateFolders]
   )
 
   const deleteFolder = useCallback(
     async (id: string) => {
       try {
         await API.delete(`folders/${id}`)
-        setFolders(prev => prev.filter(folder => folder._id !== id))
+        mutateFolders(folders.filter(folder => folder._id !== id), false)
       } catch (error) {
         console.error('Error deleting folder:', error)
+        mutateFolders()
       }
     },
-    []
+    [folders, mutateFolders]
   )
 
   const renameFolder = useCallback(
@@ -272,12 +261,13 @@ export const NextDocumentsPage = () => {
           title,
           lastUpdated: Date.now()
         })
-        setFolders(prev => prev.map(folder => folder._id === id ? response.data : folder))
+        mutateFolders(folders.map(folder => folder._id === id ? response.data : folder), false)
       } catch (error) {
         console.error('Error renaming folder:', error)
+        mutateFolders()
       }
     },
-    []
+    [folders, mutateFolders]
   )
 
   return (
@@ -290,7 +280,7 @@ export const NextDocumentsPage = () => {
       deleteFolder={deleteFolder}
       renameFolder={renameFolder}
       onMove={moveItem}
-      isLoading={isLoading}
+      isLoading={docsLoading || foldersLoading}
       bulkDelete={bulkDelete}
     />
   )

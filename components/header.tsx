@@ -7,8 +7,7 @@ import { Fragment, useCallback, useEffect, useState, useRef } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useAPI, useMouse, useNavigation } from './providers'
 import { transformTextToSlate } from '@lib/transforms/text-to-slate'
-
-import { useSyncHybridDoc } from '@lib/hooks'
+import { useSyncHybridDoc, useFolderSync } from '@lib/hooks'
 import { Divider, List, ListItem, ListItemButton, ListItemText } from '@mui/material'
 import Box from '@mui/material/Box'
 import Drawer from '@mui/material/Drawer'
@@ -69,6 +68,7 @@ const HeaderComponent = ({ id }: HeaderProps) => {
   const { user } = useUser()
   const { navigateTo, signOut } = useNavigation()
   const { post, get } = useAPI()
+  const { mutate: mutateFolders } = useFolderSync()
 
   const fetcher = useCallback(
     async (path: string) => {
@@ -142,12 +142,14 @@ const HeaderComponent = ({ id }: HeaderProps) => {
     try {
       // Create folders first
       const folderPaths = Object.keys(filesByDirectory)
+      console.log('Folder paths to create:', folderPaths)
       const folderMap = new Map<string, string>() // Maps path to folder ID
       
       for (const fullPath of folderPaths) {
         const pathParts = fullPath.split('/')
         // Skip the root folder (usually the selected folder name)
         pathParts.shift()
+        console.log('Creating folder path:', pathParts)
         
         let parentId: string | undefined = undefined
         let currentPath = ''
@@ -155,6 +157,7 @@ const HeaderComponent = ({ id }: HeaderProps) => {
         // Create each folder in the path if it doesn't exist
         for (const part of pathParts) {
           currentPath = currentPath ? `${currentPath}/${part}` : part
+          console.log('Processing folder:', { part, currentPath, parentId })
           
           if (!folderMap.has(currentPath)) {
             const response = await post('/folders', {
@@ -163,6 +166,7 @@ const HeaderComponent = ({ id }: HeaderProps) => {
               userId: user?.sub,
               lastUpdated: Date.now()
             })
+            console.log('Created folder:', { path: currentPath, id: response._id, parentId })
             folderMap.set(currentPath, response._id)
           }
           parentId = folderMap.get(currentPath)
@@ -175,11 +179,10 @@ const HeaderComponent = ({ id }: HeaderProps) => {
         pathParts.shift() // Remove root folder
         const folderPath = pathParts.join('/')
         const parentId = folderMap.get(folderPath)
+        console.log('Creating documents in folder:', { folderPath, parentId, fileCount: files.length })
 
         for (const file of files) {
-
           const content = await file.text()
-          console.log('Kiran, content:', content)
           const transformedContent = JSON.stringify(transformTextToSlate(content))
 
           await post('/documents', {
@@ -192,8 +195,13 @@ const HeaderComponent = ({ id }: HeaderProps) => {
         }
       }
 
-      // Refresh the documents list
-      mutate('/documents')
+      console.log('Starting mutations...')
+      // Refresh both documents and folders lists
+      await Promise.all([
+        mutate('/documents'),
+        mutateFolders()
+      ])
+      console.log('Mutations completed')
     } catch (error) {
       console.error('Error importing files:', error)
     }
