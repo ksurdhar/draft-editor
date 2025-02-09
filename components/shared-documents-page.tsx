@@ -4,9 +4,7 @@ import Layout from '@components/layout'
 import { Loader } from '@components/loader'
 import { useSpinner } from '@lib/hooks'
 import { DocumentData, FolderData } from '@typez/globals'
-import { format } from 'date-fns'
 import { useState, useMemo, useEffect } from 'react'
-import { useNavigation } from './providers'
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz'
 import CreateNewFolderIcon from '@mui/icons-material/CreateNewFolder'
 import FolderIcon from '@mui/icons-material/Folder'
@@ -16,17 +14,6 @@ import RenameModal from './rename-modal'
 import DeleteModal from './delete-modal'
 import { UncontrolledTreeEnvironment, Tree, StaticTreeDataProvider, TreeItemIndex, TreeItem, DraggingPosition } from 'react-complex-tree'
 import 'react-complex-tree/lib/style.css'
-
-// Helper function to safely format dates
-function formatDate(timestamp: number | undefined | null): string {
-  if (!timestamp) return 'Never'
-  try {
-    return format(new Date(timestamp), 'MMM d, yyyy')
-  } catch (error) {
-    console.error('Error formatting date:', error)
-    return 'Invalid date'
-  }
-}
 
 export interface SharedDocumentsPageProps {
   docs: DocumentData[]
@@ -54,13 +41,9 @@ const SharedDocumentsPage = ({
   const [renameModalOpen, setRenameModalOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const showSpinner = useSpinner(isLoading)
-  const { navigateTo } = useNavigation()
   const [newFolderParentId, setNewFolderParentId] = useState<string | undefined>()
 
   const items = useMemo(() => {
-    console.log('Folders:', folders)
-    console.log('Docs:', docs)
-    
     const treeItems: Record<string, any> = {
       root: {
         index: 'root',
@@ -121,7 +104,6 @@ const SharedDocumentsPage = ({
       }
     })
 
-    console.log('Tree Items:', treeItems)
     return { items: treeItems }
   }, [docs, folders])
 
@@ -136,16 +118,6 @@ const SharedDocumentsPage = ({
     [items]
   )
 
-  // Log tree structure whenever it changes
-  useMemo(() => {
-    console.log('Current tree structure:', {
-      items: items.items,
-      expandedItems: ['root', ...folders.map(f => f._id)],
-      folderCount: folders.length,
-      docCount: docs.length
-    })
-  }, [items, folders, docs])
-
   useEffect(() => {
     dataProvider.onDidChangeTreeDataEmitter.emit(['root'])
   }, [items, dataProvider])
@@ -154,9 +126,7 @@ const SharedDocumentsPage = ({
     const selectedId = selectedItems[0]?.toString()
     if (selectedId && items.items[selectedId]) {
       const item = items.items[selectedId]
-      if (item && !item.isFolder) {
-        navigateTo(`/documents/${selectedId}`)
-      } else if (item) {
+      if (item && item.isFolder) {
         setNewFolderParentId(selectedId)
       }
     }
@@ -189,45 +159,72 @@ const SharedDocumentsPage = ({
     }
   }
 
-  const handleDrop = (draggedItems: TreeItem<any>[], position: DraggingPosition) => {
-    console.log('Drop items:', draggedItems, 'onto position:', position)
+  const handleDrop = async (draggedItems: TreeItem<any>[], position: DraggingPosition) => {
+    console.log('Dragged items:', draggedItems)
+    console.log('Drop position:', position)
     
-    if (position.targetType === 'between-items') return
+    if (position.targetType === 'between-items') {
+      console.log('Dropped between items - this is not supported')
+      return
+    }
+
     const targetId = position.targetItem
     const targetItem = items.items[targetId]
-    if (!targetItem?.isFolder) return
+    
+    if (!targetItem?.isFolder) {
+      console.log('Target is not a folder - drop canceled')
+      return
+    }
 
-    // Update the parent references in the backend
-    draggedItems.forEach(async (item) => {
-      const itemData = item.data
-      if (!itemData) return
+    console.log('Successfully dropped onto folder:', targetItem.data)
+    
+    // Update the underlying data structures and server
+    for (const item of draggedItems) {
+      const itemId = item.index.toString()
+      const targetFolderId = targetId === 'root' ? undefined : targetId.toString()
 
-      if ('parentId' in itemData) {
-        // Update folder parent
-        await fetch(`/api/folders/${itemData._id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ parentId: targetItem.data._id || null })
-        })
-      } else {
-        // Update document location
-        await fetch(`/api/documents/${itemData._id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ location: targetItem.data._id || null })
-        })
+      try {
+        // Find and update the document or folder in the original arrays
+        const docIndex = docs.findIndex(d => d._id === itemId)
+        if (docIndex !== -1) {
+          // Update document on server
+          await fetch(`/api/documents/${itemId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ parentId: targetFolderId })
+          })
+          docs[docIndex] = { ...docs[docIndex], parentId: targetFolderId }
+          console.log(`Updated document ${itemId} to have parent ${targetFolderId}`)
+        }
+
+        const folderIndex = folders.findIndex(f => f._id === itemId)
+        if (folderIndex !== -1) {
+          // Update folder on server
+          await fetch(`/api/folders/${itemId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ parentId: targetFolderId })
+          })
+          folders[folderIndex] = { ...folders[folderIndex], parentId: targetFolderId }
+          console.log(`Updated folder ${itemId} to have parent ${targetFolderId}`)
+        }
+
+        // Update the visual tree structure
+        const sourceParentId = item.data.parentId || item.data.location || 'root'
+        const sourceParent = items.items[sourceParentId]
+        if (sourceParent && sourceParent.children) {
+          sourceParent.children = sourceParent.children.filter((id: string) => id !== item.index)
+        }
+        if (!targetItem.children) {
+          targetItem.children = []
+        }
+        targetItem.children.push(item.index)
+
+      } catch (error) {
+        console.error('Error updating item location:', error)
+        // You might want to show a user-friendly error message here
       }
-    })
-
-    // Update local tree data
-    draggedItems.forEach(item => {
-      const sourceParentId = item.data.parentId || item.data.location || 'root'
-      const sourceParent = items.items[sourceParentId]
-      if (sourceParent) {
-        sourceParent.children = sourceParent.children.filter((id: string) => id !== item.index)
-      }
-      targetItem.children.push(item.index)
-    })
+    }
 
     // Notify the tree of changes
     dataProvider.onDidChangeTreeDataEmitter.emit(['root'])
