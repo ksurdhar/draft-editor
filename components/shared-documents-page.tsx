@@ -67,11 +67,6 @@ const SharedDocumentsPage = ({
   const [expandedItems, setExpandedItems] = useState<TreeItemIndex[]>([])
   const [selectedItems, setSelectedItems] = useState<TreeItemIndex[]>([])
 
-  // Add effect to monitor selectedItems changes
-  useEffect(() => {
-    console.log('selectedItems changed:', selectedItems)
-  }, [selectedItems])
-
   // Add focus monitoring
   useEffect(() => {
     const handleFocusChange = () => {
@@ -189,8 +184,6 @@ const SharedDocumentsPage = ({
   }, [docs, folders])
 
   const handleSelect = (items: TreeItemIndex[]) => {
-    console.log('handleSelect called with items:', items)
-    
     // Ensure we're passing a new array reference to trigger re-render
     const newSelectedItems = [...items]
     setSelectedItems(newSelectedItems)
@@ -198,12 +191,10 @@ const SharedDocumentsPage = ({
     // Only set folder parent when a single folder is selected
     if (items.length === 1) {
       const selectedId = items[0]?.toString()
-      console.log('Single item selected, selectedId:', selectedId)
       const selectedItem = selectedId ? items[selectedId] : null
       if (!selectedId || !selectedItem) return
 
       if (selectedItem.isFolder) {
-        console.log('Selected item is a folder, setting newFolderParentId:', selectedId)
         setNewFolderParentId(selectedId)
       }
     }
@@ -284,6 +275,11 @@ const SharedDocumentsPage = ({
         return
       }
       targetId = position.targetItem.toString()
+      
+      // Expand the target folder if it's not already expanded
+      if (!expandedItems.includes(position.targetItem)) {
+        setExpandedItems([...expandedItems, position.targetItem])
+      }
       
       // When dropping directly on a folder, add to the end of its children
       const folderItems = [...docs.filter(d => d.parentId === targetId), ...folders.filter(f => f.parentId === targetId)]
@@ -447,7 +443,6 @@ const SharedDocumentsPage = ({
                   renderItem={props => {
                     const { item, depth, arrow, context } = props
                     const isFolder = Boolean(item.isFolder)
-                    console.log('Rendering item:', item.index, 'isSelected:', context.isSelected)
 
                     return (
                       <li 
