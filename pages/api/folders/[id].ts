@@ -12,14 +12,10 @@ export default async function handler(
 
   switch (req.method) {
     case 'PUT':
+    case 'PATCH':
       try {
-        const { title } = req.body
-        if (!title) {
-          return res.status(400).json({ error: 'Missing required fields' })
-        }
-
         const updatedFolder = await storage.update('folders', id, {
-          title,
+          ...req.body,
           lastUpdated: Date.now()
         })
 
@@ -48,7 +44,7 @@ export default async function handler(
           })
         }
 
-        const success = await storage.delete('folders', id)
+        const success = await storage.delete('folders', { _id: id } as Record<string, any>)
         if (!success) {
           return res.status(404).json({ error: 'Folder not found' })
         }
@@ -61,7 +57,7 @@ export default async function handler(
       break
 
     default:
-      res.setHeader('Allow', ['PUT', 'DELETE'])
+      res.setHeader('Allow', ['PUT', 'PATCH', 'DELETE'])
       res.status(405).end(`Method ${req.method} Not Allowed`)
   }
 } 

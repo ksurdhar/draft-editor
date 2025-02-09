@@ -163,36 +163,45 @@ const SharedDocumentsPage = ({
     console.log('Dragged items:', draggedItems)
     console.log('Drop position:', position)
     
-    if (position.targetType === 'between-items') {
-      console.log('Dropped between items - this is not supported')
-      return
-    }
-
-    const targetId = position.targetItem
-    const targetItem = items.items[targetId]
+    // Handle both direct folder drops and root level drops
+    let targetId = 'root'
     
-    if (!targetItem?.isFolder) {
-      console.log('Target is not a folder - drop canceled')
+    if (position.targetType === 'item') {
+      const targetItem = items.items[position.targetItem]
+      if (!targetItem?.isFolder) {
+        console.log('Target is not a folder - drop canceled')
+        return
+      }
+      targetId = position.targetItem.toString()
+    } else if (position.targetType === 'between-items' && position.parentItem === 'root') {
+      console.log('Dropping to root level')
+      targetId = 'root'
+    } else {
+      console.log('Invalid drop target')
       return
     }
 
-    console.log('Successfully dropped onto folder:', targetItem.data)
+    console.log('Successfully dropped onto:', targetId === 'root' ? 'Root' : items.items[targetId].data)
     
     // Update the underlying data structures and server
     for (const item of draggedItems) {
       const itemId = item.index.toString()
-      const targetFolderId = targetId === 'root' ? undefined : targetId.toString()
+      // When moving to root, explicitly set parentId to undefined for the server
+      const targetFolderId = targetId === 'root' ? 'root' : targetId.toString()
 
       try {
         // Find and update the document or folder in the original arrays
         const docIndex = docs.findIndex(d => d._id === itemId)
         if (docIndex !== -1) {
           // Update document on server
-          await fetch(`/api/documents/${itemId}`, {
+          const response = await fetch(`/api/documents/${itemId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ parentId: targetFolderId })
           })
+          if (!response.ok) {
+            throw new Error(`Failed to update document: ${response.statusText}`)
+          }
           // Update local document state
           docs[docIndex] = { ...docs[docIndex], parentId: targetFolderId }
           console.log(`Updated document ${itemId} to have parent ${targetFolderId}`)
@@ -201,11 +210,14 @@ const SharedDocumentsPage = ({
         const folderIndex = folders.findIndex(f => f._id === itemId)
         if (folderIndex !== -1) {
           // Update folder on server
-          await fetch(`/api/folders/${itemId}`, {
+          const response = await fetch(`/api/folders/${itemId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ parentId: targetFolderId })
           })
+          if (!response.ok) {
+            throw new Error(`Failed to update folder: ${response.statusText}`)
+          }
           // Update local folder state
           folders[folderIndex] = { ...folders[folderIndex], parentId: targetFolderId }
           console.log(`Updated folder ${itemId} to have parent ${targetFolderId}`)
