@@ -237,6 +237,32 @@ export const NextDocumentsPage = () => {
     [mutate, docs],
   )
 
+  const bulkDelete = useCallback(
+    async (documentIds: string[], folderIds: string[]) => {
+      try {
+        // Optimistically update UI
+        const updatedDocs = docs.filter(doc => !documentIds.includes(doc._id))
+        const updatedFolders = folders.filter(folder => !folderIds.includes(folder._id))
+        
+        mutate(updatedDocs, false)
+        setFolders(updatedFolders)
+
+        // Make API call
+        await API.post('documents/bulk-delete', {
+          documentIds,
+          folderIds
+        })
+      } catch (error) {
+        console.error('Error in bulk delete:', error)
+        // Revert on error
+        mutate()
+        const response = await API.get('folders')
+        setFolders(response.data)
+      }
+    },
+    [docs, folders, mutate]
+  )
+
   const renameDocument = useCallback(
     async (id: string, title: string) => {
       const updatedDocs = docs.map(doc => (doc._id === id ? { ...doc, title } : doc))
@@ -311,6 +337,7 @@ export const NextDocumentsPage = () => {
       renameFolder={renameFolder}
       onMove={moveItem}
       isLoading={isLoading}
+      bulkDelete={bulkDelete}
     />
   )
 }

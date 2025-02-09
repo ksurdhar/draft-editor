@@ -9,6 +9,9 @@ interface DeleteModalProps {
 }
 
 const DeleteModal = ({ open, onClose, onConfirm, documentTitle }: DeleteModalProps) => {
+  const titles = documentTitle.split(', ')
+  const itemCount = titles.length
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!open) return
@@ -35,7 +38,14 @@ const DeleteModal = ({ open, onClose, onConfirm, documentTitle }: DeleteModalPro
     <BaseModal
       open={open}
       onClose={onClose}
-      title="DELETE DOCUMENT"
+      title="DELETE"
+      description={
+        itemCount > 1
+          ? `Are you sure you want to delete these ${itemCount} items?`
+          : `Are you sure you want to delete ${documentTitle}?`
+      }
+      confirmText="DELETE"
+      onConfirm={handleDelete}
       actions={[
         {
           label: 'CANCEL',
@@ -49,11 +59,7 @@ const DeleteModal = ({ open, onClose, onConfirm, documentTitle }: DeleteModalPro
           }
         }
       ]}
-    >
-      <p className="mb-4 text-black/[.70] focus:outline-none [&_*]:focus:outline-none">
-        ARE YOU SURE YOU WANT TO DELETE&nbsp; &ldquo;{documentTitle}&rdquo;?
-      </p>
-    </BaseModal>
+    />
   )
 }
 

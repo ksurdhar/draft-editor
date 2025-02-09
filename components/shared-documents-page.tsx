@@ -17,6 +17,16 @@ import 'react-complex-tree/lib/style.css'
 import { useNavigation } from '@components/providers'
 import { motion, AnimatePresence } from 'framer-motion'
 
+interface TreeItemData {
+  index: TreeItemIndex
+  canMove: boolean
+  canRename: boolean
+  isFolder: boolean
+  children?: TreeItemIndex[]
+  data: string
+  folderIndex?: number
+}
+
 export interface SharedDocumentsPageProps {
   docs: DocumentData[]
   folders: FolderData[]
@@ -27,6 +37,7 @@ export interface SharedDocumentsPageProps {
   deleteFolder: (id: string) => void
   renameFolder: (id: string, title: string) => void
   onMove?: (itemId: string, targetFolderId?: string, dropIndex?: number) => Promise<void>
+  bulkDelete: (documentIds: string[], folderIds: string[]) => Promise<void>
 }
 
 const SharedDocumentsPage = ({
@@ -39,6 +50,7 @@ const SharedDocumentsPage = ({
   deleteFolder,
   renameFolder,
   onMove,
+  bulkDelete,
 }: SharedDocumentsPageProps) => {
   const { navigateTo } = useNavigation()
   const [selectedDocId, setSelectedDoc] = useState<string | null>(null)
@@ -53,8 +65,33 @@ const SharedDocumentsPage = ({
   const [expandedItems, setExpandedItems] = useState<TreeItemIndex[]>([])
   const [selectedItems, setSelectedItems] = useState<TreeItemIndex[]>([])
 
+  // Add keyboard shortcut handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if we're in an input field
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.key === 'd') {
+        e.preventDefault()
+        if (selectedItems.length > 0) {
+          setDeleteModalOpen(true)
+        }
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault()
+        if (selectedItems.length > 0) {
+          setDeleteModalOpen(true)
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedItems])
+
   const items = useMemo(() => {
-    const treeItems: Record<string, any> = {
+    const treeItems: Record<string, TreeItemData> = {
       root: {
         index: 'root',
         canMove: false,
@@ -127,12 +164,24 @@ const SharedDocumentsPage = ({
 
   const handleSelect = (items: TreeItemIndex[]) => {
     setSelectedItems(items)
-    const selectedId = items[0]?.toString()
-    if (!selectedId || !items[selectedId]) return
+    console.log('Selected items:', items.map(id => {
+      const item = items[id.toString()]
+      return {
+        id,
+        title: item?.data,
+        isFolder: item?.isFolder
+      }
+    }))
 
-    const item = items[selectedId]
-    if (item.isFolder) {
-      setNewFolderParentId(selectedId)
+    // Only set folder parent when a single folder is selected
+    if (items.length === 1) {
+      const selectedId = items[0]?.toString()
+      const selectedItem = selectedId ? items[selectedId] : null
+      if (!selectedId || !selectedItem) return
+
+      if (selectedItem.isFolder) {
+        setNewFolderParentId(selectedId)
+      }
     }
   }
 
@@ -164,6 +213,20 @@ const SharedDocumentsPage = ({
   const handleDelete = () => {
     setDeleteModalOpen(true)
     handleMenuClose()
+  }
+
+  const handleDeleteConfirm = async () => {
+    try {
+      const selectedDocs = selectedItems.filter(id => !items[id.toString()]?.isFolder).map(id => id.toString())
+      const selectedFolders = selectedItems.filter(id => items[id.toString()]?.isFolder).map(id => id.toString())
+
+      await bulkDelete(selectedDocs, selectedFolders)
+      setDeleteModalOpen(false)
+      setSelectedItems([])
+    } catch (error) {
+      console.error('Error deleting items:', error)
+      // You might want to show an error message to the user here
+    }
   }
 
   const handleCreateFolder = () => {
@@ -347,8 +410,8 @@ const SharedDocumentsPage = ({
                         <div 
                           {...props.context.itemContainerWithoutChildrenProps}
                           {...context.interactiveElementProps}
-                          className={`flex items-center justify-between py-1.5 px-2 hover:bg-white/[.2] rounded-lg cursor-pointer ${
-                            context.isSelected ? 'bg-white/[.2]' : ''
+                          className={`flex items-center justify-between py-1.5 px-2 hover:bg-white/[.2] rounded-lg cursor-pointer transition-all duration-200 ${
+                            context.isSelected ? 'bg-white/[.25]' : ''
                           }`}
                           style={{
                             paddingLeft: `${(depth + 1) * 20}px`,
@@ -492,20 +555,8 @@ const SharedDocumentsPage = ({
           setDeleteModalOpen(false)
           setSelectedDoc(null)
         }}
-        onConfirm={() => {
-          if (selectedDocId) {
-            const item = items[selectedDocId]
-            if (item) {
-              if (item.isFolder) {
-                deleteFolder(selectedDocId)
-              } else {
-                deleteDocument(selectedDocId)
-              }
-            }
-          }
-          setSelectedDoc(null)
-        }}
-        documentTitle={selectedDocId && items[selectedDocId] ? items[selectedDocId].data.toString().toUpperCase() : 'UNTITLED'}
+        onConfirm={handleDeleteConfirm}
+        documentTitle={selectedItems.length > 0 ? selectedItems.map(id => items[id.toString()]?.data.toUpperCase()).join(', ') : 'UNTITLED'}
       />
     </Layout>
   )

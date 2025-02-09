@@ -1,20 +1,67 @@
 import { Modal, Button } from '@mui/material'
 import { ReactNode } from 'react'
+import { useEffect } from 'react'
 
 export interface BaseModalProps {
   open: boolean
   onClose: () => void
   title: string
-  children: ReactNode
-  actions?: {
+  description?: string
+  confirmText?: string
+  onConfirm?: () => void
+  children?: React.ReactNode
+  actions?: Array<{
     label: string
     onClick: () => void
-    color?: string
-    hoverStyle?: React.CSSProperties
-  }[]
+    hoverStyle?: {
+      backgroundColor: string
+    }
+  }>
 }
 
-export const BaseModal = ({ open, onClose, title, children, actions = [] }: BaseModalProps) => {
+export const BaseModal = ({
+  open,
+  onClose,
+  title,
+  description,
+  confirmText = 'CONFIRM',
+  onConfirm,
+  children,
+  actions
+}: BaseModalProps) => {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && onConfirm) {
+        onConfirm()
+      }
+    }
+
+    if (open) {
+      window.addEventListener('keydown', handleKeyDown)
+    }
+
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [open, onConfirm])
+
+  const defaultActions = onConfirm ? [
+    {
+      label: 'CANCEL',
+      onClick: onClose
+    },
+    {
+      label: confirmText,
+      onClick: onConfirm,
+      hoverStyle: {
+        backgroundColor: 'rgba(239, 68, 68, 0.1)'
+      }
+    }
+  ] : [
+    {
+      label: 'CLOSE',
+      onClick: onClose
+    }
+  ]
+
   return (
     <Modal
       open={open}
@@ -43,14 +90,19 @@ export const BaseModal = ({ open, onClose, title, children, actions = [] }: Base
         }}
       >
         <h3 className="mb-4 uppercase text-black/[.70]">{title}</h3>
+        {description && (
+          <p className="mb-4 text-black/[.70] focus:outline-none [&_*]:focus:outline-none">
+            {description}
+          </p>
+        )}
         {children}
         <div className="flex justify-end gap-2">
-          {actions.map((action, index) => (
+          {(actions || defaultActions).map((action, index) => (
             <Button
               key={index}
               onClick={action.onClick}
               sx={{
-                color: action.color || 'rgba(0, 0, 0, 0.7)',
+                color: 'rgba(0, 0, 0, 0.7)',
                 textTransform: 'uppercase',
                 '&:hover': action.hoverStyle || {
                   backgroundColor: 'rgba(255, 255, 255, 0.3)',
