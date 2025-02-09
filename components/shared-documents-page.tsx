@@ -71,12 +71,6 @@ const SharedDocumentsPage = ({
   useEffect(() => {
     const handleFocusChange = () => {
       const focusedElement = document.activeElement
-      console.log('=== Focus Changed ===')
-      console.log('Focused element:', focusedElement)
-      console.log('Tag name:', focusedElement?.tagName)
-      console.log('Class list:', focusedElement?.classList)
-      console.log('ID:', focusedElement?.id)
-      console.log('Parent element:', focusedElement?.parentElement)
     }
 
     document.addEventListener('focusin', handleFocusChange)
@@ -107,7 +101,6 @@ const SharedDocumentsPage = ({
           setDeleteModalOpen(true)
         }
       } else if (e.key === 'Escape') {
-        console.log('Escape key pressed')
         e.preventDefault()
         setSelectedItems([])
         setFocusedItem(undefined)
@@ -192,15 +185,6 @@ const SharedDocumentsPage = ({
 
   const handleSelect = (items: TreeItemIndex[]) => {
     setSelectedItems(items)
-    console.log('Selected items:', items.map(id => {
-      const item = items[id.toString()]
-      return {
-        id,
-        title: item?.data,
-        isFolder: item?.isFolder
-      }
-    }))
-
     // Only set folder parent when a single folder is selected
     if (items.length === 1) {
       const selectedId = items[0]?.toString()
@@ -274,71 +258,52 @@ const SharedDocumentsPage = ({
   }
 
   const handleDrop = async (draggedItems: TreeItem<any>[], position: DraggingPosition) => {
-    console.log('=== handleDrop ===')
-    console.log('Dragged items:', draggedItems)
-    console.log('Position:', position)
-
     // Handle both direct folder drops and root level drops
     let targetId = 'root'
     let dropIndex = 0
     
     if (position.targetType === 'item') {
       const targetItem = items[position.targetItem]
+      
       if (!targetItem?.isFolder) {
         return
       }
       targetId = position.targetItem.toString()
-      console.log('Dropping onto folder:', targetId)
       
       // When dropping directly on a folder, add to the end of its children
       const folderItems = [...docs.filter(d => d.parentId === targetId), ...folders.filter(f => f.parentId === targetId)]
         .sort((a, b) => (a.folderIndex || 0) - (b.folderIndex || 0))
-      console.log('Current folder items:', folderItems.map(item => ({
-        id: item._id,
-        title: item.title,
-        index: item.folderIndex
-      })))
       dropIndex = folderItems.length
-      console.log('Setting drop index to end:', dropIndex)
     } else if (position.targetType === 'between-items') {
       targetId = position.parentItem || 'root'
-      console.log('Dropping between items in folder:', targetId)
-      console.log('Child index:', position.childIndex)
       
       // Calculate new index based on drop position
       const parentItem = items[targetId]
       if (parentItem?.children) {
-        console.log('Parent children:', parentItem.children.map((id: string) => ({
-          id,
-          index: items[id]?.folderIndex
-        })))
-
         if (position.childIndex === 0) {
-          dropIndex = 0
-          console.log('Dropping at start, index:', dropIndex)
+          // When dropping at the start, shift all other items up
+          if (parentItem.children.length > 0) {
+            const firstChild = items[parentItem.children[0]]
+            const firstIndex = firstChild?.folderIndex || 0
+            // If we're at the root level, ensure we can insert at the beginning
+            if (targetId === 'root') {
+              dropIndex = firstIndex - 1
+            } else {
+              dropIndex = firstIndex / 2
+            }
+          } else {
+            dropIndex = 0
+          }
         } else if (position.childIndex >= parentItem.children.length) {
           const lastChild = items[parentItem.children[parentItem.children.length - 1]]
           dropIndex = (lastChild?.folderIndex || 0) + 1
-          console.log('Dropping at end, index:', dropIndex)
         } else {
           const prevItem = items[parentItem.children[position.childIndex - 1]]
           const nextItem = items[parentItem.children[position.childIndex]]
           dropIndex = ((prevItem?.folderIndex || 0) + (nextItem?.folderIndex || 0)) / 2
-          console.log('Dropping between items:', {
-            prevIndex: prevItem?.folderIndex,
-            nextIndex: nextItem?.folderIndex,
-            newIndex: dropIndex
-          })
         }
       }
-    } else {
-      return
     }
-    
-    console.log('Final drop parameters:', {
-      targetId,
-      dropIndex
-    })
 
     // Update items through parent callback
     for (const item of draggedItems) {
@@ -349,7 +314,7 @@ const SharedDocumentsPage = ({
         try {
           await onMove(itemId, targetFolderId, dropIndex)
         } catch (error) {
-          console.error('Error moving item:', error)
+          // Handle error silently
         }
       }
     }
@@ -367,18 +332,12 @@ const SharedDocumentsPage = ({
       <div className="relative top-[44px] flex h-[calc(100vh_-_44px)] justify-center pb-10">
         <div className="flex w-11/12 max-w-[740px] flex-col justify-center sm:w-9/12">
           <div className="flex justify-end mb-4 gap-2">
-            <div className="flex gap-0.5 bg-white/[.05] rounded-lg p-0.5">
+            <div className="flex gap-0.5 bg-white/[.05] rounded-lg">
               <Tooltip title="Collapse all">
                 <IconButton
                   onClick={handleCollapseAll}
-                  className="hover:bg-black/[.10] rounded-md"
+                  className="hover:bg-black/[.10]"
                   size="small"
-                  sx={{
-                    '&:hover': {
-                      backgroundColor: 'rgba(0, 0, 0, 0.1)',
-                    },
-                    padding: '4px'
-                  }}
                 >
                   <ExpandLessIcon />
                 </IconButton>
@@ -386,14 +345,8 @@ const SharedDocumentsPage = ({
               <Tooltip title="Expand all">
                 <IconButton
                   onClick={handleExpandAll}
-                  className="hover:bg-black/[.10] rounded-md"
+                  className="hover:bg-black/[.10]"
                   size="small"
-                  sx={{
-                    '&:hover': {
-                      backgroundColor: 'rgba(0, 0, 0, 0.1)',
-                    },
-                    padding: '4px'
-                  }}
                 >
                   <ExpandMoreIcon />
                 </IconButton>
@@ -491,7 +444,7 @@ const SharedDocumentsPage = ({
                           {...context.interactiveElementProps}
                           className={`flex items-center justify-between py-1.5 px-2 hover:bg-white/[.2] rounded-lg cursor-pointer transition-all duration-200 ${
                             context.isSelected ? 'bg-white/[.25]' : ''
-                          } focus:outline-none focus:bg-transparent`}
+                          } focus:bg-transparent`}
                           style={{
                             paddingLeft: `${(depth + 1) * 20}px`,
                             backgroundColor: item.index === 'root' ? 'transparent' : undefined
