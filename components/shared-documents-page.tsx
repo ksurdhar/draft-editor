@@ -15,6 +15,7 @@ import DeleteModal from './delete-modal'
 import { UncontrolledTreeEnvironment, Tree, StaticTreeDataProvider, TreeItemIndex, TreeItem, DraggingPosition } from 'react-complex-tree'
 import 'react-complex-tree/lib/style.css'
 import { useNavigation } from '@components/providers'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export interface SharedDocumentsPageProps {
   docs: DocumentData[]
@@ -270,78 +271,127 @@ const SharedDocumentsPage = ({
             {!isLoading && (!docs || docs.length === 0) && (!folders || folders.length === 0) && emptyMessage}
             {(!isLoading && docs && folders) && (docs.length > 0 || folders.length > 0) && (
               <>
-                <UncontrolledTreeEnvironment
-                  dataProvider={dataProvider}
-                  getItemTitle={item => item.data}
-                  viewState={{
-                    'tree-1': {
-                      expandedItems: []
+                <div className="[&_.rct-tree-root-focus]:!outline-none">
+                  <style>{`
+                    :root {
+                      --rct-color-tree-bg: rgba(255, 255, 255, 0.05);
                     }
-                  }}
-                  canDragAndDrop={true}
-                  canDropOnFolder={true}
-                  canReorderItems={true}
-                  onSelectItems={handleSelect}
-                  onPrimaryAction={handlePrimaryAction}
-                  onDrop={handleDrop}
-                  renderItem={(props) => {
-                    const { item, depth, arrow, context } = props
-                    const isFolder = Boolean(item.isFolder)
-                    const icon = isFolder ? <FolderIcon /> : <InsertDriveFileIcon />
+                    .rct-tree-items-container {
+                      transition: all 0.2s ease-out;
+                      transform-origin: top;
+                    }
+                    .rct-tree-item-li {
+                      transition: all 0.2s ease-out;
+                    }
+                    .rct-tree-item-li-expanded > .rct-tree-items-container {
+                      animation: expandIn 0.2s ease-out;
+                    }
+                    @keyframes expandIn {
+                      from {
+                        opacity: 0;
+                        transform: translateY(-10px);
+                      }
+                      to {
+                        opacity: 1;
+                        transform: translateY(0);
+                      }
+                    }
+                  `}</style>
+                  <UncontrolledTreeEnvironment
+                    dataProvider={dataProvider}
+                    getItemTitle={item => item.data}
+                    viewState={{
+                      'tree-1': {
+                        expandedItems: []
+                      }
+                    }}
+                    canDragAndDrop={true}
+                    canDropOnFolder={true}
+                    canReorderItems={true}
+                    onSelectItems={handleSelect}
+                    onPrimaryAction={handlePrimaryAction}
+                    onDrop={handleDrop}
+                    renderItem={(props) => {
+                      const { item, depth, arrow, context } = props
+                      const isFolder = Boolean(item.isFolder)
+                      const icon = isFolder ? <FolderIcon /> : <InsertDriveFileIcon />
 
-                    return (
-                      <li 
-                        {...props.context.itemContainerWithChildrenProps}
-                        className="list-none"
-                      >
-                        <div 
-                          {...props.context.itemContainerWithoutChildrenProps}
-                          {...context.interactiveElementProps}
-                          className={`flex items-center justify-between py-2 px-2 hover:bg-white/[.1] rounded cursor-pointer ${
-                            context.isSelected ? 'bg-white/[.1]' : ''
-                          }`}
-                          style={{
-                            paddingLeft: `${(depth + 1) * 20}px`,
-                            backgroundColor: item.index === 'root' ? 'transparent' : undefined
-                          }}
+                      return (
+                        <li 
+                          {...props.context.itemContainerWithChildrenProps}
+                          className="list-none [&_.rct-tree-item-button-focus]:!outline-none"
                         >
-                          <div className="flex items-center min-w-[200px] gap-2">
-                            <div className="flex items-center gap-1">
-                              {isFolder && (
-                                <div className="w-4 h-4 flex items-center justify-center">
-                                  {arrow}
-                                </div>
-                              )}
-                              {icon}
+                          <div 
+                            {...props.context.itemContainerWithoutChildrenProps}
+                            {...context.interactiveElementProps}
+                            className={`flex items-center justify-between py-2 px-2 hover:bg-white/[.1] rounded cursor-pointer ${
+                              context.isSelected ? 'bg-white/[.1]' : ''
+                            }`}
+                            style={{
+                              paddingLeft: `${(depth + 1) * 20}px`,
+                              backgroundColor: item.index === 'root' ? 'transparent' : undefined
+                            }}
+                          >
+                            <div className="flex items-center min-w-[200px] gap-2">
+                              <div className="flex items-center gap-1">
+                                {isFolder && (
+                                  <div className="w-4 h-4 flex items-center justify-center">
+                                    {arrow}
+                                  </div>
+                                )}
+                                {icon}
+                              </div>
+                              <span className="uppercase text-black/[.70] block h-[24px] leading-[24px]">
+                                {item.data}
+                              </span>
                             </div>
-                            <span className="uppercase text-black/[.70] block h-[24px] leading-[24px]">
-                              {item.data}
-                            </span>
+                            {item.index !== 'root' && (
+                              <div className="flex items-center">
+                                <IconButton
+                                  size="small"
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    handleMenuClick(e, item.index.toString())
+                                  }}
+                                  className="hover:bg-black/[.10]">
+                                  <MoreHorizIcon fontSize="small" />
+                                </IconButton>
+                              </div>
+                            )}
                           </div>
-                          {item.index !== 'root' && (
-                            <div className="flex items-center">
-                              <IconButton
-                                size="small"
-                                onClick={e => {
-                                  e.stopPropagation()
-                                  handleMenuClick(e, item.index.toString())
+                          <AnimatePresence initial={false} mode="wait">
+                            {props.children && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0, y: -5 }}
+                                animate={{ 
+                                  opacity: context.isExpanded ? 1 : 0,
+                                  height: context.isExpanded ? 'auto' : 0,
+                                  y: context.isExpanded ? 0 : -5,
+                                  transitionEnd: {
+                                    overflow: context.isExpanded ? 'visible' : 'hidden'
+                                  }
                                 }}
-                                className="hover:bg-black/[.10]">
-                                <MoreHorizIcon fontSize="small" />
-                              </IconButton>
-                            </div>
-                          )}
-                        </div>
-                        {props.children}
-                      </li>
-                    )
-                  }}
-                >
-                  <Tree 
-                    treeId="tree-1" 
-                    rootItem="root"
-                  />
-                </UncontrolledTreeEnvironment>
+                                exit={{ opacity: 0, height: 0, y: -5, overflow: 'hidden' }}
+                                transition={{ 
+                                  duration: 0.3,
+                                  ease: [0.2, 0.8, 0.2, 1.0],
+                                  opacity: { duration: 0.35 }
+                                }}
+                              >
+                                {props.children}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </li>
+                      )
+                    }}
+                  >
+                    <Tree 
+                      treeId="tree-1" 
+                      rootItem="root"
+                    />
+                  </UncontrolledTreeEnvironment>
+                </div>
               </>
             )}
           </div>
