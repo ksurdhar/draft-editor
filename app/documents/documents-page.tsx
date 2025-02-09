@@ -24,6 +24,49 @@ export const NextDocumentsPage = () => {
     fetchFolders()
   }, [])
 
+  const moveItem = useCallback(
+    async (itemId: string, targetFolderId?: string) => {
+      // First check if it's a document
+      const docIndex = docs.findIndex(d => d._id === itemId)
+      if (docIndex !== -1) {
+        const updatedDocs = docs.map(doc => 
+          doc._id === itemId ? { ...doc, parentId: targetFolderId } : doc
+        )
+        mutate(updatedDocs, false)
+        try {
+          await API.patch(`documents/${itemId}`, {
+            parentId: targetFolderId,
+            lastUpdated: Date.now()
+          })
+        } catch (e) {
+          console.error(e)
+          mutate() // Revert on error
+        }
+        return
+      }
+
+      // If not a document, check if it's a folder
+      const folderIndex = folders.findIndex(f => f._id === itemId)
+      if (folderIndex !== -1) {
+        const updatedFolders = folders.map(folder =>
+          folder._id === itemId ? { ...folder, parentId: targetFolderId } : folder
+        )
+        setFolders(updatedFolders)
+        try {
+          await API.patch(`folders/${itemId}`, {
+            parentId: targetFolderId,
+            lastUpdated: Date.now()
+          })
+        } catch (e) {
+          console.error(e)
+          // Revert on error
+          setFolders(folders)
+        }
+      }
+    },
+    [docs, folders, mutate]
+  )
+
   const deleteDocument = useCallback(
     async (id: string) => {
       const updatedDocs = docs.filter(doc => doc._id !== id)
@@ -110,6 +153,7 @@ export const NextDocumentsPage = () => {
       createFolder={createFolder}
       deleteFolder={deleteFolder}
       renameFolder={renameFolder}
+      onMove={moveItem}
       isLoading={isLoading}
     />
   )

@@ -26,6 +26,7 @@ export interface SharedDocumentsPageProps {
   createFolder: (title: string, parentId?: string) => void
   deleteFolder: (id: string) => void
   renameFolder: (id: string, title: string) => void
+  onMove?: (itemId: string, targetFolderId?: string) => Promise<void>
 }
 
 const SharedDocumentsPage = ({
@@ -37,6 +38,7 @@ const SharedDocumentsPage = ({
   createFolder,
   deleteFolder,
   renameFolder,
+  onMove,
 }: SharedDocumentsPageProps) => {
   const { navigateTo } = useNavigation()
   const [selectedDocId, setSelectedDoc] = useState<string | null>(null)
@@ -45,6 +47,7 @@ const SharedDocumentsPage = ({
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const showSpinner = useSpinner(isLoading)
   const [newFolderParentId, setNewFolderParentId] = useState<string | undefined>()
+  const [treeVersion, setTreeVersion] = useState(0)
 
   // Tree view state
   const [focusedItem, setFocusedItem] = useState<TreeItemIndex>()
@@ -164,76 +167,34 @@ const SharedDocumentsPage = ({
   }
 
   const handleDrop = async (draggedItems: TreeItem<any>[], position: DraggingPosition) => {
-    console.log('Dragged items:', draggedItems)
-    console.log('Drop position:', position)
-    
     // Handle both direct folder drops and root level drops
     let targetId = 'root'
     
     if (position.targetType === 'item') {
       const targetItem = items[position.targetItem]
       if (!targetItem?.isFolder) {
-        console.log('Target is not a folder - drop canceled')
         return
       }
       targetId = position.targetItem.toString()
     } else if (position.targetType === 'between-items' && position.parentItem === 'root') {
-      console.log('Dropping to root level')
       targetId = 'root'
     } else {
-      console.log('Invalid drop target')
       return
     }
-
-    console.log('Successfully dropped onto:', targetId === 'root' ? 'root' : items[targetId].data)
     
-    // Update the underlying data structures and server
+    // Update items through parent callback
     for (const item of draggedItems) {
       const itemId = item.index.toString()
-      // When moving to root, explicitly set parentId to undefined for the server
-      const targetFolderId = targetId === 'root' ? 'root' : targetId.toString()
+      const targetFolderId = targetId === 'root' ? undefined : targetId
 
-      try {
-        // Find and update the document or folder in the original arrays
-        const docIndex = docs.findIndex(d => d._id === itemId)
-        if (docIndex !== -1) {
-          // Update document on server
-          const response = await fetch(`/api/documents/${itemId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ parentId: targetFolderId })
-          })
-          if (!response.ok) {
-            throw new Error(`Failed to update document: ${response.statusText}`)
-          }
-          // Update local document state
-          docs[docIndex] = { ...docs[docIndex], parentId: targetFolderId }
-          console.log(`Updated document ${itemId} to have parent ${targetFolderId}`)
+      if (onMove) {
+        try {
+          await onMove(itemId, targetFolderId)
+        } catch (error) {
+          console.error('Error moving item:', error)
         }
-
-        const folderIndex = folders.findIndex(f => f._id === itemId)
-        if (folderIndex !== -1) {
-          // Update folder on server
-          const response = await fetch(`/api/folders/${itemId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ parentId: targetFolderId })
-          })
-          if (!response.ok) {
-            throw new Error(`Failed to update folder: ${response.statusText}`)
-          }
-          // Update local folder state
-          folders[folderIndex] = { ...folders[folderIndex], parentId: targetFolderId }
-          console.log(`Updated folder ${itemId} to have parent ${targetFolderId}`)
-        }
-
-      } catch (error) {
-        console.error('Error updating item location:', error)
       }
     }
-
-    // Let the parent component's state update handle the tree structure
-    // instead of manually updating it here
   }
 
   const emptyMessage = (
@@ -288,6 +249,7 @@ const SharedDocumentsPage = ({
                   }
                 `}</style>
                 <ControlledTreeEnvironment
+                  key={`tree-${treeVersion}`}
                   items={items}
                   getItemTitle={item => item.data}
                   viewState={{
