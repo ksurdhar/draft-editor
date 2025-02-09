@@ -7,11 +7,10 @@ import { DocumentData, FolderData } from '@typez/globals'
 import { useState, useMemo, useEffect } from 'react'
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz'
 import CreateNewFolderIcon from '@mui/icons-material/CreateNewFolder'
-import FolderIcon from '@mui/icons-material/Folder'
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
 import { IconButton, Menu, MenuItem, Tooltip } from '@mui/material'
 import RenameModal from './rename-modal'
 import DeleteModal from './delete-modal'
+import CreateFolderModal from './create-folder-modal'
 import { ControlledTreeEnvironment, Tree, TreeItemIndex, TreeItem, DraggingPosition } from 'react-complex-tree'
 import 'react-complex-tree/lib/style.css'
 import { useNavigation } from '@components/providers'
@@ -57,6 +56,7 @@ const SharedDocumentsPage = ({
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [renameModalOpen, setRenameModalOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [createFolderModalOpen, setCreateFolderModalOpen] = useState(false)
   const showSpinner = useSpinner(isLoading)
   const [newFolderParentId, setNewFolderParentId] = useState<string | undefined>()
 
@@ -65,11 +65,32 @@ const SharedDocumentsPage = ({
   const [expandedItems, setExpandedItems] = useState<TreeItemIndex[]>([])
   const [selectedItems, setSelectedItems] = useState<TreeItemIndex[]>([])
 
+  // Add focus monitoring
+  useEffect(() => {
+    const handleFocusChange = () => {
+      const focusedElement = document.activeElement
+      console.log('=== Focus Changed ===')
+      console.log('Focused element:', focusedElement)
+      console.log('Tag name:', focusedElement?.tagName)
+      console.log('Class list:', focusedElement?.classList)
+      console.log('ID:', focusedElement?.id)
+      console.log('Parent element:', focusedElement?.parentElement)
+    }
+
+    document.addEventListener('focusin', handleFocusChange)
+    return () => document.removeEventListener('focusin', handleFocusChange)
+  }, [])
+
   // Add keyboard shortcut handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger if we're in an input field
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return
+      }
+
+      // Don't handle shortcuts if any modal is open
+      if (deleteModalOpen || renameModalOpen || createFolderModalOpen) {
         return
       }
 
@@ -83,12 +104,17 @@ const SharedDocumentsPage = ({
         if (selectedItems.length > 0) {
           setDeleteModalOpen(true)
         }
+      } else if (e.key === 'Escape') {
+        console.log('Escape key pressed')
+        e.preventDefault()
+        setSelectedItems([])
+        setFocusedItem(undefined)
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedItems])
+  }, [selectedItems, deleteModalOpen, renameModalOpen, createFolderModalOpen])
 
   const items = useMemo(() => {
     const treeItems: Record<string, TreeItemData> = {
@@ -230,10 +256,7 @@ const SharedDocumentsPage = ({
   }
 
   const handleCreateFolder = () => {
-    const title = prompt('Enter folder name:')
-    if (title) {
-      createFolder(title, newFolderParentId)
-    }
+    setCreateFolderModalOpen(true)
   }
 
   const handleDrop = async (draggedItems: TreeItem<any>[], position: DraggingPosition) => {
@@ -362,9 +385,16 @@ const SharedDocumentsPage = ({
                   .rct-tree-item-title-container {
                     outline: none !important;
                   }
+                  .rct-tree-item-button {
+                    outline: none !important;
+                    -webkit-tap-highlight-color: transparent;
+                  }
                   .rct-tree-item-button:focus {
                     outline: none !important;
-                    background-color: rgba(255, 255, 255, 0.2) !important;
+                    background-color: transparent !important;
+                  }
+                  .rct-tree-item-button:focus-visible {
+                    outline: none !important;
                   }
                   @keyframes expandIn {
                     from {
@@ -387,7 +417,10 @@ const SharedDocumentsPage = ({
                       selectedItems
                     }
                   }}
-                  onFocusItem={item => setFocusedItem(item.index)}
+                  onFocusItem={item => {
+                    // Prevent focus from being set
+                    return
+                  }}
                   onExpandItem={item => setExpandedItems([...expandedItems, item.index])}
                   onCollapseItem={item => 
                     setExpandedItems(expandedItems.filter(expandedItemIndex => expandedItemIndex !== item.index))
@@ -412,7 +445,7 @@ const SharedDocumentsPage = ({
                           {...context.interactiveElementProps}
                           className={`flex items-center justify-between py-1.5 px-2 hover:bg-white/[.2] rounded-lg cursor-pointer transition-all duration-200 ${
                             context.isSelected ? 'bg-white/[.25]' : ''
-                          }`}
+                          } focus:outline-none focus:bg-transparent`}
                           style={{
                             paddingLeft: `${(depth + 1) * 20}px`,
                             backgroundColor: item.index === 'root' ? 'transparent' : undefined
@@ -557,6 +590,15 @@ const SharedDocumentsPage = ({
         }}
         onConfirm={handleDeleteConfirm}
         documentTitle={selectedItems.length > 0 ? selectedItems.map(id => items[id.toString()]?.data.toUpperCase()).join(', ') : 'UNTITLED'}
+      />
+
+      <CreateFolderModal
+        open={createFolderModalOpen}
+        onClose={() => setCreateFolderModalOpen(false)}
+        onConfirm={(folderName) => {
+          createFolder(folderName, newFolderParentId)
+          setCreateFolderModalOpen(false)
+        }}
       />
     </Layout>
   )
