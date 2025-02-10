@@ -161,6 +161,8 @@ export default function DocumentPage() {
                     onPrimaryAction={handlePrimaryAction}
                     showActionButton={false}
                     className="h-full"
+                    blurAmount={4}
+                    persistExpanded={true}
                   />
                 )}
               </div>

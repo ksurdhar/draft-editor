@@ -3,7 +3,7 @@ import 'react-complex-tree/lib/style.css'
 import { motion, AnimatePresence } from 'framer-motion'
 import { IconButton } from '@mui/material'
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { DocumentData, FolderData } from '@typez/globals'
 
 export interface TreeItemData {
@@ -26,6 +26,8 @@ export interface DocumentTreeProps {
   style?: React.CSSProperties
   selectedItems?: TreeItemIndex[]
   onSelectedItemsChange?: (items: TreeItemIndex[]) => void
+  blurAmount?: number
+  persistExpanded?: boolean
 }
 
 export const createTreeItems = (docs: DocumentData[], folders: FolderData[]): Record<string, TreeItemData> => {
@@ -146,10 +148,37 @@ const DocumentTree = ({
   className = '',
   style = {},
   selectedItems: externalSelectedItems,
-  onSelectedItemsChange
+  onSelectedItemsChange,
+  blurAmount = 0,
+  persistExpanded = false
 }: DocumentTreeProps) => {
-  const [expandedItems, setExpandedItems] = useState<TreeItemIndex[]>([])
   const [internalSelectedItems, setInternalSelectedItems] = useState<TreeItemIndex[]>([])
+  const [expandedItems, setExpandedItems] = useState<TreeItemIndex[]>(() => {
+    if (persistExpanded) {
+      try {
+        const stored = localStorage.getItem('editor-tree-expanded')
+        return stored ? JSON.parse(stored) : []
+      } catch (e) {
+        console.error('Error reading from localStorage:', e)
+        return []
+      }
+    }
+    return []
+  })
+
+  // Add cleanup effect
+  useEffect(() => {
+    // Cleanup function that runs when component unmounts
+    return () => {
+      if (persistExpanded) {
+        try {
+          localStorage.removeItem('editor-tree-expanded')
+        } catch (e) {
+          console.error('Error clearing localStorage:', e)
+        }
+      }
+    }
+  }, [persistExpanded]) // Only re-run if persistExpanded changes
 
   // Use either external or internal selected items
   const selectedItems = externalSelectedItems !== undefined ? externalSelectedItems : internalSelectedItems
@@ -170,6 +199,30 @@ const DocumentTree = ({
 
   const handleDrop = async (draggedItems: TreeItem[], position: DraggingPosition) => {
     await handleMove({ draggedItems, position, items, onMove })
+  }
+
+  const handleExpandItem = (item: TreeItem) => {
+    const newExpandedItems = [...expandedItems, item.index]
+    setExpandedItems(newExpandedItems)
+    if (persistExpanded) {
+      try {
+        localStorage.setItem('editor-tree-expanded', JSON.stringify(newExpandedItems))
+      } catch (e) {
+        console.error('Error saving to localStorage:', e)
+      }
+    }
+  }
+
+  const handleCollapseItem = (item: TreeItem) => {
+    const newExpandedItems = expandedItems.filter(expandedItemIndex => expandedItemIndex !== item.index)
+    setExpandedItems(newExpandedItems)
+    if (persistExpanded) {
+      try {
+        localStorage.setItem('editor-tree-expanded', JSON.stringify(newExpandedItems))
+      } catch (e) {
+        console.error('Error saving to localStorage:', e)
+      }
+    }
   }
 
   return (
@@ -228,10 +281,8 @@ const DocumentTree = ({
           // Prevent focus from being set
           return
         }}
-        onExpandItem={item => setExpandedItems([...expandedItems, item.index])}
-        onCollapseItem={item => 
-          setExpandedItems(expandedItems.filter(expandedItemIndex => expandedItemIndex !== item.index))
-        }
+        onExpandItem={handleExpandItem}
+        onCollapseItem={handleCollapseItem}
         onSelectItems={handleSelect}
         onPrimaryAction={handlePrimaryAction}
         onDrop={handleDrop}
