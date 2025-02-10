@@ -270,65 +270,58 @@ const SharedDocumentsPage = ({
   const handleDrop = async (draggedItems: TreeItem<any>[], position: DraggingPosition) => {
     // Handle both direct folder drops and root level drops
     let targetId = 'root'
-    let dropIndex = 0
+    let targetIndex = 0
+    
+    console.log('Drop event details:', {
+      draggedItems: draggedItems.map(item => ({
+        id: item.index,
+        data: items[item.index]?.data
+      })),
+      position,
+      currentItems: items
+    })
     
     if (position.targetType === 'item') {
       const targetItem = items[position.targetItem]
-      
       if (!targetItem?.isFolder) {
+        console.log('Cancelled - target is not a folder:', targetItem)
         return
       }
       targetId = position.targetItem.toString()
+      console.log('Dropping into folder:', { targetId, targetItem })
       
-      // Expand the target folder if it's not already expanded
+      // Expand the target folder when dropping into it
       if (!expandedItems.includes(position.targetItem)) {
         setExpandedItems([...expandedItems, position.targetItem])
       }
-      
-      // When dropping directly on a folder, add to the end of its children
-      const folderItems = [...docs.filter(d => d.parentId === targetId), ...folders.filter(f => f.parentId === targetId)]
-        .sort((a, b) => (a.folderIndex || 0) - (b.folderIndex || 0))
-      dropIndex = folderItems.length
     } else if (position.targetType === 'between-items') {
       targetId = position.parentItem || 'root'
-      
-      // Calculate new index based on drop position
-      const parentItem = items[targetId]
-      if (parentItem?.children) {
-        if (position.childIndex === 0) {
-          // When dropping at the start, shift all other items up
-          if (parentItem.children.length > 0) {
-            const firstChild = items[parentItem.children[0]]
-            const firstIndex = firstChild?.folderIndex || 0
-            // If we're at the root level, ensure we can insert at the beginning
-            if (targetId === 'root') {
-              dropIndex = firstIndex - 1
-            } else {
-              dropIndex = firstIndex / 2
-            }
-          } else {
-            dropIndex = 0
-          }
-        } else if (position.childIndex >= parentItem.children.length) {
-          const lastChild = items[parentItem.children[parentItem.children.length - 1]]
-          dropIndex = (lastChild?.folderIndex || 0) + 1
-        } else {
-          const prevItem = items[parentItem.children[position.childIndex - 1]]
-          const nextItem = items[parentItem.children[position.childIndex]]
-          dropIndex = ((prevItem?.folderIndex || 0) + (nextItem?.folderIndex || 0)) / 2
-        }
-      }
+      targetIndex = position.childIndex
+      console.log('Dropping between items:', {
+        parentId: targetId,
+        targetIndex,
+        parentChildren: items[targetId]?.children
+      })
     }
 
     for (const item of draggedItems) {
       const itemId = item.index.toString()
       const targetFolderId = targetId === 'root' ? undefined : targetId
-
+      
+      console.log('Moving item:', {
+        itemId,
+        itemData: items[itemId]?.data,
+        targetFolderId,
+        targetIndex,
+        currentParent: items[itemId]?.parentId
+      })
+      
       if (onMove) {
         try {
-          await onMove(itemId, targetFolderId, dropIndex)
+          await onMove(itemId, targetFolderId, targetIndex)
+          console.log('Move completed successfully')
         } catch (error) {
-          // Handle error silently
+          console.error('Move failed:', error)
         }
       }
     }
