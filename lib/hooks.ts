@@ -3,6 +3,7 @@ import { Dispatch, SetStateAction, useCallback, useEffect, useState, createConte
 import useSWR from 'swr'
 import { DocumentData } from '../types/globals'
 import { FolderData } from '@typez/globals'
+import { Socket, io } from 'socket.io-client'
 
 export const useSpinner = (optionalCondition?: boolean) => {
   const [allowSpinner, setAllowSpinner] = useState(false)
@@ -92,4 +93,40 @@ export const useFolders = () => {
     throw new Error('useFolders must be used within a FoldersProvider')
   }
   return context
+}
+
+// Document socket hook for future use
+// socket?.emit('document-updated', data) <-- on debounced save do this
+export const useDocumentSocket = (documentId: string) => {
+  const [socket, setSocket] = useState<Socket | null>(null)
+
+  useEffect(() => {
+    if (!documentId) return
+
+    const socket = io('https://ws.whetstone-writer.com', { query: { documentId } })
+
+    setSocket(socket)
+
+    socket.on('message', (msg: any) => {
+      console.log('Message from server:', msg)
+    })
+
+    socket.on('joined', (msg: any) => {
+      console.log(msg)
+    })
+
+    socket.on('disconnect', (msg: any) => {
+      console.log(msg)
+    })
+
+    socket.on('document-updated', (msg: any) => {
+      console.log(msg)
+    })
+
+    return () => {
+      socket.disconnect()
+    }
+  }, [documentId])
+
+  return socket
 }

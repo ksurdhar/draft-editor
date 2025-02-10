@@ -34,10 +34,8 @@ export interface SharedDocumentsPageProps {
   docs: DocumentData[]
   folders: FolderData[]
   isLoading: boolean
-  deleteDocument: (id: string) => void
   renameDocument: (id: string, title: string) => void
   createFolder: (title: string, parentId?: string) => void
-  deleteFolder: (id: string) => void
   renameFolder: (id: string, title: string) => void
   onMove?: (itemId: string, targetFolderId?: string, dropIndex?: number) => Promise<void>
   bulkDelete: (documentIds: string[], folderIds: string[]) => Promise<void>
@@ -47,10 +45,8 @@ const SharedDocumentsPage = ({
   docs = [],
   folders = [],
   isLoading,
-  deleteDocument,
   renameDocument,
   createFolder,
-  deleteFolder,
   renameFolder,
   onMove,
   bulkDelete,

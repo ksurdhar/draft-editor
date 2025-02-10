@@ -14,9 +14,6 @@ type EditorProps = {
   text: Descendant[]
   title: string
   editor: WhetstoneEditor
-  commentActive: boolean
-  openCommentId: string | null
-  openComment: (isNewComment: boolean) => void
   onUpdate: (data: Partial<DocumentData>) => void
   canEdit: boolean
   hideFooter?: boolean
@@ -49,7 +46,7 @@ const setHighlight = (editor: WhetstoneEditor, color: HighlightColor) => {
   )
 }
 
-const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, commentActive, openCommentId, canEdit, hideFooter, shouldFocusTitle }: EditorProps) => {
+const EditorComponent = ({ id, text, title, editor, onUpdate, canEdit, hideFooter, shouldFocusTitle }: EditorProps) => {
   const [ wordCount, setWordCount ] = useState(countWords(text))
   const [ wordCountAtPos, setWordCountAtPos ] = useState(0)
   const [ inputValue, setInputValue ] = useState(title === 'Untitled' ? '' : title)
@@ -118,15 +115,11 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, comme
             }
           }}>
           <Editable
-            readOnly={commentActive}
             spellCheck='false'
             className='rounded-md w-full h-full static text-[19px] md:text-[22px]'
             renderElement={renderElement}
             renderLeaf={(props) => {
-              return renderLeaf({ ...props, openCommentId})
-            }}
-            onClick={event => {
-              openComment(false)
+              return renderLeaf({ ...props})
             }}
             onKeyDown={event => {
               if (!canEdit) {
@@ -137,7 +130,6 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, openComment, comme
                 switch (event.key) {
                   case '1': {
                     event.preventDefault()
-                    openComment(true)
                     break
                   }
                   case '2': {

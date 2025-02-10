@@ -145,20 +145,6 @@ export const NextDocumentsPage = () => {
     [docs, folders, mutateDocuments, mutateFolders]
   )
 
-  const deleteDocument = useCallback(
-    async (id: string) => {
-      const updatedDocs = docs.filter(doc => doc._id !== id)
-      mutateDocuments(updatedDocs, false)
-      try {
-        await API.delete(`documents/${id}`)
-      } catch (e) {
-        console.log(e)
-        mutateDocuments()
-      }
-    },
-    [mutateDocuments, docs],
-  )
-
   const bulkDelete = useCallback(
     async (documentIds: string[], folderIds: string[]) => {
       try {
@@ -221,19 +207,6 @@ export const NextDocumentsPage = () => {
     [folders, mutateFolders]
   )
 
-  const deleteFolder = useCallback(
-    async (id: string) => {
-      try {
-        await API.delete(`folders/${id}`)
-        mutateFolders(folders.filter(folder => folder._id !== id), false)
-      } catch (error) {
-        console.error('Error deleting folder:', error)
-        mutateFolders()
-      }
-    },
-    [folders, mutateFolders]
-  )
-
   const renameFolder = useCallback(
     async (id: string, title: string) => {
       try {
@@ -254,10 +227,8 @@ export const NextDocumentsPage = () => {
     <SharedDocumentsPage
       docs={docs}
       folders={folders}
-      deleteDocument={deleteDocument}
       renameDocument={renameDocument}
       createFolder={createFolder}
-      deleteFolder={deleteFolder}
       renameFolder={renameFolder}
       onMove={moveItem}
       isLoading={docsLoading || foldersLoading}
