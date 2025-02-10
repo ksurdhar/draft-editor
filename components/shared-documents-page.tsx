@@ -50,6 +50,25 @@ const SharedDocumentsPage = ({
   const showSpinner = useSpinner(isLoading)
   const [newFolderParentId, setNewFolderParentId] = useState<string | undefined>()
   const [selectedItems, setSelectedItems] = useState<TreeItemIndex[]>([])
+  const [initAnimate, setInitAnimate] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setInitAnimate(true)
+    }, 50)
+
+    return () => clearTimeout(timer)
+  }, [])
+
+  // Handle URL changes
+  useEffect(() => {
+    const handleRouteChange = () => {
+      setInitAnimate(false)
+    }
+
+    window.addEventListener('popstate', handleRouteChange)
+    return () => window.removeEventListener('popstate', handleRouteChange)
+  }, [])
 
   // Add keyboard shortcut handler
   useEffect(() => {
@@ -173,7 +192,8 @@ const SharedDocumentsPage = ({
 
   return (
     <Layout>
-      <div className="gradient absolute left-0 top-0 z-[-1] h-screen w-screen" />
+      <div className="gradient-editor fixed top-0 left-0 h-screen w-screen z-[-1]" />
+      <div className={`gradient fixed top-0 left-0 h-screen w-screen z-[-1] transition-opacity ease-in-out duration-[3000ms] ${initAnimate ? 'opacity-100' : 'opacity-0'}`} />
       <div className="relative top-[44px] flex h-[calc(100vh_-_44px)] justify-center pb-10">
         <div className="flex w-11/12 max-w-[740px] flex-col justify-center sm:w-9/12">
           <div className="flex justify-end mb-4 gap-2">

@@ -267,7 +267,7 @@ const DocumentTree = ({
                       </div>
                     )}
                   </div>
-                  <span className="uppercase text-black/[.70] text-sm font-semibold block h-[20px] leading-[20px]">
+                  <span className="uppercase text-black/[.70] text-sm font-semibold block h-[20px] leading-[20px] truncate">
                     {item.data}
                   </span>
                 </div>
