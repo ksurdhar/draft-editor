@@ -16,6 +16,8 @@ import { withHistory } from 'slate-history'
 import { withReact } from 'slate-react'
 import useSWR, { mutate } from 'swr'
 import { useDebouncedCallback } from 'use-debounce'
+import { motion, AnimatePresence } from 'framer-motion'
+import { EyeIcon, EyeOffIcon } from '@heroicons/react/outline'
 
 const backdropStyles = `
   fixed top-0 left-0 h-screen w-screen z-[-1]
@@ -78,6 +80,7 @@ export default function DocumentPage() {
   const [initAnimate, setInitAnimate] = useState(false)
   const [recentlySaved, setRecentlySaved] = useState(false)
   const skipAnimation = searchParams.get('from') === 'tree'
+  const [showTree, setShowTree] = useState(true)
 
   const debouncedSave = useDebouncedCallback((data: Partial<DocumentData>) => {
     mutate(`/documents/${id}/versions`)
@@ -124,31 +127,58 @@ export default function DocumentPage() {
         </div>
       )}
       <div className="flex h-screen">
+        {/* Tree Toggle Button */}
+        <button 
+          onClick={() => setShowTree(!showTree)}
+          className="fixed top-[41px] left-[18px] z-50 p-1.5 rounded-lg hover:bg-white/[.1] transition-colors"
+        >
+          {showTree ? (
+            <EyeIcon className="w-4 h-4 text-black/70" />
+          ) : (
+            <EyeOffIcon className="w-4 h-4 text-black/70" />
+          )}
+        </button>
+
         {/* Document Tree */}
-        <div className="w-[280px] border-r border-black/[.05] pt-[44px]">
-          <div className="h-[calc(100vh_-_44px)] p-4 overflow-y-auto">
-            {allDocs && allFolders && (
-              <DocumentTree
-                items={createTreeItems(allDocs, allFolders)}
-                onPrimaryAction={handlePrimaryAction}
-                showActionButton={false}
-                className="h-full"
-              />
-            )}
-          </div>
-        </div>
+        <AnimatePresence initial={false}>
+          {showTree && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98, filter: "blur(8px)" }}
+              animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+              exit={{ opacity: 0, scale: 0.98, filter: "blur(8px)" }}
+              transition={{ 
+                opacity: { duration: 0.5, ease: [0.23, 1, 0.32, 1] },
+                scale: { duration: 0.25, ease: [0.23, 1, 0.32, 1] },
+                filter: { duration: 0.4, ease: [0.23, 1, 0.32, 1] }
+              }}
+              style={{ willChange: "filter" }}
+              className="lg:fixed lg:left-0 lg:top-0 w-[320px] pt-[44px] h-screen shrink-0"
+            >
+              <div className="h-[calc(100vh_-_44px)] p-4 overflow-y-auto">
+                {allDocs && allFolders && (
+                  <DocumentTree
+                    items={createTreeItems(allDocs, allFolders)}
+                    onPrimaryAction={handlePrimaryAction}
+                    showActionButton={false}
+                    className="h-full"
+                  />
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Editor Container */}
-        <div className="flex-1 flex justify-center">
+        <div className="flex-1 flex justify-center lg:justify-center">
           {/* Editor */}
           <div
             id="editor-container"
-            className={`overflow-y-scroll p-[20px] pb-10 font-editor2 text-black/[.79]`}>
+            className={`overflow-y-scroll p-[20px] pb-10 font-editor2 text-black/[.79] w-full lg:w-[740px]`}>
             <div
               className={`
                 flex transition-flex
                 duration-500 ease-in ${showSpinner ? 'mt-[-36px] flex-col justify-center' : ''}
-                relative w-[740px] pb-10`}>
+                relative pb-10`}>
               {showSpinner && <Loader />}
               {hybridDoc && (
                 <Editor
