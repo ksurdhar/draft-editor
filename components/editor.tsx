@@ -55,7 +55,6 @@ const EditorComponent = ({
 }: EditorProps) => {
   const [inputValue, setInputValue] = useState(title === 'Untitled' ? '' : title)
   const [showFindPanel, setShowFindPanel] = useState(false)
-  const [cursorPosition, setCursorPosition] = useState(0)
   const titleRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -65,10 +64,8 @@ const EditorComponent = ({
   // Parse the content JSON string or use default content
   const initialContent = (() => {
     try {
-      console.log('Raw content received:', content)
       // Handle both string and object content
       const parsed = typeof content === 'string' ? JSON.parse(content) : content
-      console.log('Parsed content:', parsed)
       return parsed
     } catch (e) {
       console.error('Failed to parse editor content:', e)
@@ -92,17 +89,8 @@ const EditorComponent = ({
     onCreate: ({ editor }) => {
       console.log('Editor created with content:', editor.getJSON())
       console.log('Editor HTML:', editor.getHTML())
-    },
-    onSelectionUpdate: ({ editor }) => {
-      setCursorPosition(editor.state.selection.from)
     }
   })
-
-  // Update cursor position when editor state changes
-  useEffect(() => {
-    if (!editor) return
-    setCursorPosition(editor.state.selection.from)
-  }, [editor?.state.selection.from])
 
   useEffect(() => {
     console.log('Editor mounted with content:', editor?.getJSON())
@@ -129,52 +117,6 @@ const EditorComponent = ({
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
-
-  const calculateWordCount = (text: string) => {
-    return text.trim().split(/\s+/).filter(word => word.length > 0).length
-  }
-
-  const getWordCountAtPosition = (doc: any, pos: number) => {
-    let text = ''
-    let currentPos = 0
-    
-    doc.descendants((node: any) => {
-      if (node.isText) {
-        const nodeText = node.text || ''
-        
-        // If we're past the position, don't include this node
-        if (currentPos >= pos) {
-          return false
-        }
-        
-        // If this node ends before our position, include all of it
-        if (currentPos + nodeText.length <= pos) {
-          text += nodeText + ' '
-        } else {
-          // If our position is within this node, include text up to the position
-          const substring = nodeText.substring(0, pos - currentPos)
-          text += substring + ' '
-        }
-        
-        currentPos += nodeText.length
-      }
-      return true
-    })
-    
-    const wordCount = calculateWordCount(text)
-    return wordCount
-  }
-
-  const getTotalWordCount = (doc: any) => {
-    let text = ''
-    doc.descendants((node: any) => {
-      if (node.isText) {
-        text += node.text + ' '
-      }
-    })
-    const wordCount = calculateWordCount(text)
-    return wordCount
-  }
 
   return (
     <div className='flex-grow normal-case animate-fadein'>
@@ -215,10 +157,9 @@ const EditorComponent = ({
       )}
       {!hideFooter && (
         <Footer 
+          editor={editor}
           initFadeIn={initFadeIn} 
           fadeOut={fadeOut} 
-          wordCount={editor ? getTotalWordCount(editor.state.doc) : 0}
-          wordCountAtPos={editor ? getWordCountAtPosition(editor.state.doc, cursorPosition) : 0}
         />
       )}
     </div>
