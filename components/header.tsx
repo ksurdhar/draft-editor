@@ -159,14 +159,14 @@ const HeaderComponent = ({ id }: HeaderProps) => {
               onClick={() => navigateTo('/documents')}
               className="hover:opacity-80"
             >
-              Whetstone
+              whetstone
             </button>
           ) : (
             <button 
               onClick={() => navigateTo('/')}
               className="hover:opacity-80"
             >
-              Whetstone
+              whetstone
             </button>
           )}
         </h1>

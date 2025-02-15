@@ -91,6 +91,7 @@ export default function DocumentPage() {
   const [showTree, setShowTree] = useState(true)
   const [showVersions, setShowVersions] = useState(false)
   const [previewVersion, setPreviewVersion] = useState<VersionData | null>(null)
+  const [diffContent, setDiffContent] = useState<any>(null)
 
   const debouncedSave = useDebouncedCallback((data: Partial<DocumentData>) => {
     console.log('Debounced save triggered:', {
@@ -248,6 +249,8 @@ export default function DocumentPage() {
                   documentId={id} 
                   onPreview={handlePreviewVersion}
                   onRestore={handleRestoreVersion}
+                  onCompare={setDiffContent}
+                  currentContent={hybridDoc?.content}
                 />
               </div>
             </motion.div>
@@ -297,13 +300,14 @@ export default function DocumentPage() {
               {showSpinner && <Loader />}
               {hybridDoc && (
                 <Editor
-                  content={hybridDoc.content}
+                  content={diffContent || hybridDoc.content}
                   title={hybridDoc.title}
                   onUpdate={data => {
                     debouncedSave(data)
                   }}
                   canEdit={!!hybridDoc.canEdit}
                   shouldFocusTitle={shouldFocusTitle}
+                  diffMode={!!diffContent}
                 />
               )}
             </div>

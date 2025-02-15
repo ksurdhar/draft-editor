@@ -8,6 +8,7 @@ import { useMouse } from '../components/providers'
 import { useEditorFades } from './header'
 import FindPanel from './find-panel'
 import { SearchHighlight } from '../lib/tiptap-extensions/search-highlight'
+import { DiffHighlight } from '../lib/tiptap-extensions/diff-highlight'
 
 // Add styles to override ProseMirror defaults
 const editorStyles = `
@@ -23,6 +24,12 @@ const editorStyles = `
   .search-result-current {
     background-color: rgb(253 224 71); /* bg-yellow-300 */
   }
+  .diff-added {
+    background-color: rgba(134, 239, 172, 0.25); /* green-300 with opacity */
+  }
+  .diff-removed {
+    background-color: rgba(252, 165, 165, 0.25); /* red-300 with opacity */
+  }
 `
 
 type EditorProps = {
@@ -33,6 +40,7 @@ type EditorProps = {
   canEdit?: boolean
   hideFooter?: boolean
   shouldFocusTitle?: boolean
+  diffMode?: boolean
 }
 
 const DEFAULT_CONTENT = {
@@ -51,7 +59,8 @@ const EditorComponent = ({
   onUpdate, 
   canEdit, 
   hideFooter, 
-  shouldFocusTitle 
+  shouldFocusTitle, 
+  diffMode
 }: EditorProps) => {
   const [inputValue, setInputValue] = useState(title === 'Untitled' ? '' : title)
   const [showFindPanel, setShowFindPanel] = useState(false)
@@ -78,10 +87,12 @@ const EditorComponent = ({
     extensions: [
       StarterKit,
       SearchHighlight,
+      DiffHighlight,
     ],
     content: initialContent,
-    editable: canEdit,
+    editable: canEdit && !diffMode,
     onUpdate: ({ editor }) => {
+      if (diffMode) return // Prevent updates in diff mode
       const json = editor.getJSON()
       console.log('Editor onUpdate triggered - new content:', json)
       onUpdate({ content: json })
