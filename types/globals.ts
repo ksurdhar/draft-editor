@@ -15,7 +15,7 @@ export {}
 export type DocumentData = {
   _id: string
   title: string
-  content: string
+  content: string | { type: string, content: any[] }
   comments: CommentData[]
   lastUpdated: number
   userId: string

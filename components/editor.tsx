@@ -1,63 +1,90 @@
 'use client'
-import { HighlightColor, renderElement, renderLeaf } from '@lib/slate-renderers'
-import { countWords, removePending } from '@lib/slate-utils'
-import { DocumentData, WhetstoneEditor } from '@typez/globals'
+import { useEditor, EditorContent } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import { DocumentData } from '../types/globals'
 import { useEffect, useRef, useState } from 'react'
-import { Descendant, Editor, Node, Text, Transforms } from 'slate'
-import { Editable, Slate } from 'slate-react'
 import Footer from './footer'
+import { useMouse } from '../components/providers'
 import { useEditorFades } from './header'
-import { useMouse } from './providers'
-import FindPanel from './find-panel'
-import { AnimatePresence } from 'framer-motion'
+
+// Add styles to override ProseMirror defaults
+const editorStyles = `
+  .ProseMirror {
+    outline: none !important;
+  }
+  .ProseMirror-focused {
+    outline: none !important;
+  }
+`
 
 type EditorProps = {
-  id: string
-  text: Descendant[]
+  id?: string
+  content: DocumentData['content']
   title: string
-  editor: WhetstoneEditor
   onUpdate: (data: Partial<DocumentData>) => void
-  canEdit: boolean
+  canEdit?: boolean
   hideFooter?: boolean
   shouldFocusTitle?: boolean
 }
 
-const getWordCountAtPosition = (nodes: Descendant[], rangeIdx: number, offset: number) => {
-  let currentRowCount = 0
-  const nodesBeforeSelection = nodes.slice(0, rangeIdx)
-  const countExcludingCurrentRow = countWords(nodesBeforeSelection)
-  const currentRow = nodes[rangeIdx]
-
-  if (!!currentRow) {
-    const rowMatch = Node.string(currentRow).slice(0, offset).match(/[a-zA-Z\d]+/g)
-    currentRowCount = rowMatch?.length || 0
-  }
-  
-  return countExcludingCurrentRow + currentRowCount
+const DEFAULT_CONTENT = {
+  type: 'doc',
+  content: [
+    {
+      type: 'paragraph',
+      content: []
+    }
+  ]
 }
 
-const setHighlight = (editor: WhetstoneEditor, color: HighlightColor) => {
-  const [match] = Editor.nodes(editor, {
-    match: n => Text.isText(n) && n.highlight === color,
-    universal: true,
-  })
-  Transforms.setNodes(
-    editor,
-    { highlight: !!match ? undefined : color },
-    { match: n => Text.isText(n), split: true }
-  )
-}
-
-const EditorComponent = ({ id, text, title, editor, onUpdate, canEdit, hideFooter, shouldFocusTitle }: EditorProps) => {
-  const [ wordCount, setWordCount ] = useState(countWords(text))
-  const [ wordCountAtPos, setWordCountAtPos ] = useState(0)
-  const [ inputValue, setInputValue ] = useState(title === 'Untitled' ? '' : title)
-  const [ showFindPanel, setShowFindPanel ] = useState(false)
+const EditorComponent = ({ 
+  content, 
+  title, 
+  onUpdate, 
+  canEdit, 
+  hideFooter, 
+  shouldFocusTitle 
+}: EditorProps) => {
+  const [inputValue, setInputValue] = useState(title === 'Untitled' ? '' : title)
   const titleRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const { mouseMoved } = useMouse()
-  const [ initFadeIn, fadeOut ] = useEditorFades(!mouseMoved)
+  const [initFadeIn, fadeOut] = useEditorFades(!mouseMoved)
+
+  // Parse the content JSON string or use default content
+  const initialContent = (() => {
+    try {
+      console.log('Raw content received:', content)
+      // Handle both string and object content
+      const parsed = typeof content === 'string' ? JSON.parse(content) : content
+      console.log('Parsed content:', parsed)
+      return parsed
+    } catch (e) {
+      console.error('Failed to parse editor content:', e)
+      console.log('Content that failed to parse:', content)
+      return DEFAULT_CONTENT
+    }
+  })()
+
+  const editor = useEditor({
+    extensions: [StarterKit],
+    content: initialContent,
+    editable: canEdit,
+    onUpdate: ({ editor }) => {
+      const json = editor.getJSON()
+      console.log('Editor update - new content:', json)
+      onUpdate({ content: { type: 'doc', content: json.content || [] } })
+    },
+    onCreate: ({ editor }) => {
+      console.log('Editor created with content:', editor.getJSON())
+      console.log('Editor HTML:', editor.getHTML())
+    }
+  })
+
+  useEffect(() => {
+    console.log('Editor mounted with content:', editor?.getJSON());
+  }, [editor]);
 
   // Only focus once on mount for new documents
   useEffect(() => {
@@ -67,17 +94,11 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, canEdit, hideFoote
         titleRef.current.selectionStart = titleRef.current.selectionEnd = titleRef.current.value.length
       }
     }
-  }, []) // Empty dependency array for mount only
-
-  useEffect(() => {
-    setTimeout(() => {
-      const foundPending = removePending(editor)
-      console.log('found pending comments to clean', foundPending)
-    }, 200) // timeout is a hack, doesn't trigger onChange without a wait
-  }, [editor])
+  }, [])
 
   return (
     <div className='flex-grow normal-case animate-fadein'>
+      <style>{editorStyles}</style>
       <div className='mb-[20px] mt-[44px]'>
         <input
           type="text"
@@ -90,9 +111,7 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, canEdit, hideFoote
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault()
-              const containerNode = containerRef.current
-              const documentNode = containerNode?.querySelector<HTMLTextAreaElement>(`[data-slate-editor="true"]`)
-              documentNode?.focus()
+              editor?.commands.focus()
             }
           }}
           onChange={(e) => {
@@ -102,87 +121,22 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, canEdit, hideFoote
           }}
         />
       </div>
-      <div ref={containerRef}>
-        <Slate editor={editor} key={id} value={text} 
-          onChange={value => {
-            const offset = editor.selection?.focus.offset || 0
-            const position = editor.selection?.focus.path[0] || 0
-            setWordCountAtPos(getWordCountAtPosition(value, position, offset))
-            const isAstChange = editor.operations.some(
-              op => 'set_selection' !== op.type
-            )
-            if (isAstChange) {
-              setWordCount(countWords(value))
-              const content = JSON.stringify(value)
-              onUpdate({ content })
-            }
-          }}>
-          <Editable
-            spellCheck='false'
-            className='rounded-md w-full h-full static text-[19px] md:text-[22px]'
-            renderElement={renderElement}
-            renderLeaf={(props) => {
-              return renderLeaf({ ...props})
-            }}
-            onKeyDown={event => {
-              if (!canEdit) {
-                event.preventDefault()
-                return
-              }
-
-              // Add find panel shortcut
-              if (event.metaKey && event.key === 'f') {
-                event.preventDefault()
-                setShowFindPanel(true)
-                return
-              }
-
-              if (event.metaKey) {
-                switch (event.key) {
-                  case '1': {
-                    event.preventDefault()
-                    break
-                  }
-                  case '2': {
-                    event.preventDefault()
-                    setHighlight(editor, 'green')
-                    break
-                  }
-                  case '3': {
-                    event.preventDefault()
-                    setHighlight(editor, 'orange')
-                    break
-                  }
-                  case '4': {
-                    event.preventDefault()
-                    setHighlight(editor, 'red')
-                    break
-                  }
-                }
-              }
-            }}
-          />
-        </Slate>
+      <div ref={containerRef} className="prose max-w-none">
+        <EditorContent 
+          editor={editor} 
+          className='rounded-md w-full h-full static text-[19px] md:text-[22px] focus:outline-none focus:ring-0 [&_*]:focus:outline-none [&_*]:focus:ring-0 min-h-[200px] p-4'
+        />
       </div>
-      {
-        !hideFooter &&
+      {!hideFooter && (
         <Footer 
           initFadeIn={initFadeIn} 
           fadeOut={fadeOut} 
-          wordCount={wordCount} 
-          wordCountAtPos={wordCountAtPos} 
+          wordCount={0} // We'll implement word count later
+          wordCountAtPos={0} 
         />
-      }
-      
-      <AnimatePresence>
-        {showFindPanel && (
-          <FindPanel 
-            editor={editor}
-            onClose={() => setShowFindPanel(false)}
-          />
-        )}
-      </AnimatePresence>
+      )}
     </div>
   )
 }
+
 export default EditorComponent

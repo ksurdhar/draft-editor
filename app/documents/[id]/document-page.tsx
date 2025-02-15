@@ -6,24 +6,28 @@ import { useAPI, useNavigation } from '@components/providers'
 import { CloudIcon } from '@heroicons/react/solid'
 import { useSpinner, useSyncHybridDoc } from '@lib/hooks'
 import DocumentTree, { createTreeItems } from '@components/document-tree'
-
 import { DocumentData } from '@typez/globals'
 import { useUser } from '@wrappers/auth-wrapper-client'
-
 import { useCallback, useEffect, useState } from 'react'
-import { createEditor } from 'slate'
-import { withHistory } from 'slate-history'
-import { withReact } from 'slate-react'
 import useSWR, { mutate } from 'swr'
 import { useDebouncedCallback } from 'use-debounce'
 import { motion, AnimatePresence } from 'framer-motion'
 import { EyeIcon, EyeOffIcon } from '@heroicons/react/outline'
-import { withDecorations } from '@lib/slate-plugins/decorations'
 
 const backdropStyles = `
   fixed top-0 left-0 h-screen w-screen z-[-1]
   transition-opacity ease-in-out duration-[3000ms]
 `
+
+const DEFAULT_CONTENT = {
+  type: 'doc',
+  content: [
+    {
+      type: 'paragraph',
+      content: []
+    }
+  ]
+}
 
 const useSave = () => {
   const { patch } = useAPI()
@@ -32,6 +36,7 @@ const useSave = () => {
     const updatedData = {
       ...data,
       lastUpdated: Date.now(),
+      content: data.content
     }
 
     const cachedDoc = JSON.parse(sessionStorage.getItem(id) || '{}')
@@ -42,7 +47,6 @@ const useSave = () => {
 
     const path = `/documents/${id}`
     await patch(path, updatedData)
-
     setRecentlySaved(true)
   }
 
@@ -65,11 +69,6 @@ export default function DocumentPage() {
   const id = (pathname || '').split('/').pop()?.split('?')[0] || ''
   const searchParams = new URLSearchParams(window.location.search)
   const shouldFocusTitle = searchParams.get('focus') === 'title'
-  const [editor] = useState(() => {
-    const baseEditor = withDecorations(withReact(withHistory(createEditor())))
-    baseEditor.decorations = []
-    return baseEditor
-  })
   const documentPath = `/documents/${id}`
 
   const { data: databaseDoc } = useSWR<DocumentData, Error>(documentPath, fetcher)
@@ -188,9 +187,7 @@ export default function DocumentPage() {
               {showSpinner && <Loader />}
               {hybridDoc && (
                 <Editor
-                  id={id}
-                  text={JSON.parse(hybridDoc.content)}
-                  editor={editor}
+                  content={hybridDoc.content}
                   title={hybridDoc.title}
                   onUpdate={data => {
                     debouncedSave(data)
