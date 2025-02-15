@@ -132,11 +132,13 @@ const EditorComponent = ({
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+      // Only trigger inline search if Command+F is pressed WITHOUT shift
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'f') {
         e.preventDefault()
-        setShowFindPanel(prev => !prev)
+        setShowFindPanel(true)
       }
     }
+
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])

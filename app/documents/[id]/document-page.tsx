@@ -155,6 +155,14 @@ export default function DocumentPage() {
     }
   }
 
+  const handleToggleGlobalSearch = () => {
+    if (!showGlobalFind) {
+      // Opening global search - always close tree view
+      setShowTree(false)
+    }
+    setShowGlobalFind(!showGlobalFind)
+  }
+
   if (!hybridDoc) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -164,7 +172,7 @@ export default function DocumentPage() {
   }
 
   return (
-    <Layout documentId={id}>
+    <Layout documentId={id} onToggleGlobalSearch={handleToggleGlobalSearch}>
       {!skipAnimation && (
         <>
           <div className={`gradient ${initAnimate ? 'opacity-0' : 'opacity-100'} ${backdropStyles}`} />
