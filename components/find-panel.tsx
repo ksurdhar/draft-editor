@@ -32,6 +32,42 @@ export default function FindPanel({ editor, onClose }: FindPanelProps) {
     wholeWord: false
   })
 
+  const selectNextMatch = useCallback(() => {
+    if (matches.length === 0) return
+    const nextMatch = (currentMatch + 1) % matches.length
+    setCurrentMatch(nextMatch)
+    editor.commands.setSearchHighlight(matches, nextMatch)
+    scrollToMatch(matches[nextMatch])
+  }, [matches, currentMatch, editor])
+
+  const selectPreviousMatch = useCallback(() => {
+    if (matches.length === 0) return
+    const prevMatch = (currentMatch - 1 + matches.length) % matches.length
+    setCurrentMatch(prevMatch)
+    editor.commands.setSearchHighlight(matches, prevMatch)
+    scrollToMatch(matches[prevMatch])
+  }, [matches, currentMatch, editor])
+
+  const scrollToMatch = useCallback((_match: Match) => {
+    const element = document.querySelector('.search-result-current')
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [])
+
+  const handleClose = useCallback(() => {
+    editor.commands.unsetSearchHighlight()
+    onClose()
+  }, [editor, onClose])
+
+  const handleReplace = useCallback(() => {
+    if (currentMatch === -1 || !matches[currentMatch]) return
+    
+    const match = matches[currentMatch]
+    editor.commands.setTextSelection({ from: match.from, to: match.to })
+    editor.commands.insertContent(replaceText)
+  }, [currentMatch, matches, editor, replaceText])
+
   // Memoize the search update function to use in multiple places
   const updateSearchResults = useCallback(() => {
     if (!searchTerm) {
@@ -77,18 +113,23 @@ export default function FindPanel({ editor, onClose }: FindPanelProps) {
       if (e.key === 'Escape') {
         handleClose()
       } else if (e.key === 'Enter') {
+        const searchInput = document.querySelector('input[placeholder="Find"]')
+        const replaceInput = document.querySelector('input[placeholder="Replace with..."]')
+        const isSearchFocused = document.activeElement === searchInput
+        const isReplaceFocused = document.activeElement === replaceInput
+
         if (e.shiftKey) {
           selectPreviousMatch()
-        } else if (showReplace && document.activeElement === document.querySelector('input[type="text"]:last-of-type')) {
+        } else if (showReplace && isReplaceFocused) {
           handleReplace()
-        } else {
+        } else if (isSearchFocused && matches.length > 0) {
           selectNextMatch()
         }
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showReplace])
+  }, [showReplace, matches.length, selectNextMatch, selectPreviousMatch, handleClose, handleReplace])
 
   // Clear highlights when unmounting
   useEffect(() => {
@@ -102,43 +143,7 @@ export default function FindPanel({ editor, onClose }: FindPanelProps) {
     updateSearchResults()
   }, [searchTerm, updateSearchResults])
 
-  const selectNextMatch = () => {
-    if (matches.length === 0) return
-    const nextMatch = (currentMatch + 1) % matches.length
-    setCurrentMatch(nextMatch)
-    editor.commands.setSearchHighlight(matches, nextMatch)
-    scrollToMatch(matches[nextMatch])
-  }
-
-  const selectPreviousMatch = () => {
-    if (matches.length === 0) return
-    const prevMatch = (currentMatch - 1 + matches.length) % matches.length
-    setCurrentMatch(prevMatch)
-    editor.commands.setSearchHighlight(matches, prevMatch)
-    scrollToMatch(matches[prevMatch])
-  }
-
-  const scrollToMatch = (_match: Match) => {
-    const element = document.querySelector('.search-result-current')
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
-  }
-
-  const handleClose = () => {
-    editor.commands.unsetSearchHighlight()
-    onClose()
-  }
-
-  const handleReplace = () => {
-    if (currentMatch === -1 || !matches[currentMatch]) return
-    
-    const match = matches[currentMatch]
-    editor.commands.setTextSelection({ from: match.from, to: match.to })
-    editor.commands.insertContent(replaceText)
-  }
-
-  const handleReplaceAll = () => {
+  const handleReplaceAll = useCallback(() => {
     if (matches.length === 0) return
 
     // Replace all matches from last to first to maintain position integrity
@@ -147,14 +152,14 @@ export default function FindPanel({ editor, onClose }: FindPanelProps) {
       editor.commands.setTextSelection({ from: match.from, to: match.to })
       editor.commands.insertContent(replaceText)
     }
-  }
+  }, [matches, editor, replaceText])
 
-  const toggleSearchOption = (option: keyof SearchOptions) => {
+  const toggleSearchOption = useCallback((option: keyof SearchOptions) => {
     setSearchOptions(prev => ({
       ...prev,
       [option]: !prev[option]
     }))
-  }
+  }, [])
 
   return (
     <motion.div
