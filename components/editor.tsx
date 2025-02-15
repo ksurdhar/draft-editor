@@ -83,16 +83,38 @@ const EditorComponent = ({
     editable: canEdit,
     onUpdate: ({ editor }) => {
       const json = editor.getJSON()
-      console.log('Editor update - new content:', json)
+      console.log('Editor onUpdate triggered - new content:', json)
       onUpdate({ content: json })
     },
     onCreate: ({ editor }) => {
-      console.log('Editor created with content:', editor.getJSON())
+      console.log('Editor onCreate - initial content:', editor.getJSON())
     }
   })
 
+  // Track content prop changes
   useEffect(() => {
-    console.log('Editor mounted with content:', editor?.getJSON())
+    console.log('Editor content prop changed:', {
+      newContent: content,
+      parsed: typeof content === 'string' ? JSON.parse(content) : content,
+      currentEditorContent: editor?.getJSON()
+    })
+
+    if (editor && content) {
+      const newContent = typeof content === 'string' ? JSON.parse(content) : content
+      console.log('Setting editor content to:', newContent)
+      editor.commands.setContent(newContent)
+      console.log('Editor content after update:', editor.getJSON())
+    }
+  }, [content, editor])
+
+  // Track editor initialization
+  useEffect(() => {
+    if (editor) {
+      console.log('Editor instance changed:', {
+        content: editor.getJSON(),
+        isEditable: editor.isEditable
+      })
+    }
   }, [editor])
 
   // Only focus once on mount for new documents

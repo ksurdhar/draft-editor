@@ -23,20 +23,40 @@ export const useSyncHybridDoc = (
   setHybridDoc: Dispatch<SetStateAction<DocumentData | null | undefined>>,
 ) => {
   useEffect(() => {
-    let cachedDoc: DocumentData | {} = {}
-    if (typeof window !== 'undefined') {
-      cachedDoc = JSON.parse(sessionStorage.getItem(id) || '{}')
-    }
-    const documentNotCached = Object.keys(cachedDoc).length === 0
+    
+    // Function to get the latest state
+    const getLatestState = () => {
+      if (typeof window === 'undefined') return databaseDoc
+      const sessionDoc = sessionStorage.getItem(id)
 
-    if (documentNotCached) {
-      // console.log('document not cached, applying DB doc')
-      setHybridDoc(databaseDoc)
-    } else {
-      // console.log('document cached, using session storage doc')
-      setHybridDoc(cachedDoc as DocumentData)
+      if (sessionDoc) {
+        const parsedDoc = JSON.parse(sessionDoc)
+        // Check if the session doc is newer than the database doc
+        if (!databaseDoc || parsedDoc.lastUpdated > databaseDoc.lastUpdated) {
+          return parsedDoc
+        }
+      }
+
+      return databaseDoc
     }
-  }, [databaseDoc, setHybridDoc, id])
+
+    // Update the hybrid doc with the latest state
+    const latestDoc = getLatestState()
+    setHybridDoc(latestDoc)
+
+    // Listen for storage events
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === id) {
+        const latestDoc = getLatestState()
+        setHybridDoc(latestDoc)
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', handleStorageChange)
+      return () => window.removeEventListener('storage', handleStorageChange)
+    }
+  }, [id, databaseDoc, setHybridDoc])
 }
 
 export const useDocSync = () => {

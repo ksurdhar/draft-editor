@@ -78,6 +78,18 @@ export default function DocumentPage() {
   const [hybridDoc, setHybridDoc] = useState<DocumentData | null>()
   useSyncHybridDoc(id, databaseDoc, setHybridDoc)
 
+  // Track document state changes
+  useEffect(() => {
+    console.log('Document state changed:', {
+      id,
+      databaseDoc,
+      hybridDoc,
+      hasHybridDoc: !!hybridDoc,
+      hasDatabaseDoc: !!databaseDoc,
+      content: hybridDoc?.content
+    })
+  }, [id, databaseDoc, hybridDoc])
+
   const showSpinner = useSpinner(!hybridDoc)
 
   const { isLoading } = useUser()
@@ -87,6 +99,11 @@ export default function DocumentPage() {
   const [showTree, setShowTree] = useState(true)
 
   const debouncedSave = useDebouncedCallback((data: Partial<DocumentData>) => {
+    console.log('Debounced save triggered:', {
+      data,
+      id,
+      currentHybridDoc: hybridDoc
+    })
     mutate(`/documents/${id}/versions`)
     save(data, id, setRecentlySaved)
     mutate(documentPath)
