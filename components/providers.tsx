@@ -44,6 +44,7 @@ type apiContextType = {
   patch: (path: string, body: any) => ApiResponse
   destroy: (path: string) => void
   get: (path: string) => ApiResponse
+  delete: (path: string) => ApiResponse
 }
 
 const apiContextDefaultValue: apiContextType = {
@@ -51,6 +52,7 @@ const apiContextDefaultValue: apiContextType = {
   patch: async () => ({ data: {} }),
   destroy: async () => {},
   get: async () => ({ data: {} }),
+  delete: async () => ({ data: {} })
 }
 
 const APIContext = createContext<apiContextType>(apiContextDefaultValue)
@@ -105,10 +107,11 @@ export function APIProvider({
   patch,
   destroy,
   get,
+  delete: deleteMethod,
 }: apiContextType & {
   children: React.ReactNode
 }) {
-  const value = { post, patch, destroy, get }
+  const value = { post, patch, destroy, get, delete: deleteMethod }
   return <APIContext.Provider value={value}>{children}</APIContext.Provider>
 }
 

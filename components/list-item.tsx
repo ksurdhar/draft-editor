@@ -64,10 +64,10 @@ export const ListItem = ({
         }}
         {...itemContainerProps}
       >
-        <div className="flex items-center min-w-[200px] gap-2">
+        <div className="flex items-center min-w-0 gap-2">
           {leftIcon && (
             <div className="flex items-center gap-1">
-              <div className="w-3.5 h-3.5 flex items-center justify-center">
+              <div className="w-3.5 h-3.5 flex items-center justify-center shrink-0">
                 {leftIcon}
               </div>
             </div>
@@ -77,7 +77,7 @@ export const ListItem = ({
           </span>
         </div>
         {rightContent && (
-          <div className="flex items-center">
+          <div className="flex items-center ml-2 shrink-0">
             {rightContent}
           </div>
         )}

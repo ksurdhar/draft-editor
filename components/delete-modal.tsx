@@ -6,12 +6,10 @@ interface DeleteModalProps {
   onClose: () => void
   onConfirm: () => void
   documentTitle: string
+  itemCount?: number // Optional count for multi-select cases
 }
 
-const DeleteModal = ({ open, onClose, onConfirm, documentTitle }: DeleteModalProps) => {
-  const titles = documentTitle.split(', ')
-  const itemCount = titles.length
-
+const DeleteModal = ({ open, onClose, onConfirm, documentTitle, itemCount }: DeleteModalProps) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!open) return
@@ -34,16 +32,19 @@ const DeleteModal = ({ open, onClose, onConfirm, documentTitle }: DeleteModalPro
     onClose()
   }
 
+  const getDescription = () => {
+    if (itemCount && itemCount > 1) {
+      return `Are you sure you want to delete these ${itemCount} items?`
+    }
+    return `Are you sure you want to delete ${documentTitle}?`
+  }
+
   return (
     <BaseModal
       open={open}
       onClose={onClose}
       title="DELETE"
-      description={
-        itemCount > 1
-          ? `Are you sure you want to delete these ${itemCount} items?`
-          : `Are you sure you want to delete ${documentTitle}?`
-      }
+      description={getDescription()}
       confirmText="DELETE"
       onConfirm={handleDelete}
       actions={[

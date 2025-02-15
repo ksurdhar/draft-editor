@@ -1,10 +1,11 @@
 'use client'
 import { VersionData } from '@typez/globals'
-import { useCallback } from 'react'
-import useSWR from 'swr'
+import { useCallback, useState } from 'react'
+import useSWR, { mutate } from 'swr'
 import { useAPI } from './providers'
-import { ClockIcon, EyeIcon, RewindIcon } from '@heroicons/react/outline'
+import { ClockIcon, EyeIcon, RewindIcon, PlusIcon, TrashIcon } from '@heroicons/react/outline'
 import { ListItem } from './list-item'
+import DeleteModal from './delete-modal'
 
 interface VersionListProps {
   documentId: string
@@ -14,6 +15,8 @@ interface VersionListProps {
 
 const VersionList = ({ documentId, onPreview, onRestore }: VersionListProps) => {
   const api = useAPI()
+  const [versionToDelete, setVersionToDelete] = useState<VersionData | null>(null)
+  
   const fetcher = useCallback(
     async (path: string) => {
       return await api.get(path)
@@ -25,6 +28,37 @@ const VersionList = ({ documentId, onPreview, onRestore }: VersionListProps) => 
     `/documents/${documentId}/versions`,
     fetcher
   )
+
+  const handleCreateVersion = async () => {
+    try {
+      const doc = await api.get(`/documents/${documentId}`)
+      await api.post(`/documents/${documentId}/versions`, {
+        documentId,
+        content: doc.content,
+        createdAt: Date.now(),
+        name: ''
+      })
+      mutate(`/documents/${documentId}/versions`)
+    } catch (error) {
+      console.error('Error creating version:', error)
+    }
+  }
+
+  const handleDeleteVersion = async () => {
+    if (!versionToDelete) return
+
+    try {
+      await api.delete(`/documents/${documentId}/versions?versionId=${versionToDelete.id}`)
+      mutate(`/documents/${documentId}/versions`)
+      setVersionToDelete(null)
+    } catch (error) {
+      console.error('Error deleting version:', error)
+    }
+  }
+
+  const handleDeleteClick = (version: VersionData) => {
+    setVersionToDelete(version)
+  }
 
   if (isLoading) {
     return (
@@ -43,44 +77,57 @@ const VersionList = ({ documentId, onPreview, onRestore }: VersionListProps) => 
   }
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="mb-2 text-sm font-medium text-black/50">Document Versions</div>
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-sm font-semibold text-gray-400">Versions</h2>
+        <button
+          onClick={handleCreateVersion}
+          className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          <PlusIcon className="w-4 h-4" />
+        </button>
+      </div>
+
       {versions.map((version) => (
         <ListItem
           key={version.id}
-          label={new Date(version.createdAt).toLocaleDateString()}
-          leftIcon={<ClockIcon className="h-4 w-4 text-black/30" />}
+          label={new Date(version.createdAt).toLocaleString()}
+          leftIcon={<ClockIcon className="w-4 h-4" />}
           theme="dark"
           rightContent={
-            <div className="flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
               <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onPreview(version)
-                }}
-                className="rounded p-1 hover:bg-black/5"
+                onClick={() => onPreview(version)}
+                className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
                 title="Preview version"
               >
-                <EyeIcon className="h-4 w-4 text-black/50" />
+                <EyeIcon className="w-4 h-4" />
               </button>
               <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onRestore(version)
-                }}
-                className="rounded p-1 hover:bg-black/5"
+                onClick={() => onRestore(version)}
+                className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
                 title="Restore version"
               >
-                <RewindIcon className="h-4 w-4 text-black/50" />
+                <RewindIcon className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => handleDeleteClick(version)}
+                className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                title="Delete version"
+              >
+                <TrashIcon className="w-4 h-4" />
               </button>
             </div>
           }
-        >
-          {version.name && (
-            <div className="pl-12 text-sm text-black/50">{version.name}</div>
-          )}
-        </ListItem>
+        />
       ))}
+
+      <DeleteModal
+        open={!!versionToDelete}
+        onClose={() => setVersionToDelete(null)}
+        onConfirm={handleDeleteVersion}
+        documentTitle={versionToDelete ? `version from ${new Date(versionToDelete.createdAt).toLocaleString()}` : ''}
+      />
     </div>
   )
 }

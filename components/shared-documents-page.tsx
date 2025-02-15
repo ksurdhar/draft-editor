@@ -329,7 +329,8 @@ const SharedDocumentsPage = ({
           setSelectedDoc(null)
         }}
         onConfirm={handleDeleteConfirm}
-        documentTitle={selectedItems.length > 0 ? selectedItems.map(id => items[id.toString()]?.data.toUpperCase()).join(', ') : 'UNTITLED'}
+        documentTitle={selectedItems.map(id => items[id.toString()]?.data.toUpperCase()).join(', ')}
+        itemCount={selectedItems.length}
       />
 
       <CreateFolderModal

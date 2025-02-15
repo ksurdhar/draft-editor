@@ -13,6 +13,7 @@ export default withHybridAuth(async function versionsHandler(req: ExtendedApiReq
   }
 
   const documentId = query.id?.toString() || ''
+  const versionId = query.versionId?.toString()
 
   switch (method) {
     case 'GET':
@@ -28,8 +29,21 @@ export default withHybridAuth(async function versionsHandler(req: ExtendedApiReq
       res.status(200).json(newVersion)
       break
 
+    case 'DELETE':
+      if (!versionId) {
+        res.status(400).json({ error: 'Version ID is required' })
+        return
+      }
+      const success = await versionStorage.deleteVersion(documentId, versionId)
+      if (!success) {
+        res.status(404).json({ error: 'Version not found' })
+        return
+      }
+      res.status(200).json({ success: true })
+      break
+
     default:
-      res.setHeader('Allow', ['GET', 'POST'])
+      res.setHeader('Allow', ['GET', 'POST', 'DELETE'])
       res.status(405).end(`Method ${method} Not Allowed`)
   }
 }) 

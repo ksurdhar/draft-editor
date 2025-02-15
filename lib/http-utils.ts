@@ -23,7 +23,13 @@ export async function update(url: string, body: any): ApiResponse<void> {
 }
 
 export async function destroy(url: string): ApiResponse {
-  return await API.delete(url)
+  const result = await API.delete(url)
+  return result.data
+}
+
+export async function deleteMethod(url: string): ApiResponse {
+  const result = await API.delete(url)
+  return result.data
 }
 
 export default API
