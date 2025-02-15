@@ -12,9 +12,10 @@ import { useCallback, useEffect, useState } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useDebouncedCallback } from 'use-debounce'
 import { motion, AnimatePresence } from 'framer-motion'
-import { EyeIcon, EyeOffIcon, ClockIcon } from '@heroicons/react/outline'
+import { EyeIcon, EyeOffIcon, ClockIcon, SearchIcon } from '@heroicons/react/outline'
 import VersionList from '@components/version-list'
 import { Dialog } from '@mui/material'
+import GlobalFind from '@components/global-find'
 
 const backdropStyles = `
   fixed top-0 left-0 h-screen w-screen z-[-1]
@@ -92,6 +93,7 @@ export default function DocumentPage() {
   const skipAnimation = searchParams.get('from') === 'tree'
   const [showTree, setShowTree] = useState(true)
   const [showVersions, setShowVersions] = useState(false)
+  const [showGlobalFind, setShowGlobalFind] = useState(false)
   const [diffContent, setDiffContent] = useState<any>(null)
 
   const debouncedSave = useDebouncedCallback((data: Partial<DocumentData>) => {
@@ -183,8 +185,14 @@ export default function DocumentPage() {
         {/* Control Buttons */}
         <div className="fixed top-[41px] left-[18px] z-50 flex gap-2">
           <button 
-            onClick={() => setShowTree(!showTree)}
+            onClick={() => {
+              setShowTree(!showTree)
+              if (!showTree) {
+                setShowGlobalFind(false)
+              }
+            }}
             className="p-1.5 rounded-lg hover:bg-white/[.1] transition-colors"
+            title={showTree ? "Hide document tree" : "Show document tree"}
           >
             {showTree ? (
               <EyeIcon className="w-4 h-4 text-black/70" />
@@ -195,14 +203,27 @@ export default function DocumentPage() {
           <button 
             onClick={() => setShowVersions(!showVersions)}
             className="p-1.5 rounded-lg hover:bg-white/[.1] transition-colors"
+            title={showVersions ? "Hide versions" : "Show versions"}
           >
             <ClockIcon className="w-4 h-4 text-black/70" />
           </button>
+          <button 
+            onClick={() => {
+              setShowGlobalFind(!showGlobalFind)
+              if (!showGlobalFind) {
+                setShowTree(false)
+              }
+            }}
+            className="p-1.5 rounded-lg hover:bg-white/[.1] transition-colors"
+            title={showGlobalFind ? "Hide global find" : "Show global find"}
+          >
+            <SearchIcon className="w-4 h-4 text-black/70" />
+          </button>
         </div>
 
-        {/* Document Tree */}
+        {/* Document Tree or Global Find */}
         <AnimatePresence initial={false}>
-          {showTree && (
+          {(showTree || showGlobalFind) && (
             <motion.div
               initial={{ opacity: 0, scale: 0.98, filter: "blur(8px)" }}
               animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
@@ -215,8 +236,8 @@ export default function DocumentPage() {
               style={{ willChange: "filter" }}
               className="lg:fixed lg:left-0 lg:top-0 w-[320px] pt-[44px] h-screen shrink-0"
             >
-              <div className="h-[calc(100vh_-_44px)] p-4 overflow-y-auto">
-                {allDocs && allFolders && (
+              {showTree && allDocs && allFolders && (
+                <div className="h-[calc(100vh_-_44px)] p-4 overflow-y-auto">
                   <DocumentTree
                     items={createTreeItems(allDocs, allFolders)}
                     onPrimaryAction={handlePrimaryAction}
@@ -226,8 +247,11 @@ export default function DocumentPage() {
                     theme="dark"
                     showSelectedStyles={false}
                   />
-                )}
-              </div>
+                </div>
+              )}
+              {showGlobalFind && (
+                <GlobalFind onClose={() => setShowGlobalFind(false)} />
+              )}
             </motion.div>
           )}
         </AnimatePresence>
