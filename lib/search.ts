@@ -5,11 +5,22 @@ interface Match {
   to: number
 }
 
-export function findAllMatches(doc: Node, searchTerm: string): Match[] {
+interface SearchOptions {
+  matchCase: boolean
+  wholeWord: boolean
+}
+
+export function findAllMatches(doc: Node, searchTerm: string, options: SearchOptions = { matchCase: false, wholeWord: false }): Match[] {
   const matches: Match[] = []
   if (!searchTerm) return matches
 
-  const searchRegex = new RegExp(searchTerm, 'gi')
+  // Create regex pattern based on options
+  let pattern = searchTerm
+  if (options.wholeWord) {
+    pattern = `\\b${pattern}\\b`
+  }
+  const flags = options.matchCase ? 'g' : 'gi'
+  const searchRegex = new RegExp(pattern, flags)
 
   doc.descendants((node, nodePos) => {
     if (node.isText) {
