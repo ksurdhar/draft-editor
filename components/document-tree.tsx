@@ -1,10 +1,11 @@
 import { ControlledTreeEnvironment, Tree, TreeItemIndex, TreeItem, DraggingPosition } from 'react-complex-tree'
 import 'react-complex-tree/lib/style.css'
-import { motion, AnimatePresence } from 'framer-motion'
 import { IconButton } from '@mui/material'
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz'
 import { useState } from 'react'
 import { DocumentData, FolderData } from '@typez/globals'
+import { ListItem } from './list-item'
+import { TreeItemRenderContext } from 'react-complex-tree'
 
 export interface TreeItemData {
   index: TreeItemIndex
@@ -27,6 +28,8 @@ export interface DocumentTreeProps {
   selectedItems?: TreeItemIndex[]
   onSelectedItemsChange?: (items: TreeItemIndex[]) => void
   persistExpanded?: boolean
+  theme?: 'light' | 'dark'
+  showSelectedStyles?: boolean
 }
 
 export const createTreeItems = (docs: DocumentData[], folders: FolderData[]): Record<string, TreeItemData> => {
@@ -148,7 +151,9 @@ const DocumentTree = ({
   style = {},
   selectedItems: externalSelectedItems,
   onSelectedItemsChange,
-  persistExpanded = false
+  persistExpanded = false,
+  theme = 'light',
+  showSelectedStyles = true
 }: DocumentTreeProps) => {
   const [internalSelectedItems, setInternalSelectedItems] = useState<TreeItemIndex[]>([])
   const [expandedItems, setExpandedItems] = useState<TreeItemIndex[]>(() => {
@@ -278,74 +283,49 @@ const DocumentTree = ({
           const isFolder = Boolean(item.isFolder)
 
           return (
-            <li 
-              {...props.context.itemContainerWithChildrenProps}
-              className="list-none [&_.rct-tree-item-button-focus]:!outline-none"
-            >
-              <div 
-                {...props.context.itemContainerWithoutChildrenProps}
-                {...context.interactiveElementProps}
-                className={`flex items-center justify-between py-1.5 px-2 hover:bg-white/[.2] rounded-lg cursor-pointer ${
-                  context.isSelected ? '!bg-white/[.25]' : ''
-                }`}
-                style={{
-                  paddingLeft: `${(depth + 1) * 20}px`,
-                  backgroundColor: item.index === 'root' ? 'transparent' : undefined,
-                  transition: 'background-color 0s'
-                }}
-              >
-                <div className="flex items-center min-w-[200px] gap-2">
-                  <div className="flex items-center gap-1">
-                    {isFolder && (
-                      <div className="w-3.5 h-3.5 flex items-center justify-center">
-                        {arrow}
-                      </div>
-                    )}
-                  </div>
-                  <span className="uppercase text-black/[.70] text-sm font-semibold block h-[20px] leading-[20px] truncate">
-                    {item.data}
-                  </span>
-                </div>
-                {showActionButton && item.index !== 'root' && (
-                  <div className="flex items-center">
-                    <IconButton
-                      size="small"
-                      onClick={e => {
-                        e.stopPropagation()
-                        if (onActionButtonClick) {
-                          onActionButtonClick(e, item.index.toString())
-                        }
-                      }}
-                      className="hover:bg-black/[.10]">
-                      <MoreHorizIcon fontSize="small" />
-                    </IconButton>
-                  </div>
-                )}
-              </div>
-              <AnimatePresence initial={false} mode="wait">
-                {props.children && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0, y: -5 }}
-                    animate={{ 
-                      opacity: context.isExpanded ? 1 : 0,
-                      height: context.isExpanded ? 'auto' : 0,
-                      y: context.isExpanded ? 0 : -5,
-                      transitionEnd: {
-                        overflow: context.isExpanded ? 'visible' : 'hidden'
+            <ListItem
+              depth={depth}
+              label={item.data}
+              isSelected={context.isSelected}
+              isExpanded={context.isExpanded}
+              leftIcon={isFolder ? arrow : null}
+              theme={theme}
+              showSelectedStyles={showSelectedStyles}
+              onClick={() => {
+                if (isFolder) {
+                  if (context.isExpanded) {
+                    handleCollapseItem(item)
+                  } else {
+                    handleExpandItem(item)
+                  }
+                } else {
+                  handlePrimaryAction(item)
+                }
+              }}
+              rightContent={
+                showActionButton && item.index !== 'root' ? (
+                  <IconButton
+                    size="small"
+                    onClick={e => {
+                      e.stopPropagation()
+                      if (onActionButtonClick) {
+                        onActionButtonClick(e, item.index.toString())
                       }
                     }}
-                    exit={{ opacity: 0, height: 0, y: -5, overflow: 'hidden' }}
-                    transition={{ 
-                      duration: 0.3,
-                      ease: [0.2, 0.8, 0.2, 1.0],
-                      opacity: { duration: 0.35 }
-                    }}
+                    className="hover:bg-black/[.10]"
                   >
-                    {props.children}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </li>
+                    <MoreHorizIcon fontSize="small" />
+                  </IconButton>
+                ) : null
+              }
+              containerProps={props.context.itemContainerWithChildrenProps}
+              itemContainerProps={{
+                ...props.context.itemContainerWithoutChildrenProps,
+                ...context.interactiveElementProps
+              }}
+            >
+              {props.children}
+            </ListItem>
           )
         }}
       >
