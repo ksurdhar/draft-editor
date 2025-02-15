@@ -162,12 +162,7 @@ export default function FindPanel({ editor, onClose }: FindPanelProps) {
   }, [])
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 20 }}
-      className="fixed right-5 top-[80px] z-50 w-[380px] rounded-lg bg-white/90 backdrop-blur-md border border-black/30"
-    >
+    <div className="fixed right-5 top-[80px] z-50 w-[380px] rounded-lg bg-white/90 backdrop-blur-md border border-black/30">
       <div className="p-3 flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <button
@@ -236,12 +231,7 @@ export default function FindPanel({ editor, onClose }: FindPanelProps) {
         </div>
 
         {showReplace && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="flex items-center gap-2 pl-8"
-          >
+          <div className="flex items-center gap-2">
             <div className="flex-1 bg-black/[.03] rounded px-2 flex items-center">
               <input
                 type="text"
@@ -267,9 +257,9 @@ export default function FindPanel({ editor, onClose }: FindPanelProps) {
                 </button>
               </div>
             </div>
-          </motion.div>
+          </div>
         )}
       </div>
-    </motion.div>
+    </div>
   )
 } 

@@ -7,6 +7,7 @@ import { useAPI } from './providers'
 import { DocumentData } from '@typez/globals'
 import { useNavigation } from './providers'
 import { DocumentIcon } from '@heroicons/react/outline'
+import { mutate } from 'swr'
 
 interface SearchResult {
   documentId: string
@@ -23,8 +24,19 @@ interface GlobalFindProps {
   onClose: () => void
 }
 
+interface DocumentUpdate {
+  documentId: string
+  content: any
+  matches: {
+    text: string
+    lineNumber: number
+    matchIndex: number
+    matchLength: number
+  }[]
+}
+
 export default function GlobalFind({ onClose }: GlobalFindProps) {
-  const { get } = useAPI()
+  const { get, post, patch } = useAPI()
   const { navigateTo } = useNavigation()
   const [searchTerm, setSearchTerm] = useState('')
   const [replaceText, setReplaceText] = useState('')
@@ -36,6 +48,7 @@ export default function GlobalFind({ onClose }: GlobalFindProps) {
   const [documents, setDocuments] = useState<DocumentData[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [isReplacing, setIsReplacing] = useState(false)
 
   // Load all documents when component mounts
   useEffect(() => {
@@ -179,6 +192,123 @@ export default function GlobalFind({ onClose }: GlobalFindProps) {
     )
   }
 
+  const handleReplace = async (documentUpdate: DocumentUpdate) => {
+    try {
+      const doc = await get(`/documents/${documentUpdate.documentId}`)
+      let content = typeof doc.content === 'string' ? JSON.parse(doc.content) : doc.content
+      
+      // Sort matches in reverse order to not affect subsequent indices
+      const sortedMatches = [...documentUpdate.matches].sort((a, b) => b.lineNumber - a.lineNumber)
+      
+      // Replace matches in the content
+      content.content = content.content.map((block: any, blockIndex: number) => {
+        const matches = sortedMatches.filter(m => m.lineNumber === blockIndex + 1)
+        if (matches.length === 0) return block
+
+        let text = block.content?.[0]?.text || ''
+        matches.forEach(match => {
+          text = text.slice(0, match.matchIndex) + replaceText + text.slice(match.matchIndex + match.matchLength)
+        })
+
+        return {
+          ...block,
+          content: [{ ...block.content[0], text }]
+        }
+      })
+
+      return { documentId: documentUpdate.documentId, content }
+    } catch (error) {
+      console.error('Error preparing document update:', error)
+      return null
+    }
+  }
+
+  const handleReplaceAll = async () => {
+    if (!replaceText || searchResults.length === 0) return
+
+    setIsReplacing(true)
+    try {
+      const updates = await Promise.all(
+        searchResults.map(result => handleReplace({
+          documentId: result.documentId,
+          content: null, // Will be set in handleReplace
+          matches: result.matches
+        }))
+      )
+
+      const validUpdates = updates.filter(Boolean)
+      if (validUpdates.length === 0) {
+        throw new Error('No valid updates to perform')
+      }
+
+      // Perform bulk update
+      await post('/documents/bulk-update', { updates: validUpdates })
+
+      // Update in-memory documents state
+      setDocuments(prev => prev.map(doc => {
+        const update = validUpdates.find(u => u?.documentId === doc._id)
+        if (update) {
+          return { ...doc, content: update.content }
+        }
+        return doc
+      }))
+
+      // Refresh documents
+      await Promise.all([
+        ...searchResults.map(result => mutate(`/documents/${result.documentId}`)),
+        mutate('/documents')
+      ])
+
+      // Clear search results and close replace panel
+      setSearchResults([])
+      setShowReplace(false)
+      setReplaceText('')
+    } catch (error) {
+      console.error('Error performing replace all:', error)
+    } finally {
+      setIsReplacing(false)
+    }
+  }
+
+  const handleReplaceInDocument = async (documentId: string) => {
+    const result = searchResults.find(r => r.documentId === documentId)
+    if (!result || !replaceText) return
+
+    setIsReplacing(true)
+    try {
+      const update = await handleReplace({
+        documentId,
+        content: null, // Will be set in handleReplace
+        matches: result.matches
+      })
+
+      if (!update) {
+        throw new Error('Failed to prepare document update')
+      }
+
+      // Perform single document update
+      await patch(`/documents/${documentId}`, update)
+
+      // Update in-memory documents state
+      setDocuments(prev => prev.map(doc => 
+        doc._id === documentId ? { ...doc, content: update.content } : doc
+      ))
+
+      // Refresh document
+      await Promise.all([
+        mutate(`/documents/${documentId}`),
+        mutate('/documents')
+      ])
+
+      // Remove this document from search results
+      setSearchResults(prev => prev.filter(r => r.documentId !== documentId))
+    } catch (error) {
+      console.error('Error performing replace in document:', error)
+    } finally {
+      setIsReplacing(false)
+    }
+  }
+
   return (
     <div className="h-[calc(100vh_-_44px)] p-4 overflow-y-auto">
       <div className="flex flex-col gap-3">
@@ -224,12 +354,7 @@ export default function GlobalFind({ onClose }: GlobalFindProps) {
         </div>
 
         {showReplace && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="flex items-center gap-2 pl-8"
-          >
+          <div className="flex items-center gap-2 pl-8">
             <div className="flex-1 bg-black/[.03] rounded px-2 flex items-center">
               <input
                 type="text"
@@ -240,20 +365,22 @@ export default function GlobalFind({ onClose }: GlobalFindProps) {
               />
               <div className="flex items-center gap-1.5 shrink-0">
                 <button
-                  onClick={() => {}}
-                  className="text-xs px-2 py-1 rounded hover:bg-black/5 font-editor2 text-black/[.70]"
+                  onClick={() => searchResults[0] && handleReplaceInDocument(searchResults[0].documentId)}
+                  disabled={isReplacing || !replaceText || searchResults.length === 0}
+                  className="text-xs px-2 py-1 rounded hover:bg-black/5 font-editor2 text-black/[.70] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Replace
                 </button>
                 <button
-                  onClick={() => {}}
-                  className="text-xs px-2 py-1 rounded hover:bg-black/5 font-editor2 text-black/[.70]"
+                  onClick={handleReplaceAll}
+                  disabled={isReplacing || !replaceText}
+                  className="text-xs px-2 py-1 rounded hover:bg-black/5 font-editor2 text-black/[.70] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   All
                 </button>
               </div>
             </div>
-          </motion.div>
+          </div>
         )}
 
         {searchResults.length > 0 && (

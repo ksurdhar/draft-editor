@@ -209,13 +209,6 @@ export default function DocumentPage() {
             )}
           </button>
           <button 
-            onClick={() => setShowVersions(!showVersions)}
-            className="p-1.5 rounded-lg hover:bg-white/[.1] transition-colors"
-            title={showVersions ? "Hide versions" : "Show versions"}
-          >
-            <ClockIcon className="w-4 h-4 text-black/70" />
-          </button>
-          <button 
             onClick={() => {
               setShowGlobalFind(!showGlobalFind)
               if (!showGlobalFind) {
@@ -226,6 +219,13 @@ export default function DocumentPage() {
             title={showGlobalFind ? "Hide global find" : "Show global find"}
           >
             <SearchIcon className="w-4 h-4 text-black/70" />
+          </button>
+          <button 
+            onClick={() => setShowVersions(!showVersions)}
+            className="p-1.5 rounded-lg hover:bg-white/[.1] transition-colors"
+            title={showVersions ? "Hide versions" : "Show versions"}
+          >
+            <ClockIcon className="w-4 h-4 text-black/70" />
           </button>
         </div>
 
