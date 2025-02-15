@@ -51,7 +51,7 @@ export default function FindPanel({ editor, onClose }: FindPanelProps) {
   const scrollToMatch = useCallback((_match: Match) => {
     const element = document.querySelector('.search-result-current')
     if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      element.scrollIntoView({ block: 'center' })
     }
   }, [])
 
