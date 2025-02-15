@@ -88,7 +88,6 @@ const EditorComponent = ({
     },
     onCreate: ({ editor }) => {
       console.log('Editor created with content:', editor.getJSON())
-      console.log('Editor HTML:', editor.getHTML())
     }
   })
 

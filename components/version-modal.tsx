@@ -1,6 +1,6 @@
 'use client'
 import API from '@lib/http-utils'
-import { countWords } from '@lib/slate-utils'
+import { countWordsFromContent } from '@lib/text-utils'
 import InsertDriveFileTwoToneIcon from '@mui/icons-material/InsertDriveFileTwoTone'
 import {
   Box,
@@ -128,7 +128,7 @@ const VersionModal = ({ open, onClose, document }: VersionModalProps) => {
                     createdAt: Date.now(),
                     documentId: document.id,
                     ownerId: document.userId,
-                    wordCount: countWords(JSON.parse(document.content)),
+                    wordCount: countWordsFromContent(document.content),
                   }
                   await API.post(`/documents/${document.id}/versions`, newVersion)
                   mutate()

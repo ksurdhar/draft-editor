@@ -1,8 +1,3 @@
-import { BaseEditor, NodeEntry } from 'slate'
-import { HistoryEditor } from 'slate-history'
-import { ReactEditor } from 'slate-react'
-import { FindDecoration } from '@lib/slate-plugins/decorations'
-
 // globals.d.ts
 declare global {
   interface Window {
@@ -63,11 +58,6 @@ export enum UserPermission {
 
 export type AnimationState = 'Active' | 'Complete' | 'Inactive'
 
-export type WhetstoneEditor = BaseEditor & ReactEditor & HistoryEditor & {
-  decorations: FindDecoration[]
-  setDecorations: (decorations: FindDecoration[]) => void
-  decorate?: (entry: NodeEntry) => FindDecoration[]
-}
 
 export type FolderData = {
   _id: string

@@ -1,15 +1,12 @@
 'use client'
 import { useState } from 'react'
 import { Editor } from '@tiptap/react'
+import { calculateWordCount, getTotalWordCount } from '@lib/text-utils'
 
 interface FooterProps {
   editor: Editor | null
   initFadeIn: boolean
   fadeOut: boolean
-}
-
-const calculateWordCount = (text: string) => {
-  return text.trim().split(/\s+/).filter(word => word.length > 0).length
 }
 
 const getWordCountAtPosition = (doc: any, pos: number) => {
@@ -76,16 +73,6 @@ const getWordCountInRange = (doc: any, from: number, to: number) => {
     return true
   })
   
-  return calculateWordCount(text)
-}
-
-const getTotalWordCount = (doc: any) => {
-  let text = ''
-  doc.descendants((node: any) => {
-    if (node.isText) {
-      text += (node.text || '') + ' '
-    }
-  })
   return calculateWordCount(text)
 }
 

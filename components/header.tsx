@@ -5,8 +5,8 @@ import { useUser } from '@wrappers/auth-wrapper-client'
 import { Fragment, useCallback, useEffect, useState, useRef } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useAPI, useMouse, useNavigation } from './providers'
-import { transformTextToSlate } from '@lib/transforms/text-to-slate'
 import { useSyncHybridDoc, useFolderSync } from '@lib/hooks'
+import { importFiles } from '@lib/import-utils'
 import { Divider, List, ListItem, ListItemButton, ListItemText } from '@mui/material'
 import Box from '@mui/material/Box'
 import Drawer from '@mui/material/Drawer'
@@ -119,94 +119,20 @@ const HeaderComponent = ({ id }: HeaderProps) => {
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
-    if (!files) return
-
-    // Group files by their directory structure
-    const filesByDirectory: { [key: string]: File[] } = {}
-    
-    Array.from(files).forEach(file => {
-      // Skip .DS_Store files
-      if (file.name === '.DS_Store') return
-      
-      const path = file.webkitRelativePath
-      // Get the directory path without the filename
-      const dirPath = path.split('/').slice(0, -1).join('/')
-      
-      if (!filesByDirectory[dirPath]) {
-        filesByDirectory[dirPath] = []
-      }
-      filesByDirectory[dirPath].push(file)
-    })
+    if (!files || !user?.sub) return
 
     try {
-      // Create folders first
-      const folderPaths = Object.keys(filesByDirectory)
-      console.log('Folder paths to create:', folderPaths)
-      const folderMap = new Map<string, string>() // Maps path to folder ID
-      
-      for (const fullPath of folderPaths) {
-        const pathParts = fullPath.split('/')
-        // Skip the root folder (usually the selected folder name)
-        pathParts.shift()
-        console.log('Creating folder path:', pathParts)
-        
-        let parentId: string | undefined = undefined
-        let currentPath = ''
-        
-        // Create each folder in the path if it doesn't exist
-        for (const part of pathParts) {
-          currentPath = currentPath ? `${currentPath}/${part}` : part
-          console.log('Processing folder:', { part, currentPath, parentId })
-          
-          if (!folderMap.has(currentPath)) {
-            const response = await post('/folders', {
-              title: part,
-              parentId,
-              userId: user?.sub,
-              lastUpdated: Date.now()
-            })
-            console.log('Created folder:', { path: currentPath, id: response._id, parentId })
-            folderMap.set(currentPath, response._id)
-          }
-          parentId = folderMap.get(currentPath)
-        }
-      }
-
-      // Create documents
-      for (const [dirPath, files] of Object.entries(filesByDirectory)) {
-        const pathParts = dirPath.split('/')
-        pathParts.shift() // Remove root folder
-        const folderPath = pathParts.join('/')
-        const parentId = folderMap.get(folderPath)
-        console.log('Creating documents in folder:', { folderPath, parentId, fileCount: files.length })
-
-        for (const file of files) {
-          const content = await file.text()
-          const transformedContent = JSON.stringify(transformTextToSlate(content))
-
-          await post('/documents', {
-            title: file.name.replace('.txt', ''),
-            content: transformedContent,
-            parentId,
-            userId: user?.sub,
-            lastUpdated: Date.now()
-          })
-        }
-      }
-
-      console.log('Starting mutations...')
-      // Refresh both documents and folders lists
-      await Promise.all([
-        mutate('/documents'),
-        mutateFolders()
-      ])
-      console.log('Mutations completed')
-    } catch (error) {
+      await importFiles(files, user.sub, { post }, () => {
+        Promise.all([
+          mutate('/documents'),
+          mutateFolders()
+        ])
+      })
+    } catch (error: any) {
       console.error('Error importing files:', error)
     }
     
     setMenuOpen(false)
-    // Reset input so the same file can be selected again
     event.target.value = ''
   }
 
@@ -233,14 +159,14 @@ const HeaderComponent = ({ id }: HeaderProps) => {
               onClick={() => navigateTo('/documents')}
               className="hover:opacity-80"
             >
-              whetstone
+              Whetstone
             </button>
           ) : (
             <button 
               onClick={() => navigateTo('/')}
               className="hover:opacity-80"
             >
-              whetstone
+              Whetstone
             </button>
           )}
         </h1>
