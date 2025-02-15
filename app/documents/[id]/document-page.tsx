@@ -47,18 +47,20 @@ const useSave = () => {
 
 export default function DocumentPage() {
   const { getLocation, navigateTo } = useNavigation()
+  const location = getLocation()
+  const id = location.split('/').pop()?.split('?')[0] || ''
+  const { get, patch } = useAPI()
   const save = useSave()
   const pathname = getLocation()
 
   const api = useAPI()
   const fetcher = useCallback(
     async (path: string) => {
-      return await api.get(path)
+      return await get(path)
     },
-    [api],
+    [get],
   )
 
-  const id = (pathname || '').split('/').pop()?.split('?')[0] || ''
   const searchParams = new URLSearchParams(window.location.search)
   const shouldFocusTitle = searchParams.get('focus') === 'title'
   const documentPath = `/documents/${id}`
@@ -90,7 +92,6 @@ export default function DocumentPage() {
   const skipAnimation = searchParams.get('from') === 'tree'
   const [showTree, setShowTree] = useState(true)
   const [showVersions, setShowVersions] = useState(false)
-  const [previewVersion, setPreviewVersion] = useState<VersionData | null>(null)
   const [diffContent, setDiffContent] = useState<any>(null)
 
   const debouncedSave = useDebouncedCallback((data: Partial<DocumentData>) => {
@@ -124,38 +125,40 @@ export default function DocumentPage() {
     navigateTo(`/documents/${selectedId}?from=tree`)
   }
 
-  const handlePreviewVersion = (version: VersionData) => {
-    setPreviewVersion(version)
-  }
-
   const handleRestoreVersion = async (version: VersionData) => {
+    if (!version || !id) return
+
     try {
-      // Update the document with the version's content
-      await api.patch(`/documents/${id}`, {
+      await patch(`/documents/${id}`, {
         content: version.content,
         lastUpdated: Date.now()
       })
       
-      // Update both the document cache and the hybrid document state
       const updatedDoc = {
         ...hybridDoc,
         content: version.content,
         lastUpdated: Date.now()
       }
 
-      // Store in session storage for hybrid state
       if (process.env.NEXT_PUBLIC_STORAGE_TYPE !== 'json') {
         sessionStorage.setItem(id, JSON.stringify(updatedDoc))
       }
       
-      // Force revalidation of both the document data and hybrid state
       await Promise.all([
         mutate(documentPath, updatedDoc, true),
         mutate(`/hybrid-documents/${id}`, updatedDoc, true)
       ])
     } catch (e) {
-      console.error('Error restoring version:', e)
+      console.error('Error in restore process:', e)
     }
+  }
+
+  if (!hybridDoc) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="animate-pulse text-black/50">Loading document...</div>
+      </div>
+    )
   }
 
   return (
@@ -247,44 +250,14 @@ export default function DocumentPage() {
               <div className="h-[calc(100vh_-_44px)] p-4 overflow-y-auto">
                 <VersionList 
                   documentId={id} 
-                  onPreview={handlePreviewVersion}
                   onRestore={handleRestoreVersion}
                   onCompare={setDiffContent}
-                  currentContent={hybridDoc?.content}
+                  currentContent={hybridDoc.content}
                 />
               </div>
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Version Preview Dialog */}
-        <Dialog 
-          fullScreen 
-          open={!!previewVersion} 
-          onClose={() => setPreviewVersion(null)}
-        >
-          <div className="flex h-[calc(100vh)] justify-center overflow-y-scroll p-[20px] pb-10 font-editor2 text-black/[.79]">
-            <div className="relative flex min-w-[calc(100vw_-_40px)] max-w-[740px] pb-10 md:min-w-[0px]">
-              {previewVersion && (
-                <Editor
-                  content={previewVersion.content}
-                  title={hybridDoc?.title || ''}
-                  onUpdate={() => {}} // Preview is read-only
-                  canEdit={false}
-                  hideFooter={true}
-                />
-              )}
-            </div>
-          </div>
-          <div className="fixed bottom-5 right-5">
-            <button
-              onClick={() => setPreviewVersion(null)}
-              className="rounded-lg bg-black/5 px-4 py-2 text-sm font-medium text-black/70 hover:bg-black/10"
-            >
-              Close Preview
-            </button>
-          </div>
-        </Dialog>
 
         {/* Editor Container */}
         <div className="flex-1 flex justify-center lg:justify-center">
@@ -302,12 +275,9 @@ export default function DocumentPage() {
                 <Editor
                   content={diffContent || hybridDoc.content}
                   title={hybridDoc.title}
-                  onUpdate={data => {
-                    debouncedSave(data)
-                  }}
-                  canEdit={!!hybridDoc.canEdit}
-                  shouldFocusTitle={shouldFocusTitle}
-                  diffMode={!!diffContent}
+                  onUpdate={debouncedSave}
+                  canEdit={!diffContent}
+                  hideFooter={!!diffContent}
                 />
               )}
             </div>

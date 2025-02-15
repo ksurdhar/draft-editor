@@ -11,7 +11,6 @@ import { Divider, List, ListItem, ListItemButton, ListItemText } from '@mui/mate
 import Box from '@mui/material/Box'
 import Drawer from '@mui/material/Drawer'
 import ShareModal from './share-modal'
-import VersionModal from './version-modal'
 
 interface DirectoryInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   webkitdirectory?: string
@@ -90,13 +89,6 @@ const HeaderComponent = ({ id }: HeaderProps) => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
   const openShareModal = () => setIsShareModalOpen(true)
   const closeShareModal = () => setIsShareModalOpen(false)
-
-  const [isVersionModalOpen, setIsVersionModalOpen] = useState(false)
-  const openVersionModal = () => {
-    mutate(`/documents/${id}/versions`)
-    setIsVersionModalOpen(true)
-  }
-  const closeVersionModal = () => setIsVersionModalOpen(false)
 
   const { mouseMoved, hoveringOverMenu } = useMouse()
   const [initFadeIn, fadeOut] = useEditorFades(!mouseMoved)
@@ -238,19 +230,11 @@ const HeaderComponent = ({ id }: HeaderProps) => {
                       <ListItemText primary={'Share'} />
                     </ListItemButton>
                   </ListItem>
-                  <ListItem disablePadding>
-                    <ListItemButton onClick={openVersionModal}>
-                      <ListItemText primary={'Versions'} />
-                    </ListItemButton>
-                  </ListItem>
                 </List>
               )}
             </Box>
           </Drawer>
           {isOwner && <ShareModal open={isShareModalOpen} onClose={closeShareModal} document={hybridDoc} />}
-          {isOwner && (
-            <VersionModal open={isVersionModalOpen} onClose={closeVersionModal} document={hybridDoc} />
-          )}
         </Fragment>
       </div>
     </>

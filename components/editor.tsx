@@ -94,7 +94,6 @@ const EditorComponent = ({
     onUpdate: ({ editor }) => {
       if (diffMode) return // Prevent updates in diff mode
       const json = editor.getJSON()
-      console.log('Editor onUpdate triggered - new content:', json)
       onUpdate({ content: json })
     },
     onCreate: ({ editor }) => {
@@ -104,17 +103,9 @@ const EditorComponent = ({
 
   // Track content prop changes
   useEffect(() => {
-    console.log('Editor content prop changed:', {
-      newContent: content,
-      parsed: typeof content === 'string' ? JSON.parse(content) : content,
-      currentEditorContent: editor?.getJSON()
-    })
-
     if (editor && content) {
       const newContent = typeof content === 'string' ? JSON.parse(content) : content
-      console.log('Setting editor content to:', newContent)
       editor.commands.setContent(newContent)
-      console.log('Editor content after update:', editor.getJSON())
     }
   }, [content, editor])
 

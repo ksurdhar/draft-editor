@@ -10,7 +10,6 @@ import { computeTiptapDiff } from '@lib/diff-utils'
 
 interface VersionListProps {
   documentId: string
-  onPreview: (version: VersionData) => void
   onRestore: (version: VersionData) => void
   onCompare: (diffContent: any) => void
   currentContent: any
@@ -18,7 +17,6 @@ interface VersionListProps {
 
 const VersionList = ({ 
   documentId, 
-  onPreview, 
   onRestore, 
   onCompare,
   currentContent 
