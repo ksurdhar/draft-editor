@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from 'react'
 import Footer from './footer'
 import { useMouse } from '../components/providers'
 import { useEditorFades } from './header'
+import FindPanel from './find-panel'
+import { SearchHighlight } from '../lib/tiptap-extensions/search-highlight'
 
 // Add styles to override ProseMirror defaults
 const editorStyles = `
@@ -14,6 +16,12 @@ const editorStyles = `
   }
   .ProseMirror-focused {
     outline: none !important;
+  }
+  .search-result {
+    background-color: rgb(254 249 195); /* bg-yellow-100 */
+  }
+  .search-result-current {
+    background-color: rgb(253 224 71); /* bg-yellow-300 */
   }
 `
 
@@ -46,6 +54,7 @@ const EditorComponent = ({
   shouldFocusTitle 
 }: EditorProps) => {
   const [inputValue, setInputValue] = useState(title === 'Untitled' ? '' : title)
+  const [showFindPanel, setShowFindPanel] = useState(false)
   const titleRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -68,13 +77,16 @@ const EditorComponent = ({
   })()
 
   const editor = useEditor({
-    extensions: [StarterKit],
+    extensions: [
+      StarterKit,
+      SearchHighlight,
+    ],
     content: initialContent,
     editable: canEdit,
     onUpdate: ({ editor }) => {
       const json = editor.getJSON()
       console.log('Editor update - new content:', json)
-      onUpdate({ content: { type: 'doc', content: json.content || [] } })
+      onUpdate({ content: json })
     },
     onCreate: ({ editor }) => {
       console.log('Editor created with content:', editor.getJSON())
@@ -83,8 +95,8 @@ const EditorComponent = ({
   })
 
   useEffect(() => {
-    console.log('Editor mounted with content:', editor?.getJSON());
-  }, [editor]);
+    console.log('Editor mounted with content:', editor?.getJSON())
+  }, [editor])
 
   // Only focus once on mount for new documents
   useEffect(() => {
@@ -94,6 +106,18 @@ const EditorComponent = ({
         titleRef.current.selectionStart = titleRef.current.selectionEnd = titleRef.current.value.length
       }
     }
+  }, [])
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault()
+        setShowFindPanel(prev => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
   return (
@@ -127,6 +151,12 @@ const EditorComponent = ({
           className='rounded-md w-full h-full static text-[19px] md:text-[22px] focus:outline-none focus:ring-0 [&_*]:focus:outline-none [&_*]:focus:ring-0 min-h-[200px] p-4'
         />
       </div>
+      {showFindPanel && editor && (
+        <FindPanel 
+          editor={editor} 
+          onClose={() => setShowFindPanel(false)} 
+        />
+      )}
       {!hideFooter && (
         <Footer 
           initFadeIn={initFadeIn} 

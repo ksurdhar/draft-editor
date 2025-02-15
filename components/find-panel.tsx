@@ -2,125 +2,94 @@
 import { XIcon } from '@heroicons/react/outline'
 import { ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/solid'
 import { motion } from 'framer-motion'
-import { Editor, Text } from 'slate'
-import { ReactEditor } from 'slate-react'
-import { WhetstoneEditor } from '@typez/globals'
+import { Editor } from '@tiptap/react'
 import { useEffect, useState } from 'react'
-import { FindDecoration } from '@lib/slate-plugins/decorations'
+import { findAllMatches } from '../lib/search'
 
-type FindPanelProps = {
-  editor: WhetstoneEditor
+interface FindPanelProps {
+  editor: Editor
   onClose: () => void
 }
 
-type Match = {
-  path: number[]
-  range: {
-    anchor: { path: number[], offset: number }
-    focus: { path: number[], offset: number }
-    color: 'blue' | 'pending'
-  }
+interface Match {
+  from: number
+  to: number
 }
 
-const FindPanel = ({ editor, onClose }: FindPanelProps) => {
+export default function FindPanel({ editor, onClose }: FindPanelProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [matches, setMatches] = useState<Match[]>([])
-  const [currentMatch, setCurrentMatch] = useState(0)
+  const [currentMatch, setCurrentMatch] = useState(-1)
 
-  const findMatches = (term: string) => {
-    console.log('=== Starting search for:', term, '===')
-    if (!term) {
-      setMatches([])
-      editor.setDecorations([])
-      console.log('=== Search ended: empty term ===')
-      return
-    }
-
-    const foundMatches: Match[] = []
-    for (const [node, path] of Editor.nodes(editor, {
-      at: [],
-      match: n => Text.isText(n) && n.text.toLowerCase().includes(term.toLowerCase()),
-    })) {
-      if (Text.isText(node)) {
-        const textContent = node.text
-        let lastIndex = 0
-        while (lastIndex !== -1) {
-          const index = textContent.toLowerCase().indexOf(term.toLowerCase(), lastIndex)
-          if (index === -1) break
-          
-          // Create a range that only covers the exact match
-          const range = {
-            anchor: { path, offset: index },
-            focus: { path, offset: index + term.length },
-            color: 'pending' as const
-          }
-          foundMatches.push({ path, range })
-          // Move past this match to find the next one
-          lastIndex = index + term.length
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleClose()
+      } else if (e.key === 'Enter') {
+        if (e.shiftKey) {
+          selectPreviousMatch()
+        } else {
+          selectNextMatch()
         }
       }
     }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
-    // Update decorations for all matches
-    const decorations: FindDecoration[] = foundMatches.map((match, index) => ({
-      anchor: match.range.anchor,
-      focus: match.range.focus,
-      color: index === currentMatch ? 'blue' : 'pending'
-    }))
-    editor.setDecorations(decorations)
-    console.log('=== Search ended:', foundMatches.length, 'matches found ===')
+  // Clear highlights when unmounting
+  useEffect(() => {
+    return () => {
+      editor.commands.unsetSearchHighlight()
+    }
+  }, [editor])
 
-    setMatches(foundMatches)
-    setCurrentMatch(foundMatches.length > 0 ? 0 : -1)
-  }
+  useEffect(() => {
+    if (!searchTerm) {
+      editor.commands.unsetSearchHighlight()
+      setMatches([])
+      setCurrentMatch(-1)
+      return
+    }
 
-  const handleNext = () => {
+    const newMatches = findAllMatches(editor.state.doc, searchTerm)
+    setMatches(newMatches)
+    setCurrentMatch(newMatches.length > 0 ? 0 : -1)
+
+    if (newMatches.length > 0) {
+      editor.commands.setSearchHighlight(newMatches, 0)
+    } else {
+      editor.commands.unsetSearchHighlight()
+    }
+  }, [searchTerm, editor])
+
+  const selectNextMatch = () => {
     if (matches.length === 0) return
     const nextMatch = (currentMatch + 1) % matches.length
     setCurrentMatch(nextMatch)
-    selectAndScrollToMatch(matches[nextMatch])
+    editor.commands.setSearchHighlight(matches, nextMatch)
+    scrollToMatch(matches[nextMatch])
   }
 
-  const handlePrevious = () => {
+  const selectPreviousMatch = () => {
     if (matches.length === 0) return
     const prevMatch = (currentMatch - 1 + matches.length) % matches.length
     setCurrentMatch(prevMatch)
-    selectAndScrollToMatch(matches[prevMatch])
+    editor.commands.setSearchHighlight(matches, prevMatch)
+    scrollToMatch(matches[prevMatch])
   }
 
-  const selectAndScrollToMatch = (match: Match) => {
-    try {
-      ReactEditor.focus(editor)
-      const domRange = ReactEditor.toDOMRange(editor, match.range)
-      const domSelection = window.getSelection()
-      if (domSelection) {
-        domSelection.removeAllRanges()
-        domSelection.addRange(domRange)
-      }
-      domRange.startContainer.parentElement?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-        inline: 'center'
-      })
-
-      // Update decorations to highlight current match differently
-      const decorations: FindDecoration[] = matches.map((m, index) => ({
-        anchor: m.range.anchor,
-        focus: m.range.focus,
-        color: index === currentMatch ? 'blue' : 'pending'
-      }))
-      editor.setDecorations(decorations)
-    } catch (err) {
-      console.error('Error setting selection:', err)
+  const scrollToMatch = (_match: Match) => {
+    const element = document.querySelector('.search-result-current')
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
   }
 
-  useEffect(() => {
-    findMatches(searchTerm)
-    return () => {
-      editor.setDecorations([])
-    }
-  }, [searchTerm])
+  const handleClose = () => {
+    editor.commands.unsetSearchHighlight()
+    onClose()
+  }
 
   return (
     <motion.div
@@ -143,21 +112,21 @@ const FindPanel = ({ editor, onClose }: FindPanelProps) => {
             {matches.length > 0 ? `${currentMatch + 1}/${matches.length}` : '0/0'}
           </span>
           <button
-            onClick={handlePrevious}
+            onClick={selectPreviousMatch}
             disabled={matches.length === 0}
             className="p-1 rounded hover:bg-black/5 disabled:opacity-30"
           >
             <ChevronUpIcon className="w-4 h-4" />
           </button>
           <button
-            onClick={handleNext}
+            onClick={selectNextMatch}
             disabled={matches.length === 0}
             className="p-1 rounded hover:bg-black/5 disabled:opacity-30"
           >
             <ChevronDownIcon className="w-4 h-4" />
           </button>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-1 rounded hover:bg-black/5"
           >
             <XIcon className="w-4 h-4" />
@@ -166,6 +135,4 @@ const FindPanel = ({ editor, onClose }: FindPanelProps) => {
       </div>
     </motion.div>
   )
-}
-
-export default FindPanel 
+} 
