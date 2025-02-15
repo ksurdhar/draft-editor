@@ -15,7 +15,8 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
-    "start-socket": "node websocket/server.js"
+    "start-socket": "node websocket/server.js",
+    "migrate-storage": "ts-node scripts/migrate-to-files.ts"
   },
   "engines": {
     "node": "^20.0.0"
