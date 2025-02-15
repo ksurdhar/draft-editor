@@ -2,7 +2,6 @@
 
 import { DocumentData } from '@typez/globals'
 import { useUser } from '@wrappers/auth-wrapper-client'
-import Link from 'next/link'
 import { Fragment, useCallback, useEffect, useState, useRef } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useAPI, useMouse, useNavigation } from './providers'
@@ -230,9 +229,19 @@ const HeaderComponent = ({ id }: HeaderProps) => {
         } fixed top-0 z-[39] flex w-[100vw] flex-row justify-between p-5 pb-[30px] transition-opacity duration-700 hover:opacity-100`}>
         <h1 className="lowercase">
           {user ? (
-            <Link href={'/documents'}>Whetstone</Link>
+            <button 
+              onClick={() => navigateTo('/documents')}
+              className="hover:opacity-80"
+            >
+              whetstone
+            </button>
           ) : (
-            <Link href={'/'}>Whetstone</Link>
+            <button 
+              onClick={() => navigateTo('/')}
+              className="hover:opacity-80"
+            >
+              whetstone
+            </button>
           )}
         </h1>
       </header>

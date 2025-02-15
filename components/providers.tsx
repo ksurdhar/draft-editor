@@ -25,12 +25,14 @@ type navContextType = {
   navigateTo: (path: string) => void
   getLocation: () => string
   signOut: () => void
+  clearTreeState: () => void
 }
 
 const navContextDefaultValue: navContextType = {
   navigateTo: () => {},
   getLocation: () => '',
   signOut: () => {},
+  clearTreeState: () => {},
 }
 
 const NavigationContext = createContext<navContextType>(navContextDefaultValue)
@@ -121,7 +123,26 @@ export function NavigationProvider({
   getLocation: () => string
   signOut: () => void
 }) {
-  const value = { navigateTo, getLocation, signOut }
+  const clearTreeState = () => {
+    try {
+      localStorage.removeItem('editor-tree-expanded')
+    } catch (e) {
+      console.error('Error clearing tree state:', e)
+    }
+  }
+
+  const value = { 
+    navigateTo: (path: string) => {
+      // Clear tree state when navigating to documents list
+      if (path === '/documents') {
+        clearTreeState()
+      }
+      navigateTo(path)
+    }, 
+    getLocation, 
+    signOut,
+    clearTreeState
+  }
 
   return <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>
 }

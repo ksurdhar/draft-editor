@@ -3,7 +3,7 @@ import 'react-complex-tree/lib/style.css'
 import { motion, AnimatePresence } from 'framer-motion'
 import { IconButton } from '@mui/material'
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { DocumentData, FolderData } from '@typez/globals'
 
 export interface TreeItemData {
@@ -26,7 +26,6 @@ export interface DocumentTreeProps {
   style?: React.CSSProperties
   selectedItems?: TreeItemIndex[]
   onSelectedItemsChange?: (items: TreeItemIndex[]) => void
-  blurAmount?: number
   persistExpanded?: boolean
 }
 
@@ -149,7 +148,6 @@ const DocumentTree = ({
   style = {},
   selectedItems: externalSelectedItems,
   onSelectedItemsChange,
-  blurAmount = 0,
   persistExpanded = false
 }: DocumentTreeProps) => {
   const [internalSelectedItems, setInternalSelectedItems] = useState<TreeItemIndex[]>([])
@@ -165,20 +163,6 @@ const DocumentTree = ({
     }
     return []
   })
-
-  // Add cleanup effect
-  useEffect(() => {
-    // Cleanup function that runs when component unmounts
-    return () => {
-      if (persistExpanded) {
-        try {
-          localStorage.removeItem('editor-tree-expanded')
-        } catch (e) {
-          console.error('Error clearing localStorage:', e)
-        }
-      }
-    }
-  }, [persistExpanded]) // Only re-run if persistExpanded changes
 
   // Use either external or internal selected items
   const selectedItems = externalSelectedItems !== undefined ? externalSelectedItems : internalSelectedItems
