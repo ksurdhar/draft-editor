@@ -8,6 +8,8 @@ import { Editable, Slate } from 'slate-react'
 import Footer from './footer'
 import { useEditorFades } from './header'
 import { useMouse } from './providers'
+import FindPanel from './find-panel'
+import { AnimatePresence } from 'framer-motion'
 
 type EditorProps = {
   id: string
@@ -50,6 +52,7 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, canEdit, hideFoote
   const [ wordCount, setWordCount ] = useState(countWords(text))
   const [ wordCountAtPos, setWordCountAtPos ] = useState(0)
   const [ inputValue, setInputValue ] = useState(title === 'Untitled' ? '' : title)
+  const [ showFindPanel, setShowFindPanel ] = useState(false)
   const titleRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -126,6 +129,14 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, canEdit, hideFoote
                 event.preventDefault()
                 return
               }
+
+              // Add find panel shortcut
+              if (event.metaKey && event.key === 'f') {
+                event.preventDefault()
+                setShowFindPanel(true)
+                return
+              }
+
               if (event.metaKey) {
                 switch (event.key) {
                   case '1': {
@@ -163,6 +174,14 @@ const EditorComponent = ({ id, text, title, editor, onUpdate, canEdit, hideFoote
         />
       }
       
+      <AnimatePresence>
+        {showFindPanel && (
+          <FindPanel 
+            editor={editor}
+            onClose={() => setShowFindPanel(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

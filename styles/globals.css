@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 html,
 body {
   padding: 0;
@@ -56,11 +60,6 @@ a {
     url(https://grainy-gradients.vercel.app/noise.svg);
   filter: brightness(146%);
 }
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 
 .file-button {
   align-items: center;

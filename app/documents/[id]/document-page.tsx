@@ -18,6 +18,7 @@ import useSWR, { mutate } from 'swr'
 import { useDebouncedCallback } from 'use-debounce'
 import { motion, AnimatePresence } from 'framer-motion'
 import { EyeIcon, EyeOffIcon } from '@heroicons/react/outline'
+import { withDecorations } from '@lib/slate-plugins/decorations'
 
 const backdropStyles = `
   fixed top-0 left-0 h-screen w-screen z-[-1]
@@ -64,7 +65,11 @@ export default function DocumentPage() {
   const id = (pathname || '').split('/').pop()?.split('?')[0] || ''
   const searchParams = new URLSearchParams(window.location.search)
   const shouldFocusTitle = searchParams.get('focus') === 'title'
-  const [editor] = useState(() => withReact(withHistory(createEditor())))
+  const [editor] = useState(() => {
+    const baseEditor = withDecorations(withReact(withHistory(createEditor())))
+    baseEditor.decorations = []
+    return baseEditor
+  })
   const documentPath = `/documents/${id}`
 
   const { data: databaseDoc } = useSWR<DocumentData, Error>(documentPath, fetcher)

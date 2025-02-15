@@ -1,8 +1,16 @@
 import { BaseEditor } from "slate"
 import { ReactEditor } from "slate-react"
+import React from 'react'
+import styled from '@emotion/styled'
 
-export type HighlightColor = 'red' | 'orange' | 'green' | 'blue' | 'pending' | 'comment'
-export type DefaultText = { text: string, highlight?: HighlightColor, commentId?: string }
+export type HighlightColor = 'red' | 'orange' | 'green' | 'blue' | 'pending' | 'comment' | 'none'
+export type DefaultText = { 
+  text: string
+  highlight?: HighlightColor
+  commentId?: string
+  isCurrentMatch?: boolean
+}
+
 type DefaultElement = { type: 'default'; children: DefaultText[] }
 type CustomElement = DefaultElement 
 
@@ -15,7 +23,7 @@ declare module 'slate' {
 }
 
 type RenderElementProps = {
-  attributes: Object
+  attributes: Record<string, unknown>
   element: CustomElement
   children: React.ReactNode
 }
@@ -36,37 +44,43 @@ export const renderElement = (props: RenderElementProps) => {
 }
 
 type RenderLeafProps = {
-  attributes: Object
+  attributes: Record<string, unknown>
   leaf: DefaultText
   children: React.ReactNode
-  openCommentId: string
+  openCommentId?: string
 }
 
-type ColorMap = Record<HighlightColor, string>
+const HighlightedSpan = styled.span<{ highlight?: HighlightColor }>`
+  transition: background-color 100ms ease;
+  ${props => {
+    switch (props.highlight) {
+      case 'green':
+        return 'background-color: rgb(187 247 208);' // bg-green-200 equivalent
+      case 'orange':
+        return 'background-color: rgb(254 215 170);' // bg-orange-200 equivalent
+      case 'red':
+        return 'background-color: rgb(254 202 202);' // bg-red-200 equivalent
+      case 'blue':
+        return 'background-color: rgb(253 224 71);' // bg-yellow-300 equivalent
+      case 'pending':
+        return 'background-color: rgb(254 249 195);' // bg-yellow-100 equivalent
+      default:
+        return ''
+    }
+  }}
+`
 
-const Leaf = ({ attributes, leaf, children, openCommentId }: RenderLeafProps) => {
-  let highlight = ''
+export const renderLeaf = (props: RenderLeafProps) => {
+  const { attributes, children, leaf } = props
+  console.log('=== Rendering leaf ===')
+  console.log('Text:', leaf.text)
+  console.log('Highlight:', leaf.highlight)
+  console.log('Props:', props)
 
-  const colorMap: ColorMap = {
-    blue: 'bg-blue-200',
-    green: 'bg-green-200',
-    orange: 'bg-orange-200',
-    red: 'bg-red-200',
-    pending: 'bg-slate-200',
-    comment: `${openCommentId === leaf.commentId ? 'bg-orange-300' : 'bg-orange-200' } hover:bg-orange-300`
-  }
-
-  if (leaf.highlight) {
-    highlight = colorMap[leaf.highlight]
-  }
-  
+  console.log('=== End rendering leaf ===\n')
   return (
-    <span {...attributes} className={`transition duration-500 ${highlight}`}>
+    <HighlightedSpan {...attributes} highlight={leaf.highlight}>
       {children}
-    </span>
+    </HighlightedSpan>
   )
-}
-
-export const renderLeaf = (props: any) => {
-  return <Leaf {...props} />
 }
