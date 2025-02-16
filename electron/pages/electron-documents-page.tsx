@@ -39,15 +39,20 @@ const ElectronDocumentsPage = () => {
 
   const renameDocument = useCallback(
     async (id: string, title: string) => {
-      const prevDocs = docs
-      const updatedDocs = docs.map(doc => (doc.id === id ? { ...doc, title } : doc))
+      // Immediate optimistic update
+      const updatedDocs = docs.map(doc => (doc._id === id ? { ...doc, title } : doc))
       setDocs(updatedDocs)
 
       try {
-        await window.electronAPI.renameDocument(id, { title, lastUpdated: Date.now() })
+        await window.electronAPI.renameDocument(id, { 
+          title, 
+          lastUpdated: Date.now() 
+        })
       } catch (e) {
         console.log(e)
-        setDocs(prevDocs)
+        // On error, fetch fresh data
+        const docsResult = await window.electronAPI.getDocuments()
+        setDocs(docsResult)
       }
     },
     [docs],
