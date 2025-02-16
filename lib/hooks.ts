@@ -23,32 +23,90 @@ export const useSyncHybridDoc = (
   setHybridDoc: Dispatch<SetStateAction<DocumentData | null | undefined>>,
 ) => {
   useEffect(() => {
+    console.log('useSyncHybridDoc effect triggered:', {
+      id,
+      hasDatabaseDoc: !!databaseDoc,
+      databaseDoc,
+      hasContent: !!databaseDoc?.content
+    })
+    
+    // Skip setting hybrid doc if we don't have content yet
+    if (databaseDoc && !databaseDoc.content) {
+      console.log('Skipping hybrid doc update - no content in database doc')
+      return
+    }
     
     // Function to get the latest state
     const getLatestState = () => {
-      if (typeof window === 'undefined') return databaseDoc
+      if (typeof window === 'undefined') {
+        console.log('Server-side rendering, returning database doc')
+        return databaseDoc
+      }
+      
       const sessionDoc = sessionStorage.getItem(id)
+      console.log('Session storage state:', {
+        id,
+        hasSessionDoc: !!sessionDoc,
+        sessionDoc: sessionDoc ? JSON.parse(sessionDoc) : null,
+        hasSessionContent: sessionDoc ? !!JSON.parse(sessionDoc).content : false
+      })
 
       if (sessionDoc) {
         const parsedDoc = JSON.parse(sessionDoc)
-        // Check if the session doc is newer than the database doc
-        if (!databaseDoc || parsedDoc.lastUpdated > databaseDoc.lastUpdated) {
+        // Only use session doc if it has content and is newer
+        if (parsedDoc.content && (!databaseDoc || parsedDoc.lastUpdated > databaseDoc.lastUpdated)) {
+          console.log('Using session doc (newer with content):', {
+            sessionLastUpdated: parsedDoc.lastUpdated,
+            dbLastUpdated: databaseDoc?.lastUpdated
+          })
           return parsedDoc
         }
       }
 
-      return databaseDoc
+      // Only use database doc if it has content
+      if (databaseDoc?.content) {
+        console.log('Using database doc with content')
+        return databaseDoc
+      }
+
+      console.log('No valid document state found')
+      return undefined
     }
 
     // Update the hybrid doc with the latest state
     const latestDoc = getLatestState()
-    setHybridDoc(latestDoc)
+    
+    // Only update if we have a document with content
+    if (latestDoc?.content) {
+      console.log('Setting hybrid doc:', { 
+        id,
+        hasContent: !!latestDoc.content,
+        source: latestDoc === databaseDoc ? 'database' : 'session'
+      })
+      setHybridDoc(latestDoc)
+    } else {
+      console.log('Skipping hybrid doc update - no content in latest doc')
+    }
 
     // Listen for storage events
     const handleStorageChange = (e: StorageEvent) => {
+      console.log('Storage event:', { 
+        key: e.key, 
+        hasNewValue: !!e.newValue,
+        hasOldValue: !!e.oldValue,
+        matchesCurrentId: e.key === id 
+      })
+      
       if (e.key === id) {
         const latestDoc = getLatestState()
-        setHybridDoc(latestDoc)
+        if (latestDoc?.content) {
+          console.log('Storage event update:', { 
+            id,
+            hasContent: !!latestDoc.content,
+            source: latestDoc === databaseDoc ? 'database' : 'session'
+          })
+          setHybridDoc(latestDoc)
+        }
       }
     }
 

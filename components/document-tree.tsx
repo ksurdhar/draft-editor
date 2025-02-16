@@ -181,8 +181,25 @@ const DocumentTree = ({
   }
 
   const handlePrimaryAction = (item: TreeItem) => {
-    if (onPrimaryAction) {
-      onPrimaryAction(item)
+    const selectedId = item.index.toString()
+    if (!selectedId || !items[selectedId]) return
+
+    const treeItem = items[selectedId]
+    if (!treeItem.isFolder) {
+      const currentUrl = window.location.pathname
+      const baseDocumentId = currentUrl.split('/').pop()
+      console.log('Tree selection:', { selectedId, baseDocumentId, currentUrl })
+      
+      if (baseDocumentId && currentUrl.includes('/documents/')) {
+        const newUrl = `/documents/${baseDocumentId}?documentId=${selectedId}`
+        console.log('Updating URL and dispatching event:', newUrl)
+        window.history.pushState({}, '', newUrl)
+        // Dispatch custom event for document change
+        window.dispatchEvent(new Event('documentChanged'))
+      } else {
+        console.log('Navigating to document:', selectedId)
+        onPrimaryAction?.(item)
+      }
     }
   }
 

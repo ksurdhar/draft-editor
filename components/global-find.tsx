@@ -140,7 +140,20 @@ export default function GlobalFind({ onClose }: GlobalFindProps) {
   }, [searchTerm, searchOptions, searchDocuments])
 
   const handleDocumentClick = (documentId: string) => {
-    navigateTo(`/documents/${documentId}`)
+    const currentUrl = window.location.pathname
+    const baseDocumentId = currentUrl.split('/').pop()
+    console.log('Global find selection:', { documentId, baseDocumentId, currentUrl })
+
+    if (baseDocumentId) {
+      const newUrl = `/documents/${baseDocumentId}?documentId=${documentId}`
+      console.log('Updating URL and dispatching event:', newUrl)
+      window.history.pushState({}, '', newUrl)
+      // Dispatch custom event for document change
+      window.dispatchEvent(new Event('documentChanged'))
+    } else {
+      console.log('Navigating to document:', documentId)
+      navigateTo(`/documents/${documentId}`)
+    }
   }
 
   const toggleSearchOption = (option: 'matchCase' | 'wholeWord') => {

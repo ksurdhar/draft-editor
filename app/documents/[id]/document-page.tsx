@@ -64,28 +64,119 @@ export default function DocumentPage() {
 
   const searchParams = new URLSearchParams(window.location.search)
   const shouldFocusTitle = searchParams.get('focus') === 'title'
-  const documentPath = `/documents/${id}`
+  const documentId = searchParams.get('documentId') || id
+  const documentPath = `/documents/${documentId}`
 
-  const { data: databaseDoc } = useSWR<DocumentData, Error>(documentPath, fetcher)
+  // Update URL when document ID changes
+  useEffect(() => {
+    if (documentId && documentId !== id) {
+      const newUrl = `/documents/${id}?documentId=${documentId}`
+      window.history.pushState({}, '', newUrl)
+    }
+  }, [documentId, id])
+
+  const { data: databaseDoc, mutate: mutateDoc } = useSWR<DocumentData, Error>(documentPath, fetcher)
   const { data: allDocs } = useSWR<DocumentData[], Error>('/documents', fetcher)
   const { data: allFolders } = useSWR<DocumentData[], Error>('/folders', fetcher)
   
   const [hybridDoc, setHybridDoc] = useState<DocumentData | null>()
-  useSyncHybridDoc(id, databaseDoc, setHybridDoc)
+  const [isTransitioning, setIsTransitioning] = useState(false)
+  const [currentContent, setCurrentContent] = useState<any>(null)
+  useSyncHybridDoc(documentId, databaseDoc, setHybridDoc)
+
+  // Use the current document's content or fall back to hybrid doc
+  const documentContent = currentContent || hybridDoc?.content
+  
+  // Handle document content updates
+  useEffect(() => {
+    const loadDocument = async (docId: string) => {
+      console.log('Loading document:', {
+        docId,
+        currentDocId: documentId,
+        hasCurrentContent: !!currentContent,
+        isTransitioning
+      })
+      
+      // Only skip if we have content for this specific document
+      if (currentContent && docId === documentId && !isTransitioning) {
+        console.log('Skipping load - already have content for this document')
+        return
+      }
+      
+      setIsTransitioning(true)
+      setCurrentContent(null)
+      
+      try {
+        const doc = await get(`/documents/${docId}`)
+        console.log('Loaded document:', {
+          docId,
+          hasContent: !!doc.content,
+          contentLength: doc.content?.content?.length
+        })
+        
+        // Check if we're still on the same document
+        const currentDocId = new URLSearchParams(window.location.search).get('documentId') || id
+        if (docId === currentDocId) {
+          setCurrentContent(doc.content)
+        } else {
+          console.log('Document changed while loading, skipping update')
+        }
+      } catch (error) {
+        console.error('Error loading document:', error)
+        setCurrentContent(null)
+      } finally {
+        // Small delay to ensure smooth transition
+        setTimeout(() => {
+          setIsTransitioning(false)
+        }, 100)
+      }
+    }
+
+    // Load initial document
+    if (documentId) {
+      loadDocument(documentId)
+    }
+
+    // Listen for document changes
+    const handleDocumentChange = () => {
+      const newParams = new URLSearchParams(window.location.search)
+      const newDocId = newParams.get('documentId') || id
+      
+      console.log('Document change event:', {
+        newDocId,
+        currentDocId: documentId,
+        hasCurrentContent: !!currentContent,
+        isTransitioning
+      })
+
+      if (newDocId !== documentId) {
+        // Reset state before loading new document
+        setCurrentContent(null)
+        setIsTransitioning(false)
+        loadDocument(newDocId)
+      }
+    }
+
+    window.addEventListener('documentChanged', handleDocumentChange)
+    return () => {
+      window.removeEventListener('documentChanged', handleDocumentChange)
+    }
+  }, [documentId, id, get])
 
   // Track document state changes
   useEffect(() => {
     console.log('Document state changed:', {
       id,
-      databaseDoc,
-      hybridDoc,
+      documentId,
       hasHybridDoc: !!hybridDoc,
       hasDatabaseDoc: !!databaseDoc,
-      content: hybridDoc?.content
+      hasCurrentContent: !!currentContent,
+      isTransitioning,
+      url: window.location.href
     })
-  }, [id, databaseDoc, hybridDoc])
+  }, [id, documentId, databaseDoc, hybridDoc, currentContent, isTransitioning])
 
-  const showSpinner = useSpinner(!hybridDoc)
+  const showSpinner = !documentContent && isTransitioning
 
   const { isLoading } = useUser()
   const [initAnimate, setInitAnimate] = useState(false)
@@ -99,11 +190,11 @@ export default function DocumentPage() {
   const debouncedSave = useDebouncedCallback((data: Partial<DocumentData>) => {
     console.log('Debounced save triggered:', {
       data,
-      id,
+      documentId,
       currentHybridDoc: hybridDoc
     })
-    mutate(`/documents/${id}/versions`)
-    save(data, id, setRecentlySaved)
+    mutate(`/documents/${documentId}/versions`)
+    save(data, documentId, setRecentlySaved)
     mutate(documentPath)
   }, 1000)
 
@@ -128,10 +219,10 @@ export default function DocumentPage() {
   }
 
   const handleRestoreVersion = async (version: VersionData) => {
-    if (!version || !id) return
+    if (!version || !documentId) return
 
     try {
-      await patch(`/documents/${id}`, {
+      await patch(`/documents/${documentId}`, {
         content: version.content,
         lastUpdated: Date.now()
       })
@@ -143,13 +234,16 @@ export default function DocumentPage() {
       }
 
       if (process.env.NEXT_PUBLIC_STORAGE_TYPE !== 'json') {
-        sessionStorage.setItem(id, JSON.stringify(updatedDoc))
+        sessionStorage.setItem(documentId, JSON.stringify(updatedDoc))
       }
       
       await Promise.all([
         mutate(documentPath, updatedDoc, true),
-        mutate(`/hybrid-documents/${id}`, updatedDoc, true)
+        mutate(`/hybrid-documents/${documentId}`, updatedDoc, true)
       ])
+
+      // Update current content to show restored version immediately
+      setCurrentContent(version.content)
     } catch (e) {
       console.error('Error in restore process:', e)
     }
@@ -162,6 +256,11 @@ export default function DocumentPage() {
     }
     setShowGlobalFind(!showGlobalFind)
   }
+
+  // Clear diff content when switching documents
+  useEffect(() => {
+    setDiffContent(null)
+  }, [documentId])
 
   if (!hybridDoc) {
     return (
@@ -247,6 +346,7 @@ export default function DocumentPage() {
               {showTree && allDocs && allFolders && (
                 <div className="h-[calc(100vh_-_44px)] p-4 overflow-y-auto">
                   <DocumentTree
+                    key="document-tree"
                     items={createTreeItems(allDocs, allFolders)}
                     onPrimaryAction={handlePrimaryAction}
                     showActionButton={false}
@@ -281,10 +381,10 @@ export default function DocumentPage() {
             >
               <div className="h-[calc(100vh_-_44px)] p-4 overflow-y-auto">
                 <VersionList 
-                  documentId={id} 
+                  documentId={documentId} 
                   onRestore={handleRestoreVersion}
                   onCompare={setDiffContent}
-                  currentContent={hybridDoc.content}
+                  currentContent={documentContent}
                 />
               </div>
             </motion.div>
@@ -293,25 +393,31 @@ export default function DocumentPage() {
 
         {/* Editor Container */}
         <div className="flex-1 flex justify-center lg:justify-center">
-          {/* Editor */}
           <div
             id="editor-container"
             className={`overflow-y-scroll p-[20px] pb-10 font-editor2 text-black/[.79] w-full lg:w-[740px]`}>
-            <div
-              className={`
-                flex transition-flex
-                duration-500 ease-in ${showSpinner ? 'mt-[-36px] flex-col justify-center' : ''}
-                relative pb-10`}>
+            <div className={`flex transition-flex duration-500 ease-in ${showSpinner ? 'mt-[-36px] flex-col justify-center' : ''} relative pb-10`}>
               {showSpinner && <Loader />}
-              {hybridDoc && (
-                <Editor
-                  content={diffContent || hybridDoc.content}
-                  title={hybridDoc.title}
-                  onUpdate={debouncedSave}
-                  canEdit={!diffContent}
-                  hideFooter={!!diffContent}
-                />
-              )}
+              <AnimatePresence mode="wait">
+                {documentContent && (
+                  <motion.div
+                    key={documentId}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Editor
+                      key={documentId}
+                      content={diffContent || documentContent}
+                      title={hybridDoc?.title || ''}
+                      onUpdate={debouncedSave}
+                      canEdit={!diffContent}
+                      hideFooter={!!diffContent}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </div>
