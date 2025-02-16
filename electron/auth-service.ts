@@ -11,7 +11,7 @@ import tokenStore from './token-store'
 const envPath = path.resolve(__dirname, '../../env-electron.json')
 const env = JSON.parse(fs.readFileSync(envPath, 'utf-8'))
 
-const apiIdentifier = env.NEXT_PUBLIC_BASE_URL + '/api'
+const apiIdentifier = env.API_IDENTIFIER
 const auth0Domain = env.AUTH0_DOMAIN
 const clientId = env.CLIENT_ID
 
