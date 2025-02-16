@@ -42,7 +42,8 @@ function ElectronApp() {
           get={window.electronAPI.get}
           destroy={window.electronAPI.destroy}
           patch={window.electronAPI.patch}
-          post={window.electronAPI.post}>
+          post={window.electronAPI.post}
+          delete={window.electronAPI.destroy}>
           <Providers>
             {location === '/' && <LandingPage />}
             {location === '/documents' && <DocumentsPage />}

@@ -20,9 +20,45 @@ The electron app requires Python for building native dependencies. To set up Pyt
    python3 -m pip install setuptools wheel
    ```
 
+### Configuration Options
+
+The electron app can be configured using `env-electron.json` in the root directory. There are two main modes:
+
+1. **Production Mode** - Uses Auth0 authentication and remote database:
+   ```json
+   {
+     "API_IDENTIFIER": "https://www.whetstone-writer.com/api",
+     "AUTH0_DOMAIN": "your-tenant.auth0.com",
+     "CLIENT_ID": "your-client-id",
+     "MOCK_AUTH": false,
+     "LOCAL_DB": false
+   }
+   ```
+
+2. **Local Development Mode** - Uses mock authentication and local database:
+   ```json
+   {
+     "API_IDENTIFIER": "https://www.whetstone-writer.com/api",
+     "AUTH0_DOMAIN": "your-tenant.auth0.com",
+     "CLIENT_ID": "your-client-id",
+     "MOCK_AUTH": true,
+     "LOCAL_DB": true
+   }
+   ```
+
+When `MOCK_AUTH` is enabled:
+- No Auth0 authentication is required
+- A mock user is provided automatically
+- The app skips the login process
+
+When `LOCAL_DB` is enabled:
+- Data is stored locally instead of in the remote database
+- No internet connection is required
+- Perfect for local development and testing
+
 ### Auth0 Configuration
 
-The electron app uses Auth0 for authentication. You'll need to set up the following:
+If not using mock authentication (`MOCK_AUTH: false`), you'll need to set up Auth0:
 
 1. Create an Auth0 account if you haven't already
 2. Create a new API in Auth0:
@@ -33,16 +69,6 @@ The electron app uses Auth0 for authentication. You'll need to set up the follow
    - Set application type to "Native"
    - Add `http://localhost/callback*` to the Allowed Callback URLs
    - Note down the Client ID
-
-4. Create an `env-electron.json` file in the root directory with the following structure:
-   ```json
-   {
-     "API_IDENTIFIER": "https://www.whetstone-writer.com/api",
-     "AUTH0_DOMAIN": "your-tenant.auth0.com",
-     "CLIENT_ID": "your-client-id"
-   }
-   ```
-   Replace `your-tenant.auth0.com` with your Auth0 domain and `your-client-id` with the Client ID from step 3.
 
 ## Starting the App
 
@@ -73,4 +99,5 @@ If you encounter authentication errors:
 1. Verify your Auth0 configuration in `env-electron.json`
 2. Ensure your Auth0 application is set up as a Native application
 3. Confirm the callback URL is correctly set in Auth0
-4. Check that your API identifier matches exactly what's in Auth0 
+4. Check that your API identifier matches exactly what's in Auth0
+5. Consider enabling `MOCK_AUTH: true` for local development 

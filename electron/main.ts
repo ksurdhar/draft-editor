@@ -1,4 +1,6 @@
 import { BrowserWindow, app, ipcMain, dialog } from 'electron'
+import * as fs from 'fs'
+import * as path from 'path'
 import apiService from './api-service'
 import { createAppWindow } from './app'
 import { createAuthWindow, createLogoutWindow } from './auth-process'
@@ -6,13 +8,26 @@ import authService from './auth-service'
 
 let mainWindow: BrowserWindow | null = null
 
+const envPath = path.resolve(__dirname, '../../env-electron.json')
+const env = JSON.parse(fs.readFileSync(envPath, 'utf-8'))
+const mockAuth = env.MOCK_AUTH || false
+
 async function createWindow() {
   try {
-    // if previously authorized, get refresh tokens
-    await authService.refreshTokens()
-    mainWindow = await createAppWindow()
+    if (mockAuth) {
+      // Skip auth in mock mode
+      mainWindow = await createAppWindow()
+    } else {
+      // Normal auth flow
+      await authService.refreshTokens()
+      mainWindow = await createAppWindow()
+    }
   } catch (err) {
-    await createAuthWindow()
+    if (!mockAuth) {
+      await createAuthWindow()
+    } else {
+      mainWindow = await createAppWindow()
+    }
   }
 }
 
@@ -53,4 +68,4 @@ app
       if (mainWindow === null) createWindow()
     })
   })
-  .catch(console.log)
+  .catch(console.trace)

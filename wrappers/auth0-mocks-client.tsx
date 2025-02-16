@@ -1,13 +1,7 @@
-import { UserContext, UserProfile } from '@auth0/nextjs-auth0/client'
+import { UserContext } from '@auth0/nextjs-auth0/client'
 import { NextApiRequest, NextApiResponse } from 'next'
 import { FC, ReactNode, createContext } from 'react'
-
-export const mockUser: UserProfile = {
-  name: 'Mock User',
-  email: 'mockuser@example.com',
-  picture: 'https://mock.image.url',
-  sub: 'mock|12345',
-}
+import { mockUser } from '../lib/mock-auth'
 
 const userContext: UserContext = {
   user: mockUser,
