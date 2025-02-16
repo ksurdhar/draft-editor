@@ -33,6 +33,11 @@ export interface DocumentTreeProps {
 }
 
 export const createTreeItems = (docs: DocumentData[], folders: FolderData[]): Record<string, TreeItemData> => {
+  console.log('Creating tree items with:', { 
+    docs: docs.map(d => ({ id: d._id || d.id, title: d.title })),
+    folders: folders.map(f => ({ id: f._id || f.id, title: f.title }))
+  })
+
   const treeItems: Record<string, TreeItemData> = {
     root: {
       index: 'root',
@@ -46,47 +51,69 @@ export const createTreeItems = (docs: DocumentData[], folders: FolderData[]): Re
 
   // Add folders first
   folders.forEach(folder => {
-    const folderId = folder._id
+    const folderId = folder._id || folder.id
+    if (!folderId) {
+      console.warn('Found folder without ID:', folder)
+      return
+    }
+    if (treeItems[folderId]) {
+      console.warn('Duplicate folder ID:', folderId)
+      return
+    }
     treeItems[folderId] = {
       index: folderId,
       canMove: true,
       canRename: true,
       isFolder: true,
       children: [],
-      data: folder.title,
+      data: folder.title || 'Untitled Folder',
       folderIndex: folder.folderIndex
     }
   })
 
   // Add documents
   docs.forEach(doc => {
-    const docId = doc._id
+    const docId = doc._id || doc.id
+    if (!docId) {
+      console.warn('Found document without ID:', doc)
+      return
+    }
+    if (treeItems[docId]) {
+      console.warn('Duplicate document ID:', docId)
+      return
+    }
     treeItems[docId] = {
       index: docId,
       canMove: true,
       canRename: true,
       isFolder: false,
-      data: doc.title,
+      data: doc.title || 'Untitled',
       folderIndex: doc.folderIndex
     }
   })
 
   // Build tree structure with sorted children
   folders.forEach(folder => {
-    const folderId = folder._id
+    const folderId = folder._id || folder.id
+    if (!folderId) return
     const parentId = folder.parentId || 'root'
     if (treeItems[parentId]) {
       treeItems[parentId].children = treeItems[parentId].children || []
-      treeItems[parentId].children.push(folderId)
+      if (!treeItems[parentId].children.includes(folderId)) {
+        treeItems[parentId].children.push(folderId)
+      }
     }
   })
 
   docs.forEach(doc => {
-    const docId = doc._id
+    const docId = doc._id || doc.id
+    if (!docId) return
     const parentId = doc.parentId || 'root'
     if (treeItems[parentId]) {
       treeItems[parentId].children = treeItems[parentId].children || []
-      treeItems[parentId].children.push(docId)
+      if (!treeItems[parentId].children.includes(docId)) {
+        treeItems[parentId].children.push(docId)
+      }
     }
   })
 
@@ -96,7 +123,7 @@ export const createTreeItems = (docs: DocumentData[], folders: FolderData[]): Re
       item.children.sort((a, b) => {
         const itemA = treeItems[a.toString()]
         const itemB = treeItems[b.toString()]
-        return (itemA.folderIndex || 0) - (itemB.folderIndex || 0)
+        return (itemA?.folderIndex || 0) - (itemB?.folderIndex || 0)
       })
     }
   })

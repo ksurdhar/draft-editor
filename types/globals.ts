@@ -67,6 +67,7 @@ export type AnimationState = 'Active' | 'Complete' | 'Inactive'
 
 export type FolderData = {
   _id: string
+  id?: string // Added for compatibility with frontend
   title: string
   parentId?: string | 'root' // ID of the parent folder, 'root' means root level
   userId: string
