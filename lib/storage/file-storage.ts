@@ -31,12 +31,17 @@ export class FileStorageAdapter implements StorageAdapter {
   }
 
   async create(collection: string, data: Omit<Document, '_id'>): Promise<Document> {
+    console.log('\n=== FileStorageAdapter.create ===')
+    console.log('Collection:', collection)
+    console.log('Input data:', data)
+
     if (!collection) {
       throw new Error('Collection name is required')
     }
 
     const documentsPath = this.getDocumentsPath(collection)
     fs.ensureDirSync(documentsPath)
+    console.log('Documents path:', documentsPath)
 
     const newDoc: Document = {
       ...data,
@@ -44,23 +49,34 @@ export class FileStorageAdapter implements StorageAdapter {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }
+    console.log('Created new document:', newDoc)
 
     const filePath = this.getDocumentPath(collection, newDoc._id)
+    console.log('Writing to file path:', filePath)
     await fs.writeFile(filePath, JSON.stringify(newDoc, null, 2))
+    console.log('Successfully wrote document to file')
 
     return newDoc
   }
 
   async findById(collection: string, id: string): Promise<Document | null> {
+    console.log('\n=== FileStorageAdapter.findById ===')
+    console.log('Collection:', collection)
+    console.log('Document ID:', id)
+
     const filePath = this.getDocumentPath(collection, id)
+    console.log('Looking for file:', filePath)
     
     if (!fs.existsSync(filePath)) {
+      console.log('File not found')
       return null
     }
 
     try {
       const content = await fs.readFile(filePath, 'utf-8')
-      return JSON.parse(content) as Document
+      const doc = JSON.parse(content) as Document
+      console.log('Found document:', doc)
+      return doc
     } catch (error) {
       console.error('Error reading document:', error)
       return null
@@ -95,23 +111,41 @@ export class FileStorageAdapter implements StorageAdapter {
   }
 
   async update(collection: string, id: string, data: Partial<Document>): Promise<Document | null> {
+    console.log('\n=== FileStorageAdapter.update ===')
+    console.log('Collection:', collection)
+    console.log('Document ID:', id)
+    console.log('Update data:', data)
+
     const filePath = this.getDocumentPath(collection, id)
+    console.log('File path:', filePath)
     
     if (!fs.existsSync(filePath)) {
+      console.log('File not found')
       return null
     }
 
     try {
       const content = await fs.readFile(filePath, 'utf-8')
       const existingDoc = JSON.parse(content) as Document
+      console.log('Existing document:', existingDoc)
       
+      // Only include defined fields in the update
+      const definedUpdates = Object.entries(data).reduce((acc, [key, value]) => {
+        if (value !== undefined) {
+          acc[key] = value
+        }
+        return acc
+      }, {} as Record<string, any>)
+
       const updatedDoc = {
         ...existingDoc,
-        ...data,
+        ...definedUpdates,
         updatedAt: new Date().toISOString()
       }
+      console.log('Updated document:', updatedDoc)
 
       await fs.writeFile(filePath, JSON.stringify(updatedDoc, null, 2))
+      console.log('Successfully wrote updated document to file')
       return updatedDoc
     } catch (error) {
       console.error('Error updating document:', error)

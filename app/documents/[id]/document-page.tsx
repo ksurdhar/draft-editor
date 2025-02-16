@@ -52,9 +52,7 @@ export default function DocumentPage() {
   const id = location.split('/').pop()?.split('?')[0] || ''
   const { get, patch } = useAPI()
   const save = useSave()
-  const pathname = getLocation()
 
-  const api = useAPI()
   const fetcher = useCallback(
     async (path: string) => {
       return await get(path)

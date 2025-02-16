@@ -113,18 +113,32 @@ const ElectronDocumentsPage = () => {
   const createFolder = useCallback(
     async (title: string, parentId?: string) => {
       try {
-        const response = await window.electronAPI.post('folders', {
+        // Prepare the folder data
+        const folderData = {
           title,
-          parentId,
-          userId: 'current',
-          lastUpdated: Date.now()
-        })
-        setFolders([...folders, response])
+          parentId: parentId || 'root', // Set root as default if no parent
+          userId: user?.sub || 'mock|12345', // Use actual user ID
+          lastUpdated: Date.now(),
+          folderIndex: folders.length // Set folder index based on current folders length
+        }
+
+        // Make the API call
+        const response = await window.electronAPI.post('folders', folderData)
+        
+        // Optimistically update the UI
+        setFolders(currentFolders => [...currentFolders, response])
+
+        // Fetch fresh data to ensure everything is in sync
+        const foldersResult = await window.electronAPI.get('/folders')
+        setFolders(foldersResult)
       } catch (error) {
         console.error('Error creating folder:', error)
+        // On error, refresh the data to ensure UI is in sync
+        const foldersResult = await window.electronAPI.get('/folders')
+        setFolders(foldersResult)
       }
     },
-    [folders]
+    [folders.length, user?.sub] // Add dependencies for folders length and user ID
   )
 
   const renameFolder = useCallback(
@@ -146,7 +160,7 @@ const ElectronDocumentsPage = () => {
     if (!user?.sub) return
     
     try {
-      const docId = await createDocument(
+      await createDocument(
         user.sub,
         operations,
         (docId) => {

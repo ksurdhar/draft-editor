@@ -4,6 +4,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import authService from './auth-service'
 import { documentStorage, versionStorage } from './storage-adapter'
+import { DEFAULT_DOCUMENT_CONTENT } from '../lib/constants'
 
 const envPath = path.resolve(__dirname, '../../env-electron.json')
 const env = JSON.parse(fs.readFileSync(envPath, 'utf-8'))
@@ -34,8 +35,10 @@ const apiService = {
   },
 
   deleteDocument: async (id: string) => {
-    // console.log('deleteDocument called:', id)
+    console.log('\n=== Deleting Document ===')
+    console.log('Document ID:', id)
     const result = await makeRequest('delete', `/documents/${id}`)
+    console.log('Delete result:', result)
     return result.data
   },
 
@@ -93,11 +96,10 @@ const makeRequest = async (
       }
       if (method === 'post') {
         console.log('Creating new document:', data)
-        const defaultContent = JSON.stringify([{ type: 'default', children: [{ text: '', highlight: 'none' }] }])
         const now = Date.now()
         const newDocument = await documentStorage.create(DOCUMENTS_COLLECTION, {
           ...data,
-          content: defaultContent,
+          content: DEFAULT_DOCUMENT_CONTENT,
           comments: [],
           lastUpdated: now
         })
@@ -108,7 +110,101 @@ const makeRequest = async (
     }
     if (endpoint === 'folders') {
       console.log('Handling collection-level folders request')
-      return { data: await documentStorage.find(FOLDERS_COLLECTION, {}) }
+      if (method === 'get') {
+        return { data: await documentStorage.find(FOLDERS_COLLECTION, {}) }
+      }
+      if (method === 'post') {
+        console.log('Creating new folder:', data)
+        const now = Date.now()
+        const newFolder = await documentStorage.create(FOLDERS_COLLECTION, {
+          ...data,
+          lastUpdated: now
+        })
+        console.log('Created folder:', newFolder)
+        return { data: newFolder }
+      }
+      return { data: null }
+    }
+
+    // Handle bulk delete operation
+    if (endpoint === 'documents/bulk-delete') {
+      console.log('Handling bulk delete request')
+      if (method === 'post' && data) {
+        const { documentIds = [], folderIds = [] } = data as { documentIds: string[], folderIds: string[] }
+        console.log('Bulk deleting:', { documentIds, folderIds })
+
+        // Helper function to recursively delete a folder and its contents
+        async function deleteFolder(folderId: string) {
+          console.log(`Starting to delete folder ${folderId}`)
+          
+          // Get all documents and subfolders in this folder
+          const [docs, subfolders] = await Promise.all([
+            documentStorage.find(DOCUMENTS_COLLECTION, { parentId: folderId }),
+            documentStorage.find(FOLDERS_COLLECTION, { parentId: folderId })
+          ])
+
+          console.log(`Found in folder ${folderId}:`, {
+            documentsCount: docs.length,
+            subfoldersCount: subfolders.length,
+            documents: docs.map(d => d._id),
+            subfolders: subfolders.map(f => f._id)
+          })
+
+          // Recursively delete all subfolders
+          if (subfolders.length > 0) {
+            console.log(`Deleting ${subfolders.length} subfolders of ${folderId}`)
+            await Promise.all(
+              subfolders.map(folder => folder._id ? deleteFolder(folder._id) : Promise.resolve())
+            )
+          }
+
+          // Delete all documents in this folder
+          if (docs.length > 0) {
+            console.log(`Deleting ${docs.length} documents from folder ${folderId}`)
+            await Promise.all(
+              docs.map(doc => doc._id ? 
+                documentStorage.delete(DOCUMENTS_COLLECTION, { _id: doc._id }) : 
+                Promise.resolve()
+              )
+            )
+          }
+
+          // Finally delete the folder itself
+          console.log(`Deleting folder ${folderId}`)
+          const result = await documentStorage.delete(FOLDERS_COLLECTION, { _id: folderId })
+          if (!result) {
+            throw new Error(`Failed to delete folder ${folderId}`)
+          }
+          return result
+        }
+
+        try {
+          // Delete all documents
+          if (documentIds.length > 0) {
+            console.log(`Starting to delete ${documentIds.length} documents`)
+            await Promise.all(
+              documentIds.map(id => 
+                documentStorage.delete(DOCUMENTS_COLLECTION, { _id: id })
+              )
+            )
+          }
+
+          // Delete all folders recursively
+          if (folderIds.length > 0) {
+            console.log(`Starting to delete ${folderIds.length} folders`)
+            await Promise.all(
+              folderIds.map(id => deleteFolder(id))
+            )
+          }
+
+          console.log('Bulk delete operation completed successfully')
+          return { data: { success: true } }
+        } catch (error) {
+          console.error('Error during bulk delete:', error)
+          return { data: { success: false, error: error.message } }
+        }
+      }
+      return { data: null }
     }
 
     // Handle document operations
@@ -130,7 +226,10 @@ const makeRequest = async (
           if (!data) return { data: null }
           return { data: await documentStorage.update(DOCUMENTS_COLLECTION, id, data as Partial<Document>) }
         case 'delete':
-          return { data: await documentStorage.delete(DOCUMENTS_COLLECTION, { _id: id }) }
+          console.log('Attempting to delete document with ID:', id)
+          const deleteResult = await documentStorage.delete(DOCUMENTS_COLLECTION, { _id: id })
+          console.log('Delete operation result:', deleteResult)
+          return { data: { success: deleteResult } }
         case 'post':
           if (!data) return { data: null }
           return { data: await documentStorage.create(DOCUMENTS_COLLECTION, data as Omit<Document, '_id'>) }

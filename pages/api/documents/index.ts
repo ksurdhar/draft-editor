@@ -2,16 +2,16 @@ import withHybridAuth, { ExtendedApiRequest } from '@lib/with-hybrid-auth'
 import { DocumentData } from '@typez/globals'
 import type { NextApiResponse } from 'next'
 import { storage } from '@lib/storage'
+import { DEFAULT_DOCUMENT_CONTENT, DEFAULT_DOCUMENT_TITLE } from '@lib/constants'
 
 const handlers = {
   async POST(req: ExtendedApiRequest, res: NextApiResponse) {
     const now = Date.now()
-    const defaultContent = JSON.stringify([{ type: 'default', children: [{ text: '', highlight: 'none' }] }])
     const newDocument = await storage.create('documents', {
       ...req.body,
       userId: req.user!.sub,
-      title: req.body.title || 'Untitled Document',
-      content: req.body.content || defaultContent,
+      title: req.body.title || DEFAULT_DOCUMENT_TITLE,
+      content: req.body.content || DEFAULT_DOCUMENT_CONTENT,
       comments: [],
       lastUpdated: now
     })

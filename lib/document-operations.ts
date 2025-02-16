@@ -145,18 +145,25 @@ export const createDocument = async (
   onSuccess: (docId: string) => void
 ) => {
   try {
+    console.log('\n=== Creating Document ===')
+    console.log('Initial data:', { userId })
+
     const response = await operations.createDocument({ 
       userId,
       title: 'Untitled',
     })
+    console.log('Create document response:', response)
     
     // Handle both direct response and response.data patterns
     const data = response.data || response
+    console.log('Processed response data:', data)
+
     const docId = data._id || data.id
     if (!docId) {
       throw new Error('No document ID in response: ' + JSON.stringify(data))
     }
     
+    console.log('Successfully created document with ID:', docId)
     onSuccess(docId)
     return docId
   } catch (error) {
