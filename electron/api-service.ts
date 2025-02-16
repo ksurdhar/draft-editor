@@ -14,13 +14,6 @@ const BASE_URL = 'https://whetstone-writer.com/api'
 const DOCUMENTS_COLLECTION = 'documents'
 const FOLDERS_COLLECTION = 'folders'
 
-// console.log('API Service Configuration:', {
-//   useLocalDb,
-//   baseUrl: BASE_URL,
-//   documentsCollection: DOCUMENTS_COLLECTION,
-//   foldersCollection: FOLDERS_COLLECTION
-// })
-
 const apiService = {
   getDocuments: async () => {
     // console.log('getDocuments called')

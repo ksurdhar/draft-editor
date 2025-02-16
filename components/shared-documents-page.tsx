@@ -4,7 +4,7 @@ import Layout from '@components/layout'
 import { Loader } from '@components/loader'
 import { useSpinner } from '@lib/hooks'
 import { DocumentData, FolderData } from '@typez/globals'
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import CreateNewFolderIcon from '@mui/icons-material/CreateNewFolder'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
@@ -13,99 +13,180 @@ import { IconButton, Menu, MenuItem, Tooltip } from '@mui/material'
 import RenameModal from './rename-modal'
 import DeleteModal from './delete-modal'
 import CreateFolderModal from './create-folder-modal'
-import { TreeItem, TreeItemIndex } from 'react-complex-tree'
+import DocumentTree, { createTreeItems } from './document-tree'
 import { useNavigation, useAPI } from '@components/providers'
 import { useUser } from '@wrappers/auth-wrapper-client'
-import DocumentTree, { createTreeItems } from './document-tree'
+import { moveItem, bulkDelete, createDocument, DocumentOperations } from '@lib/document-operations'
+import useSWR, { mutate } from 'swr'
 
 export interface SharedDocumentsPageProps {
-  docs: DocumentData[]
-  folders: FolderData[]
-  isLoading: boolean
-  renameDocument: (id: string, title: string) => void
-  createFolder: (title: string, parentId?: string) => void
-  renameFolder: (id: string, title: string) => void
-  onMove?: (itemId: string, targetFolderId?: string, dropIndex?: number) => Promise<void>
-  bulkDelete: (documentIds: string[], folderIds: string[]) => Promise<void>
-  onCreateDocument?: () => Promise<void>
+  className?: string
 }
 
-const SharedDocumentsPage = ({
-  docs = [],
-  folders = [],
-  isLoading,
-  renameDocument,
-  createFolder,
-  renameFolder,
-  onMove,
-  bulkDelete,
-  onCreateDocument,
-}: SharedDocumentsPageProps) => {
+const SharedDocumentsPage = ({ className = '' }: SharedDocumentsPageProps) => {
   const { navigateTo } = useNavigation()
-  const { post } = useAPI()
-  const { user } = useUser()
+  const { get, post, patch, destroy } = useAPI()
+  const { user, isLoading: userLoading } = useUser()
   const [selectedDocId, setSelectedDoc] = useState<string | null>(null)
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [renameModalOpen, setRenameModalOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [createFolderModalOpen, setCreateFolderModalOpen] = useState(false)
-  const showSpinner = useSpinner(isLoading)
   const [newFolderParentId, setNewFolderParentId] = useState<string | undefined>()
-  const [selectedItems, setSelectedItems] = useState<TreeItemIndex[]>([])
+  const [selectedItems, setSelectedItems] = useState<string[]>([])
   const [initAnimate, setInitAnimate] = useState(false)
+
+  // Fetch documents and folders
+  const { data: docs, mutate: mutateDocs, isLoading: docsLoading } = useSWR<DocumentData[]>('/documents', get)
+  const { data: folders, mutate: mutateFolders, isLoading: foldersLoading } = useSWR<FolderData[]>('/folders', get)
+
+  const operations = useMemo<DocumentOperations>(() => ({
+    patchDocument: (id: string, data: any) => patch(`documents/${id}`, data),
+    patchFolder: (id: string, data: any) => patch(`folders/${id}`, data),
+    bulkDeleteItems: (documentIds: string[], folderIds: string[]) => 
+      post('documents/bulk-delete', { documentIds, folderIds }),
+    createDocument: async (data: any) => {
+      const response = await post('/documents', data)
+      return response
+    }
+  }), [patch, post])
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setInitAnimate(true)
     }, 50)
-
     return () => clearTimeout(timer)
   }, [])
 
-  // Handle URL changes
-  useEffect(() => {
-    const handleRouteChange = () => {
-      setInitAnimate(false)
-    }
-
-    window.addEventListener('popstate', handleRouteChange)
-    return () => window.removeEventListener('popstate', handleRouteChange)
-  }, [])
-
-  // Add keyboard shortcut handler
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger if we're in an input field
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return
+  const handleMoveItem = useCallback(
+    async (itemId: string, targetFolderId?: string, targetIndex?: number) => {
+      try {
+        await moveItem(
+          itemId,
+          targetFolderId,
+          targetIndex,
+          docs || [],
+          folders || [],
+          operations,
+          (updatedDocs, updatedFolders) => {
+            mutateDocs(updatedDocs, false)
+            mutateFolders(updatedFolders, false)
+          }
+        )
+      } catch (error) {
+        // Revert on error
+        mutateDocs()
+        mutateFolders()
       }
+    },
+    [docs, folders, operations, mutateDocs, mutateFolders]
+  )
 
-      // Don't handle shortcuts if any modal is open
-      if (deleteModalOpen || renameModalOpen || createFolderModalOpen) {
-        return
+  const handleBulkDelete = useCallback(
+    async (documentIds: string[], folderIds: string[]) => {
+      try {
+        await bulkDelete(
+          documentIds,
+          folderIds,
+          docs || [],
+          folders || [],
+          operations,
+          (updatedDocs, updatedFolders) => {
+            mutateDocs(updatedDocs, false)
+            mutateFolders(updatedFolders, false)
+          }
+        )
+      } catch (error) {
+        // Revert on error
+        mutateDocs()
+        mutateFolders()
       }
+    },
+    [docs, folders, operations, mutateDocs, mutateFolders]
+  )
 
-      if ((e.metaKey || e.ctrlKey) && e.key === 'd') {
-        e.preventDefault()
-        if (selectedItems.length > 0) {
-          setDeleteModalOpen(true)
+  const renameDocument = useCallback(
+    async (id: string, title: string) => {
+      // Update list view immediately
+      const updatedDocs = (docs || []).map(doc => (doc._id === id ? { ...doc, title } : doc))
+      mutateDocs(updatedDocs, false)
+
+      try {
+        // Update the document
+        const updatedDoc = await operations.patchDocument(id, {
+          title,
+          lastUpdated: Date.now(),
+        })
+
+        // Update both the list and individual document cache
+        await Promise.all([
+          // Revalidate the documents list
+          mutateDocs(current => 
+            current?.map(doc => doc._id === id ? { ...doc, title } : doc)
+          ),
+          // Update/revalidate the individual document cache
+          mutate(`/documents/${id}`, { ...updatedDoc, title }, false)
+        ])
+      } catch (e) {
+        console.log(e)
+        mutateDocs()
+      }
+    },
+    [mutateDocs, docs, operations, mutate],
+  )
+
+  const createFolder = useCallback(
+    async (title: string, parentId?: string) => {
+      try {
+        const folderData = {
+          title,
+          parentId: parentId || 'root',
+          userId: user?.sub || 'current',
+          lastUpdated: Date.now(),
+          folderIndex: (folders || []).length
         }
-      } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        e.preventDefault()
-        if (selectedItems.length > 0) {
-          setDeleteModalOpen(true)
-        }
-      } else if (e.key === 'Escape') {
-        e.preventDefault()
-        setSelectedItems([])
+
+        const response = await post('folders', folderData)
+        mutateFolders([...(folders || []), response], false)
+      } catch (error) {
+        console.error('Error creating folder:', error)
+        mutateFolders()
       }
+    },
+    [folders, mutateFolders, post, user?.sub]
+  )
+
+  const renameFolder = useCallback(
+    async (id: string, title: string) => {
+      try {
+        const response = await operations.patchFolder(id, {
+          title,
+          lastUpdated: Date.now()
+        })
+        mutateFolders((folders || []).map(folder => folder._id === id ? response : folder), false)
+      } catch (error) {
+        console.error('Error renaming folder:', error)
+        mutateFolders()
+      }
+    },
+    [folders, operations, mutateFolders]
+  )
+
+  const handleCreateDocument = useCallback(async () => {
+    if (!user?.sub) return
+    
+    try {
+      await createDocument(
+        user.sub,
+        operations,
+        (docId) => {
+          navigateTo(`/documents/${docId}?focus=title`)
+        }
+      )
+    } catch (error) {
+      console.error('Error creating document:', error)
     }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedItems, deleteModalOpen, renameModalOpen, createFolderModalOpen])
-
-  const items = useMemo(() => createTreeItems(docs, folders), [docs, folders])
+  }, [user?.sub, operations, navigateTo])
 
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>, id: string) => {
     event.stopPropagation()
@@ -130,10 +211,11 @@ const SharedDocumentsPage = ({
 
   const handleDeleteConfirm = async () => {
     try {
-      const selectedDocs = selectedItems.map(id => id.toString()).filter(id => !items[id]?.isFolder)
-      const selectedFolders = selectedItems.map(id => id.toString()).filter(id => items[id]?.isFolder)
+      const items = createTreeItems(docs || [], folders || [])
+      const selectedDocs = selectedItems.filter(id => !items[id]?.isFolder)
+      const selectedFolders = selectedItems.filter(id => items[id]?.isFolder)
 
-      await bulkDelete(selectedDocs, selectedFolders)
+      await handleBulkDelete(selectedDocs, selectedFolders)
       setDeleteModalOpen(false)
       setSelectedItems([])
     } catch (error) {
@@ -141,41 +223,8 @@ const SharedDocumentsPage = ({
     }
   }
 
-  const handleCreateFolder = () => {
-    setCreateFolderModalOpen(true)
-  }
-
-  const handleCollapseAll = () => {
-    // This will be handled by the tree component internally
-  }
-
-  const handleExpandAll = () => {
-    // This will be handled by the tree component internally
-  }
-
-  const handleCreateDocument = async () => {
-    if (!onCreateDocument) {
-      console.error('No document creation handler provided')
-      return
-    }
-    await onCreateDocument()
-  }
-
-  const handlePrimaryAction = (item: TreeItem) => {
-    const selectedId = item.index.toString()
-    if (!selectedId || !items[selectedId]) return
-
-    const treeItem = items[selectedId]
-    if (!treeItem.isFolder) {
-      navigateTo(`/documents/${selectedId}`)
-    } else {
-      setNewFolderParentId(selectedId)
-    }
-  }
-
-  const handleSelectedItemsChange = (items: TreeItemIndex[]) => {
-    setSelectedItems(items)
-  }
+  const showSpinner = useSpinner(docsLoading || foldersLoading || userLoading)
+  const items = useMemo(() => createTreeItems(docs || [], folders || []), [docs, folders])
 
   const emptyMessage = (
     <div className={'text-center text-[14px] font-semibold uppercase text-black/[.5]'}>
@@ -191,26 +240,6 @@ const SharedDocumentsPage = ({
         <div className="flex w-11/12 max-w-[740px] flex-col justify-center sm:w-9/12">
           <div className="flex justify-end mb-4 gap-2">
             <div className="flex gap-0.5 bg-white/[.05] rounded-lg">
-              <Tooltip title="Collapse all">
-                <IconButton
-                  onClick={handleCollapseAll}
-                  className="hover:bg-black/[.10]"
-                  size="small"
-                >
-                  <ExpandLessIcon />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Expand all">
-                <IconButton
-                  onClick={handleExpandAll}
-                  className="hover:bg-black/[.10]"
-                  size="small"
-                >
-                  <ExpandMoreIcon />
-                </IconButton>
-              </Tooltip>
-            </div>
-            <div className="flex gap-0.5 bg-white/[.05] rounded-lg">
               <Tooltip title="Create new document">
                 <IconButton
                   onClick={handleCreateDocument}
@@ -222,7 +251,7 @@ const SharedDocumentsPage = ({
               </Tooltip>
               <Tooltip title="Create new folder">
                 <IconButton
-                  onClick={handleCreateFolder}
+                  onClick={() => setCreateFolderModalOpen(true)}
                   className="hover:bg-black/[.10]"
                   size="small"
                 >
@@ -233,16 +262,16 @@ const SharedDocumentsPage = ({
           </div>
           <div className="max-h-[calc(100vh_-_100px)] overflow-y-auto rounded-lg bg-white/[.05] p-4">
             {showSpinner && <Loader />}
-            {!isLoading && (!docs?.length && !folders?.length) && emptyMessage}
-            {(!isLoading && (docs?.length > 0 || folders?.length > 0)) && (
+            {!docsLoading && !foldersLoading && (!docs?.length && !folders?.length) && emptyMessage}
+            {(!docsLoading && !foldersLoading && (docs?.length || folders?.length)) && (
               <DocumentTree
                 items={items}
-                onPrimaryAction={handlePrimaryAction}
-                onMove={onMove}
+                onPrimaryAction={item => navigateTo(`/documents/${item.index}?from=tree`)}
+                onMove={handleMoveItem}
                 showActionButton={true}
                 onActionButtonClick={handleMenuClick}
                 selectedItems={selectedItems}
-                onSelectedItemsChange={handleSelectedItemsChange}
+                onSelectedItemsChange={items => setSelectedItems(items.map(i => i.toString()))}
               />
             )}
           </div>
@@ -322,7 +351,7 @@ const SharedDocumentsPage = ({
           setSelectedDoc(null)
         }}
         onConfirm={handleDeleteConfirm}
-        documentTitle={selectedItems.map(id => items[id.toString()]?.data.toUpperCase()).join(', ')}
+        documentTitle={selectedItems.map(id => items[id]?.data.toUpperCase()).join(', ')}
         itemCount={selectedItems.length}
       />
 
