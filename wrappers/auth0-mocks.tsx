@@ -1,6 +1,6 @@
 import { Session } from '@auth0/nextjs-auth0'
 import { NextApiHandler, NextApiRequest, NextApiResponse } from 'next'
-import { mockUser } from './auth0-mocks-client'
+import { mockUser } from '@lib/mock-auth'
 
 const mockSession: Session = {
   user: mockUser,
