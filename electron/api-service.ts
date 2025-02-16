@@ -88,7 +88,23 @@ const makeRequest = async (
     // Handle collection-level operations
     if (endpoint === 'documents') {
       console.log('Handling collection-level documents request')
-      return { data: await documentStorage.find(DOCUMENTS_COLLECTION, {}) }
+      if (method === 'get') {
+        return { data: await documentStorage.find(DOCUMENTS_COLLECTION, {}) }
+      }
+      if (method === 'post') {
+        console.log('Creating new document:', data)
+        const defaultContent = JSON.stringify([{ type: 'default', children: [{ text: '', highlight: 'none' }] }])
+        const now = Date.now()
+        const newDocument = await documentStorage.create(DOCUMENTS_COLLECTION, {
+          ...data,
+          content: defaultContent,
+          comments: [],
+          lastUpdated: now
+        })
+        console.log('Created document:', newDocument)
+        return { data: newDocument }
+      }
+      return { data: null }
     }
     if (endpoint === 'folders') {
       console.log('Handling collection-level folders request')

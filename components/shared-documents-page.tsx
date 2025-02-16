@@ -27,6 +27,7 @@ export interface SharedDocumentsPageProps {
   renameFolder: (id: string, title: string) => void
   onMove?: (itemId: string, targetFolderId?: string, dropIndex?: number) => Promise<void>
   bulkDelete: (documentIds: string[], folderIds: string[]) => Promise<void>
+  onCreateDocument?: () => Promise<void>
 }
 
 const SharedDocumentsPage = ({
@@ -38,6 +39,7 @@ const SharedDocumentsPage = ({
   renameFolder,
   onMove,
   bulkDelete,
+  onCreateDocument,
 }: SharedDocumentsPageProps) => {
   const { navigateTo } = useNavigation()
   const { post } = useAPI()
@@ -152,20 +154,11 @@ const SharedDocumentsPage = ({
   }
 
   const handleCreateDocument = async () => {
-    try {
-      const response = await post('/documents', { 
-        userId: user?.sub,
-        title: 'Untitled'
-      })
-      const docId = response._id || response.id
-      if (!docId) {
-        console.error('No document ID in response:', response)
-        return
-      }
-      navigateTo(`/documents/${docId}?focus=title`)
-    } catch (error) {
-      console.error('Error creating document:', error)
+    if (!onCreateDocument) {
+      console.error('No document creation handler provided')
+      return
     }
+    await onCreateDocument()
   }
 
   const handlePrimaryAction = (item: TreeItem) => {
