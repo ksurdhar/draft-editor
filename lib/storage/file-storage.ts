@@ -95,7 +95,7 @@ export class FileStorageAdapter implements StorageAdapter {
     try {
       const content = await fs.readFile(filePath, 'utf-8')
       const doc = JSON.parse(content) as Document
-      console.log('Found document:', doc)
+      // console.log('Found document:', doc)
       return doc
     } catch (error) {
       console.error('Error reading document:', error)

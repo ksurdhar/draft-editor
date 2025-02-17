@@ -114,7 +114,7 @@ export class YjsStorageAdapter implements StorageAdapter {
         doc.content = ytext.toString()
       }
 
-      console.log('Found document:', doc._id)
+      // console.log('Found document:', doc._id)
       return this.ensureStringDates(doc)
     } catch (error) {
       console.error('Error reading document:', error)
