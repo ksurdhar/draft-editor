@@ -35,11 +35,32 @@ const SharedDocumentsPage = () => {
   const [initAnimate, setInitAnimate] = useState(false)
 
   // Use appropriate endpoint based on platform
-  const documentsEndpoint = isElectron ? '/documents' : '/documents/metadata'
+  const documentsEndpoint = 'documents'
 
-  // Fetch documents and folders
-  const { data: docs, mutate: mutateDocs, isLoading: docsLoading } = useSWR<DocumentData[]>(documentsEndpoint, get)
-  const { data: folders, mutate: mutateFolders, isLoading: foldersLoading } = useSWR<FolderData[]>('/folders', get)
+  // Fetch documents and folders with proper error handling
+  const { data: docs, mutate: mutateDocs, isLoading: docsLoading } = useSWR<DocumentData[]>(
+    documentsEndpoint,
+    get,
+    { 
+      dedupingInterval: 5000,
+      revalidateOnFocus: false, // Prevent revalidation on window focus
+      onError: (error) => {
+        console.error('Error fetching documents:', error)
+      }
+    }
+  )
+  
+  const { data: folders, mutate: mutateFolders, isLoading: foldersLoading } = useSWR<FolderData[]>(
+    'folders',
+    get,
+    { 
+      dedupingInterval: 5000,
+      revalidateOnFocus: false, // Prevent revalidation on window focus
+      onError: (error) => {
+        console.error('Error fetching folders:', error)
+      }
+    }
+  )
 
   const operations = useMemo<DocumentOperations>(() => ({
     patchDocument: (id: string, data: any) => patch(`documents/${id}`, data),

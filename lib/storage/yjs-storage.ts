@@ -123,24 +123,60 @@ export class YjsStorageAdapter implements StorageAdapter {
   }
 
   async find(collection: string, query: Record<string, any> = {}): Promise<JsonDocument[]> {
+    console.log('\n=== YjsStorageAdapter.find ===')
+    console.log('Collection:', collection)
+    console.log('Query:', query)
+
     const documentsPath = this.getDocumentsPath(collection)
+    console.log('Documents path:', documentsPath)
+
     if (!fs.existsSync(documentsPath)) {
+      console.log('Documents path does not exist')
       return []
     }
 
     try {
       const files = await fs.readdir(documentsPath)
+      console.log('Found files:', files)
+
+      const jsonFiles = files.filter(file => file.endsWith('.json'))
+      console.log('JSON files:', jsonFiles)
+
       const documents = await Promise.all(
-        files
+        jsonFiles
           .filter(file => file.endsWith('.json'))
-          .map(file => this.findById(collection, file.replace('.json', '')))
+          .map(async file => {
+            const id = file.replace('.json', '')
+            console.log('Loading document:', id)
+            const doc = await this.findById(collection, id)
+            if (!doc) {
+              console.log('Failed to load document:', id)
+            }
+            return doc
+          })
       )
 
-      return documents
-        .filter((doc): doc is JsonDocument => 
-          doc !== null && 
-          Object.entries(query).every(([key, value]) => doc[key] === value)
-        )
+      const validDocuments = documents.filter((doc): doc is JsonDocument => {
+        if (!doc) {
+          return false
+        }
+        const matches = Object.entries(query).every(([key, value]) => doc[key] === value)
+        console.log('Document validation:', {
+          id: doc._id,
+          matches,
+          query: Object.entries(query).map(([k, v]) => `${k}: ${doc[k]} === ${v}`)
+        })
+        return matches
+      })
+
+      console.log('Found valid documents:', validDocuments.length)
+      console.log('Document summaries:', validDocuments.map(doc => ({
+        id: doc._id,
+        title: doc.title,
+        parentId: doc.parentId
+      })))
+
+      return validDocuments
     } catch (error) {
       console.error('Error reading documents:', error)
       return []
