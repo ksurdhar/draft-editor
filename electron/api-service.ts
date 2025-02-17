@@ -3,7 +3,7 @@ import axios, { AxiosRequestConfig } from 'axios'
 import * as fs from 'fs'
 import * as path from 'path'
 import authService from './auth-service'
-import { documentStorage, versionStorage } from './storage-adapter'
+import { documentStorage, folderStorage, versionStorage } from './storage-adapter'
 import { DEFAULT_DOCUMENT_CONTENT } from '../lib/constants'
 
 const envPath = path.resolve(__dirname, '../../env-electron.json')
@@ -104,12 +104,12 @@ const makeRequest = async (
     if (endpoint === 'folders') {
       console.log('Handling collection-level folders request')
       if (method === 'get') {
-        return { data: await documentStorage.find(FOLDERS_COLLECTION, {}) }
+        return { data: await folderStorage.find(FOLDERS_COLLECTION, {}) }
       }
       if (method === 'post') {
         console.log('Creating new folder:', data)
         const now = Date.now()
-        const newFolder = await documentStorage.create(FOLDERS_COLLECTION, {
+        const newFolder = await folderStorage.create(FOLDERS_COLLECTION, {
           ...data,
           lastUpdated: now
         })
@@ -264,17 +264,17 @@ const makeRequest = async (
       switch (method) {
         case 'get':
           console.log(`Finding folder by ID: ${id} in collection: ${FOLDERS_COLLECTION}`)
-          const folder = await documentStorage.findById(FOLDERS_COLLECTION, id)
+          const folder = await folderStorage.findById(FOLDERS_COLLECTION, id)
           console.log('Folder found:', folder ? 'yes' : 'no')
           return { data: folder }
         case 'patch':
           if (!data) return { data: null }
-          return { data: await documentStorage.update(FOLDERS_COLLECTION, id, data as Partial<Document>) }
+          return { data: await folderStorage.update(FOLDERS_COLLECTION, id, data as Partial<Document>) }
         case 'delete':
-          return { data: await documentStorage.delete(FOLDERS_COLLECTION, { _id: id }) }
+          return { data: await folderStorage.delete(FOLDERS_COLLECTION, { _id: id }) }
         case 'post':
           if (!data) return { data: null }
-          return { data: await documentStorage.create(FOLDERS_COLLECTION, data as Omit<Document, '_id'>) }
+          return { data: await folderStorage.create(FOLDERS_COLLECTION, data as Omit<Document, '_id'>) }
       }
     }
 
