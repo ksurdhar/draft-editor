@@ -32,7 +32,7 @@ const SharedDocumentsPage = () => {
   const [initAnimate, setInitAnimate] = useState(false)
 
   // Fetch documents and folders
-  const { data: docs, mutate: mutateDocs, isLoading: docsLoading } = useSWR<DocumentData[]>('/documents', get)
+  const { data: docs, mutate: mutateDocs, isLoading: docsLoading } = useSWR<DocumentData[]>('/documents/metadata', get)
   const { data: folders, mutate: mutateFolders, isLoading: foldersLoading } = useSWR<FolderData[]>('/folders', get)
 
   const operations = useMemo<DocumentOperations>(() => ({

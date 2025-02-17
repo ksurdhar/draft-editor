@@ -143,12 +143,6 @@ const EditorComponent = ({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  useEffect(() => {
-    if (shouldFocusTitle) {
-      titleRef.current?.focus()
-    }
-  }, [shouldFocusTitle])
-
   return (
     <div className='flex-grow normal-case animate-fadein'>
       <style>{editorStyles}</style>

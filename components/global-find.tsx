@@ -7,6 +7,7 @@ import { DocumentData } from '@typez/globals'
 import { useNavigation } from './providers'
 import { DocumentIcon } from '@heroicons/react/outline'
 import { mutate } from 'swr'
+import { useDebouncedCallback } from 'use-debounce'
 
 interface SearchResult {
   documentId: string
@@ -45,7 +46,7 @@ export default function GlobalFind({ onClose: _onClose }: GlobalFindProps) {
     wholeWord: false
   })
   const [documents, setDocuments] = useState<DocumentData[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [isReplacing, setIsReplacing] = useState(false)
 
@@ -57,86 +58,38 @@ export default function GlobalFind({ onClose: _onClose }: GlobalFindProps) {
         setDocuments(docs)
       } catch (error) {
         console.error('Error loading documents:', error)
-      } finally {
-        setIsLoading(false)
       }
     }
     loadDocuments()
   }, [get])
 
-  // Search function
-  const searchDocuments = useMemo(() => {
-    return (term: string, options: typeof searchOptions) => {
-      if (!term.trim()) {
-        setSearchResults([])
-        return
-      }
-
-      const results: SearchResult[] = []
-      const searchRegex = options.wholeWord
-        ? new RegExp(`\\b${term}\\b`, options.matchCase ? 'g' : 'gi')
-        : new RegExp(term, options.matchCase ? 'g' : 'gi')
-
-      documents.forEach(doc => {
-        const matches: SearchResult['matches'] = []
-        let content: string
-
-        // Handle both string and object content
-        try {
-          content = typeof doc.content === 'string' 
-            ? JSON.parse(doc.content).content
-              .map((block: any) => block.content?.[0]?.text || '')
-              .join('\n')
-            : doc.content.content
-              .map((block: any) => {
-                // Ensure we're getting the exact text with preserved case
-                const text = block.content?.[0]?.text
-                return text !== undefined ? text : ''
-              })
-              .join('\n')
-        } catch (e) {
-          console.error('Error parsing document content:', e)
-          return
-        }
-
-        const lines = content.split('\n')
-        lines.forEach((line, index) => {
-          let match
-          // Create a new regex for each exec to avoid lastIndex issues
-          const regex = new RegExp(searchRegex)
-          while ((match = regex.exec(line)) !== null) {
-            // Get the actual text that was matched, preserving case
-            const actualMatch = line.slice(match.index, match.index + match[0].length)
-            matches.push({
-              text: line,
-              lineNumber: index + 1,
-              matchIndex: match.index,
-              matchLength: actualMatch.length
-            })
-          }
-        })
-
-        if (matches.length > 0) {
-          results.push({
-            documentId: doc._id,
-            documentTitle: doc.title,
-            matches
-          })
-        }
-      })
-
-      setSearchResults(results)
+  // Debounced search function
+  const debouncedSearch = useDebouncedCallback(async (term: string) => {
+    if (!term) {
+      setSearchResults([])
+      return
     }
-  }, [documents])
 
-  // Debounced search effect
+    setIsLoading(true)
+    try {
+      const params = new URLSearchParams({
+        q: term,
+        matchCase: searchOptions.matchCase.toString(),
+        wholeWord: searchOptions.wholeWord.toString()
+      })
+      const results = await get(`/documents/search?${params}`)
+      setSearchResults(results)
+    } catch (error) {
+      console.error('Error searching documents:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }, 300)
+
+  // Update search when term or options change
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      searchDocuments(searchTerm, searchOptions)
-    }, 300)
-
-    return () => clearTimeout(timeoutId)
-  }, [searchTerm, searchOptions, searchDocuments])
+    debouncedSearch(searchTerm)
+  }, [searchTerm, searchOptions.matchCase, searchOptions.wholeWord])
 
   const handleDocumentClick = (documentId: string) => {
     const currentUrl = window.location.pathname

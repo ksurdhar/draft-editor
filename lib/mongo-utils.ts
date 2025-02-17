@@ -192,3 +192,11 @@ export const deleteVersion = async (id: string) => {
     console.log('ERROR:', e)
   }
 }
+
+export const getDocumentMetadata = async (userId: string) => {
+  const documents = await Doc.find(
+    { userId },
+    { title: 1, parentId: 1, folderIndex: 1, lastUpdated: 1, userId: 1 }
+  )
+  return documents.map((document) => document.toJSON())
+}
