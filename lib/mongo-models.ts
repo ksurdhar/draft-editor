@@ -3,15 +3,30 @@ import Mongoose, { Document, Model } from 'mongoose'
 // Mongo Init Code
 if (!global.db) {
   const MONGO_DB = process.env.MOCK_AUTH === 'true' 
-  ? 'mongodb://localhost:27017/whetstone'
-  : `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_CLUSTER}.mongodb.net/${process.env.DB_NAME}?retryWrites=true&w=majority`
+    ? 'mongodb://localhost:27017/whetstone'
+    : `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_CLUSTER}.mongodb.net/${process.env.DB_NAME}?retryWrites=true&w=majority`
+  
+  console.log('\n=== MongoDB Connection ===')
+  console.log('MOCK_AUTH:', process.env.MOCK_AUTH)
+  console.log('LOCAL_DB:', process.env.LOCAL_DB)
+  console.log('Storage Type:', process.env.NEXT_PUBLIC_STORAGE_TYPE)
+  console.log('Connection string:', MONGO_DB.replace(process.env.DB_PASS || '', '[REDACTED]'))
+  
   Mongoose.set('strictQuery', true)
   Mongoose.connect(MONGO_DB)
   global.db = Mongoose.connection
 }
-global.db.on('error', console.error.bind(console, 'connection error: '))
+
+global.db.on('error', (error) => {
+  console.error('\nMongoDB Connection Error:', error)
+})
+
 global.db.once('open', () => {
-  console.log('Connected successfully')  
+  if (!global.db) return
+  console.log('\nMongoDB Connected Successfully')
+  console.log('Database:', global.db.name)
+  console.log('Host:', global.db.host)
+  console.log('Port:', global.db.port)
 })
 
 const DocumentSchema = new Mongoose.Schema({
@@ -20,13 +35,20 @@ const DocumentSchema = new Mongoose.Schema({
     default: '',
   },
   content: {
-    type: Mongoose.Schema.Types.String,
-    default: '',
+    type: Mongoose.Schema.Types.Mixed,
+    default: {
+      type: 'doc',
+      content: [{
+        type: 'paragraph',
+        content: [{ type: 'text', text: '' }]
+      }]
+    }
   },
   comments: {
     type: [{ 
       content: Mongoose.Schema.Types.String, 
-      id: Mongoose.Schema.Types.String
+      id: Mongoose.Schema.Types.String,
+      timestamp: Mongoose.Schema.Types.Number
     }],
     default: []
   },
@@ -37,6 +59,14 @@ const DocumentSchema = new Mongoose.Schema({
   lastUpdated: {
     type: Mongoose.Schema.Types.Number,
     default: Date.now()
+  },
+  parentId: {
+    type: Mongoose.Schema.Types.String,
+    default: 'root'
+  },
+  folderIndex: {
+    type: Mongoose.Schema.Types.Number,
+    default: 0
   }
 })
 
@@ -97,41 +127,99 @@ const VersionSchema = new Mongoose.Schema({
 DocumentSchema.set('toJSON', {
   virtuals: true,
   versionKey: false,
-  transform: function (doc, ret) { delete ret._id  }
+  transform: function (doc, ret) { 
+    ret.id = ret._id.toString()
+    delete ret._id
+  }
 })
 
 PermissionSchema.set('toJSON', {
   virtuals: true,
   versionKey: false,
-  transform: function (doc, ret) { delete ret._id  }
+  transform: function (doc, ret) { 
+    ret.id = ret._id.toString()
+    delete ret._id
+  }
 })
 
 VersionSchema.set('toJSON', {
   virtuals: true,
   versionKey: false,
-  transform: function (doc, ret) { delete ret._id  }
+  transform: function (doc, ret) { 
+    ret.id = ret._id.toString()
+    delete ret._id
+  }
+})
+
+// Add a new schema for folders
+const FolderSchema = new Mongoose.Schema({
+  title: {
+    type: Mongoose.Schema.Types.String,
+    required: true
+  },
+  parentId: {
+    type: Mongoose.Schema.Types.String,
+    default: 'root'
+  },
+  userId: {
+    type: Mongoose.Schema.Types.String,
+    required: true
+  },
+  lastUpdated: {
+    type: Mongoose.Schema.Types.Number,
+    default: Date.now()
+  },
+  folderIndex: {
+    type: Mongoose.Schema.Types.Number,
+    default: 0
+  }
+})
+
+// Add toJSON for FolderSchema
+FolderSchema.set('toJSON', {
+  virtuals: true,
+  versionKey: false,
+  transform: function (doc, ret) { 
+    ret.id = ret._id.toString()
+    delete ret._id
+  }
 })
 
 export interface IDoc {
   title: string
-  content: string
-  comments: string[] // not quite true
+  content: {
+    type: 'doc'
+    content: Array<{
+      type: string
+      content?: any[]
+      text?: string
+      marks?: Array<{ type: string }>
+    }>
+  }
+  comments: Array<{
+    content: string
+    id: string
+    timestamp: number
+  }>
   userId: string
   lastUpdated: number
+  parentId: string
+  folderIndex: number
 }
-export interface IDocDocument extends IDoc, Document {}
+
+export interface IDocDocument extends Document, IDoc {}
 export interface IDocModel extends Model<IDocDocument> {}
-export const Doc = Mongoose.models && Mongoose.models.Document || Mongoose.model<IDocDocument>('Document', DocumentSchema) 
+export const Doc = Mongoose.models && Mongoose.models.Document || Mongoose.model<IDocDocument>('Document', DocumentSchema)
 
 export interface IPermission {
   globalPermission: string
-  users: string[] // not quite true
+  users: string[]
   ownerId: string
   documentId: string
 }
-export interface IPermissionDocument extends IPermission, Document {}
+export interface IPermissionDocument extends Document, IPermission {}
 export interface IPermissionModel extends Model<IPermissionDocument> {}
-export const Permission = Mongoose.models && Mongoose.models.Permission || Mongoose.model<IPermissionDocument>('Permission', PermissionSchema) 
+export const Permission = Mongoose.models && Mongoose.models.Permission || Mongoose.model<IPermissionDocument>('Permission', PermissionSchema)
 
 export interface IVersion {
   ownerId: string
@@ -142,6 +230,17 @@ export interface IVersion {
   wordCount: number
   content: string
 }
-export interface IVersionDocument extends IVersion, Document {}
+export interface IVersionDocument extends Document, IVersion {}
 export interface IVersionModel extends Model<IVersionDocument> {}
-export const Version = Mongoose.models && Mongoose.models.Version || Mongoose.model<IVersionDocument>('Version', VersionSchema) 
+export const Version = Mongoose.models && Mongoose.models.Version || Mongoose.model<IVersionDocument>('Version', VersionSchema)
+
+export interface IFolder {
+  title: string
+  parentId: string
+  userId: string
+  lastUpdated: number
+  folderIndex: number
+}
+export interface IFolderDocument extends Document, IFolder {}
+export interface IFolderModel extends Model<IFolderDocument> {}
+export const Folder = Mongoose.models && Mongoose.models.Folder || Mongoose.model<IFolderDocument>('Folder', FolderSchema) 

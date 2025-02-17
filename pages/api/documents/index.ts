@@ -1,22 +1,32 @@
-import { createDocument, createPermission, getDocuments } from '@lib/mongo-utils'
 import withHybridAuth, { ExtendedApiRequest } from '@lib/with-hybrid-auth'
 import { DocumentData } from '@typez/globals'
 import type { NextApiResponse } from 'next'
+import { storage } from '@lib/storage'
+import { DEFAULT_DOCUMENT_CONTENT, DEFAULT_DOCUMENT_TITLE } from '@lib/constants'
 
 const handlers = {
   async POST(req: ExtendedApiRequest, res: NextApiResponse) {
-    const newDocument = await createDocument(req.body)
-    await createPermission({ ownerId: req.user!.sub, documentId: newDocument.id })
+    const now = Date.now()
+    const newDocument = await storage.create('documents', {
+      ...req.body,
+      userId: req.user!.sub,
+      title: req.body.title || DEFAULT_DOCUMENT_TITLE,
+      content: req.body.content || DEFAULT_DOCUMENT_CONTENT,
+      comments: [],
+      lastUpdated: now
+    })
     res.status(200).json(newDocument)
   },
 
   async GET(req: ExtendedApiRequest, res: NextApiResponse) {
-    const documents = await getDocuments(req.user!.sub)
-    const docsWithPermissions = documents.map(doc => {
-      doc.canEdit = true
-      doc.canComment = true
-      return doc
-    })
+    const documents = await storage.find('documents', { userId: req.user!.sub })
+    const docsWithPermissions = documents.map(doc => ({
+      ...doc,
+      id: doc._id,
+      canEdit: true,
+      canComment: true,
+      lastUpdated: doc.lastUpdated || Date.now()
+    }))
     res.status(200).json(docsWithPermissions as DocumentData[])
   },
 }

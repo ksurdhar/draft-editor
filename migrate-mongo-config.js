@@ -1,9 +1,11 @@
 // In this file you can configure migrate-mongo
+require('dotenv').config({ path: '.env.local' })
 
 const config = {
   mongodb: {
-    // TODO Change (or review) the url to your MongoDB:
-    url: ``,
+    url: process.env.MOCK_AUTH === 'true'
+      ? 'mongodb://localhost:27017/whetstone'
+      : `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_CLUSTER}.mongodb.net/${process.env.DB_NAME}?retryWrites=true&w=majority`,
 
     options: {
       useNewUrlParser: true, // removes a deprecation warning when connecting

@@ -43,3 +43,7 @@ yarn-error.log*
 /analyze
 
 env-electron.json
+
+# local storage
+/data/
+/data/*.json

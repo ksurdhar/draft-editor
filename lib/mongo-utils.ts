@@ -1,7 +1,7 @@
 import Mongoose from 'mongoose'
 import { DocumentData, PermissionData, UserPermission, VersionData } from '../types/globals'
 import { Doc, Permission, Version } from './mongo-models'
-import { countWords } from './slate-utils'
+import { countWordsFromContent } from './text-utils'
 
 declare global {
   // allow global `var` declarations
@@ -48,7 +48,7 @@ export const createPermission = async (body: Partial<PermissionData>): Promise<P
 }
 
 export const createOrUpdateVersion = async (documentId: string, document: DocumentData) => {
-  const wordCount = countWords(JSON.parse(document.content))
+  const wordCount = countWordsFromContent(document.content)
   const newVersion: Partial<VersionData> = { 
     documentId: documentId,
     ownerId: document.userId,

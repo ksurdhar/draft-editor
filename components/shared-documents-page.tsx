@@ -2,75 +2,224 @@
 
 import Layout from '@components/layout'
 import { Loader } from '@components/loader'
-import { DotsHorizontalIcon } from '@heroicons/react/solid'
 import { useSpinner } from '@lib/hooks'
-import { DocumentData } from '@typez/globals'
-import { format } from 'date-fns'
-import Link from 'next/link'
-import { useState } from 'react'
-import { useNavigation } from './providers'
+import { DocumentData, FolderData } from '@typez/globals'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+import CreateNewFolderIcon from '@mui/icons-material/CreateNewFolder'
+import NoteAddIcon from '@mui/icons-material/NoteAdd'
+import { IconButton, Menu, MenuItem, Tooltip } from '@mui/material'
+import RenameModal from './rename-modal'
+import DeleteModal from './delete-modal'
+import CreateFolderModal from './create-folder-modal'
+import DocumentTree, { createTreeItems } from './document-tree'
+import { useNavigation, useAPI } from '@components/providers'
+import { useUser } from '@wrappers/auth-wrapper-client'
+import { moveItem, bulkDelete, createDocument, DocumentOperations } from '@lib/document-operations'
+import useSWR, { mutate } from 'swr'
 
-export interface SharedDocumentsPageProps {
-  docs: DocumentData[]
-  isLoading: boolean
-  deleteDocument: (id: string) => void
-  renameDocument: (id: string, title: string) => void
-}
 
-const SharedDocumentsPage = ({
-  docs,
-  isLoading,
-  deleteDocument,
-  renameDocument,
-}: SharedDocumentsPageProps) => {
-  const [selectedDocId, setSelectedDoc] = useState<string | null>(null)
-  const [renameActive, setRenameActive] = useState(false)
-  const [newName, setNewName] = useState('')
-  const showSpinner = useSpinner(isLoading)
+const SharedDocumentsPage = () => {
   const { navigateTo } = useNavigation()
+  const { get, post, patch } = useAPI()
+  const { user, isLoading: userLoading } = useUser()
+  const [selectedDocId, setSelectedDoc] = useState<string | null>(null)
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
+  const [renameModalOpen, setRenameModalOpen] = useState(false)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [createFolderModalOpen, setCreateFolderModalOpen] = useState(false)
+  const [newFolderParentId] = useState<string | undefined>()
+  const [selectedItems, setSelectedItems] = useState<string[]>([])
+  const [initAnimate, setInitAnimate] = useState(false)
 
-  const documentItems = docs.map(({ id, title, lastUpdated }, idx) => {
-    return (
-      <div
-        className={`
-          flex min-h-[40px] animate-fadein
-          justify-between border-solid border-black/[.35] px-[10px]
-          text-[14px] font-semibold
-          uppercase transition duration-[250ms]
-          hover:cursor-pointer hover:bg-white/[.30]
-          ${id === selectedDocId ? 'border-black/[.14] bg-white/[.30]' : ''}
-          ${selectedDocId && id !== selectedDocId ? 'pointer-events-none opacity-40' : ''} 
-          ${idx !== docs.length - 1 ? 'border-b' : 'border-transparent'} 
-        `}
-        onClick={() => {
-          if (!selectedDocId) {
-            navigateTo(`/documents/${id}`)
+  // Fetch documents and folders
+  const { data: docs, mutate: mutateDocs, isLoading: docsLoading } = useSWR<DocumentData[]>('/documents', get)
+  const { data: folders, mutate: mutateFolders, isLoading: foldersLoading } = useSWR<FolderData[]>('/folders', get)
+
+  const operations = useMemo<DocumentOperations>(() => ({
+    patchDocument: (id: string, data: any) => patch(`documents/${id}`, data),
+    patchFolder: (id: string, data: any) => patch(`folders/${id}`, data),
+    bulkDeleteItems: (documentIds: string[], folderIds: string[]) => 
+      post('documents/bulk-delete', { documentIds, folderIds }),
+    createDocument: async (data: any) => {
+      const response = await post('/documents', data)
+      return response
+    }
+  }), [patch, post])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setInitAnimate(true)
+    }, 50)
+    return () => clearTimeout(timer)
+  }, [])
+
+  const handleMoveItem = useCallback(
+    async (itemId: string, targetFolderId?: string, targetIndex?: number) => {
+      try {
+        await moveItem(
+          itemId,
+          targetFolderId,
+          targetIndex,
+          docs || [],
+          folders || [],
+          operations,
+          (updatedDocs, updatedFolders) => {
+            mutateDocs(updatedDocs, false)
+            mutateFolders(updatedFolders, false)
           }
-        }}
-        key={id}>
-        <div className="grow self-center overflow-hidden text-ellipsis whitespace-nowrap">
-          <Link href={`/documents/${id}`}>{title}</Link>
-        </div>
-        <div className="w-28 min-w-[7rem] self-center text-black/[.65] md:w-44 md:min-w-[11rem]">
-          {format(new Date(lastUpdated), 'PP')}
-        </div>
-        <div className="flex items-center">
-          <div
-            className="flex h-[28px] w-[28px] flex-col justify-center rounded-full hover:bg-black/[.10]"
-            onClick={async e => {
-              e.stopPropagation()
-              if (selectedDocId === id) {
-                setSelectedDoc(null)
-              } else {
-                setSelectedDoc(id)
-              }
-            }}>
-            <DotsHorizontalIcon className="h-[16px] w-[16px] self-center" />
-          </div>
-        </div>
-      </div>
-    )
-  })
+        )
+      } catch (error) {
+        // Revert on error
+        mutateDocs()
+        mutateFolders()
+      }
+    },
+    [docs, folders, operations, mutateDocs, mutateFolders]
+  )
+
+  const handleBulkDelete = useCallback(
+    async (documentIds: string[], folderIds: string[]) => {
+      try {
+        await bulkDelete(
+          documentIds,
+          folderIds,
+          docs || [],
+          folders || [],
+          operations,
+          (updatedDocs, updatedFolders) => {
+            mutateDocs(updatedDocs, false)
+            mutateFolders(updatedFolders, false)
+          }
+        )
+      } catch (error) {
+        // Revert on error
+        mutateDocs()
+        mutateFolders()
+      }
+    },
+    [docs, folders, operations, mutateDocs, mutateFolders]
+  )
+
+  const renameDocument = useCallback(
+    async (id: string, title: string) => {
+      // Update list view immediately
+      const updatedDocs = (docs || []).map(doc => (doc._id === id ? { ...doc, title } : doc))
+      mutateDocs(updatedDocs, false)
+
+      try {
+        // Update the document
+        const updatedDoc = await operations.patchDocument(id, {
+          title,
+          lastUpdated: Date.now(),
+        })
+
+        // Update both the list and individual document cache
+        await Promise.all([
+          // Revalidate the documents list
+          mutateDocs(current => 
+            current?.map(doc => doc._id === id ? { ...doc, title } : doc)
+          ),
+          // Update/revalidate the individual document cache
+          mutate(`/documents/${id}`, { ...updatedDoc, title }, false)
+        ])
+      } catch (e) {
+        console.log(e)
+        mutateDocs()
+      }
+    },
+    [mutateDocs, docs, operations],
+  )
+
+  const createFolder = useCallback(
+    async (title: string, parentId?: string) => {
+      try {
+        const folderData = {
+          title,
+          parentId: parentId || 'root',
+          userId: user?.sub || 'current',
+          lastUpdated: Date.now(),
+          folderIndex: (folders || []).length
+        }
+
+        const response = await post('folders', folderData)
+        mutateFolders([...(folders || []), response], false)
+      } catch (error) {
+        console.error('Error creating folder:', error)
+        mutateFolders()
+      }
+    },
+    [folders, mutateFolders, post, user?.sub]
+  )
+
+  const renameFolder = useCallback(
+    async (id: string, title: string) => {
+      try {
+        const response = await operations.patchFolder(id, {
+          title,
+          lastUpdated: Date.now()
+        })
+        mutateFolders((folders || []).map(folder => folder._id === id ? response : folder), false)
+      } catch (error) {
+        console.error('Error renaming folder:', error)
+        mutateFolders()
+      }
+    },
+    [folders, operations, mutateFolders]
+  )
+
+  const handleCreateDocument = useCallback(async () => {
+    if (!user?.sub) return
+    
+    try {
+      await createDocument(
+        user.sub,
+        operations,
+        (docId) => {
+          navigateTo(`/documents/${docId}?focus=title`)
+        }
+      )
+    } catch (error) {
+      console.error('Error creating document:', error)
+    }
+  }, [user?.sub, operations, navigateTo])
+
+  const handleMenuClick = (event: React.MouseEvent<HTMLElement>, id: string) => {
+    event.stopPropagation()
+    setAnchorEl(event.currentTarget)
+    setSelectedDoc(id)
+    setSelectedItems([id])
+  }
+
+  const handleMenuClose = () => {
+    setAnchorEl(null)
+  }
+
+  const handleRename = () => {
+    setRenameModalOpen(true)
+    handleMenuClose()
+  }
+
+  const handleDelete = () => {
+    setDeleteModalOpen(true)
+    handleMenuClose()
+  }
+
+  const handleDeleteConfirm = async () => {
+    try {
+      const items = createTreeItems(docs || [], folders || [])
+      const selectedDocs = selectedItems.filter(id => !items[id]?.isFolder)
+      const selectedFolders = selectedItems.filter(id => items[id]?.isFolder)
+
+      await handleBulkDelete(selectedDocs, selectedFolders)
+      setDeleteModalOpen(false)
+      setSelectedItems([])
+    } catch (error) {
+      console.error('Error deleting items:', error)
+    }
+  }
+
+  const showSpinner = useSpinner(docsLoading || foldersLoading || userLoading)
+  const items = useMemo(() => createTreeItems(docs || [], folders || []), [docs, folders])
 
   const emptyMessage = (
     <div className={'text-center text-[14px] font-semibold uppercase text-black/[.5]'}>
@@ -79,78 +228,137 @@ const SharedDocumentsPage = ({
   )
 
   return (
-    <>
-      <Layout>
-        <div className="gradient absolute left-0 top-0 z-[-1] h-screen w-screen" />
-        <div
-          className="relative top-[44px] flex h-[calc(100vh_-_44px)] justify-center pb-10"
-          onClick={() => {
-            if (selectedDocId || renameActive) {
-              setSelectedDoc(null)
-              setTimeout(() => setRenameActive(false), 251) // bit of a hack to prevent animations
-            }
-          }}>
-          <div className={'flex w-11/12 max-w-[740px] flex-col justify-center sm:w-9/12'}>
-            <div className="max-h-[280px] overflow-y-scroll">
-              {showSpinner && <Loader />}
-              {documentItems}
-              {!isLoading && docs.length === 0 && emptyMessage}
-            </div>
-
-            {/* the selected item's 'menu' area  */}
-            <div
-              className={`${
-                selectedDocId ? 'opacity-100' : 'pointer-events-none opacity-0'
-              } mt-[48px] flex h-[40px] justify-evenly transition-opacity duration-[250ms]`}>
-              {!renameActive && (
-                <>
-                  <button
-                    onClick={e => {
-                      e.stopPropagation()
-                      setRenameActive(true)
-                    }}
-                    className="file-button hover:bg-white/[.15]"
-                    role="button">
-                    rename
-                  </button>
-                  <button
-                    onClick={async e => {
-                      e.stopPropagation()
-                      deleteDocument(selectedDocId as string)
-                      setSelectedDoc(null)
-                    }}
-                    className="file-button file-button-red hover:bg-white/[.15]"
-                    role="button">
-                    delete
-                  </button>
-                </>
-              )}
-              {renameActive && (
-                <form
-                  className={'w-[70%]'}
-                  onSubmit={async e => {
-                    e.preventDefault()
-                    renameDocument(selectedDocId as string, newName)
-                    setSelectedDoc(null)
-                    setRenameActive(false)
-                  }}>
-                  <input
-                    onChange={e => setNewName(e.currentTarget.value)}
-                    onClick={e => e.stopPropagation()}
-                    type="text"
-                    spellCheck="false"
-                    autoFocus
-                    placeholder={`New Title`}
-                    className={`w-[100%] border-x-0 border-b-[1px] border-t-0 bg-transparent text-center font-editor2 text-[18px] 
-                  uppercase text-black/[.70] ring-transparent placeholder:text-black/[.25] focus:border-black/[.2] focus:ring-transparent`}
-                  />
-                </form>
-              )}
+    <Layout>
+      <div className="gradient-editor fixed top-0 left-0 h-screen w-screen z-[-1]" />
+      <div className={`gradient fixed top-0 left-0 h-screen w-screen z-[-1] transition-opacity ease-in-out duration-[3000ms] ${initAnimate ? 'opacity-100' : 'opacity-0'}`} />
+      <div className="relative top-[44px] flex h-[calc(100vh_-_44px)] justify-center pb-10">
+        <div className="flex w-11/12 max-w-[740px] flex-col justify-center sm:w-9/12">
+          <div className="flex justify-end mb-4 gap-2">
+            <div className="flex gap-0.5 bg-white/[.05] rounded-lg">
+              <Tooltip title="Create new document">
+                <IconButton
+                  onClick={handleCreateDocument}
+                  className="hover:bg-black/[.10]"
+                  size="small"
+                >
+                  <NoteAddIcon />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Create new folder">
+                <IconButton
+                  onClick={() => setCreateFolderModalOpen(true)}
+                  className="hover:bg-black/[.10]"
+                  size="small"
+                >
+                  <CreateNewFolderIcon />
+                </IconButton>
+              </Tooltip>
             </div>
           </div>
+          <div className="max-h-[calc(100vh_-_100px)] overflow-y-auto rounded-lg bg-white/[.05] p-4">
+            {showSpinner && <Loader />}
+            {!docsLoading && !foldersLoading && (!docs?.length && !folders?.length) && emptyMessage}
+            {(!docsLoading && !foldersLoading && (docs?.length || folders?.length)) && (
+              <DocumentTree
+                items={items}
+                onPrimaryAction={item => navigateTo(`/documents/${item.index}?from=tree`)}
+                onMove={handleMoveItem}
+                showActionButton={true}
+                onActionButtonClick={handleMenuClick}
+                selectedItems={selectedItems}
+                onSelectedItemsChange={items => setSelectedItems(items.map(i => i.toString()))}
+              />
+            )}
+          </div>
         </div>
-      </Layout>
-    </>
+      </div>
+
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'right',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
+        transitionDuration={250}
+        slotProps={{
+          paper: {
+            style: {
+              transformOrigin: 'top'
+            }
+          }
+        }}
+        sx={{
+          '& .MuiPaper-root': {
+            backgroundColor: 'rgba(255, 255, 255, 0.3)',
+            backdropFilter: 'blur(10px)',
+            fontFamily: 'Mukta, sans-serif',
+            boxShadow: 'none',
+            border: '1px solid rgba(0, 0, 0, 0.1)',
+            borderRadius: '6px',
+            elevation: 0,
+            transition: 'opacity 150ms ease, transform 150ms ease',
+          },
+          '& .MuiMenuItem-root': {
+            fontFamily: 'inherit',
+            color: 'rgba(0, 0, 0, 0.7)',
+            textTransform: 'uppercase',
+            '&:hover': {
+              backgroundColor: 'rgba(255, 255, 255, 0.3)',
+            },
+          }
+        }}>
+        <MenuItem onClick={handleRename}>RENAME</MenuItem>
+        <MenuItem onClick={handleDelete}>DELETE</MenuItem>
+      </Menu>
+
+      <RenameModal
+        open={renameModalOpen}
+        onClose={() => {
+          setRenameModalOpen(false)
+          setSelectedDoc(null)
+        }}
+        onConfirm={(newName) => {
+          if (selectedDocId) {
+            const item = items[selectedDocId]
+            if (item) {
+              if (item.isFolder) {
+                renameFolder(selectedDocId, newName)
+              } else {
+                renameDocument(selectedDocId, newName)
+              }
+            }
+          }
+          setSelectedDoc(null)
+        }}
+        initialValue={selectedDocId ? (items[selectedDocId]?.data || '') : ''}
+      />
+
+      <DeleteModal
+        open={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false)
+          setSelectedDoc(null)
+        }}
+        onConfirm={handleDeleteConfirm}
+        documentTitle={selectedItems.map(id => items[id]?.data.toUpperCase()).join(', ')}
+        itemCount={selectedItems.length}
+      />
+
+      <CreateFolderModal
+        open={createFolderModalOpen}
+        onClose={() => setCreateFolderModalOpen(false)}
+        onConfirm={(folderName) => {
+          createFolder(folderName, newFolderParentId)
+          setCreateFolderModalOpen(false)
+        }}
+      />
+    </Layout>
   )
 }
 

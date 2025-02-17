@@ -6,14 +6,16 @@ import jwtDecode from 'jwt-decode'
 import * as os from 'os'
 import * as path from 'path'
 import * as url from 'url'
+import { getMockToken, mockUser } from '../lib/mock-auth'
 import tokenStore from './token-store'
 
 const envPath = path.resolve(__dirname, '../../env-electron.json')
 const env = JSON.parse(fs.readFileSync(envPath, 'utf-8'))
 
-const apiIdentifier = env.NEXT_PUBLIC_BASE_URL + '/api'
+const apiIdentifier = env.API_IDENTIFIER
 const auth0Domain = env.AUTH0_DOMAIN
 const clientId = env.CLIENT_ID
+const mockAuth = env.MOCK_AUTH || false
 
 const redirectUri = 'http://localhost/callback*'
 
@@ -29,15 +31,17 @@ function sha256(buffer: string) {
 }
 const challenge = base64URLEncode(sha256(verifier))
 
-let accessToken: string = ''
-let profile: any = null
+let accessToken: string = mockAuth ? getMockToken() : ''
+let profile: any = mockAuth ? mockUser : null
 let refreshToken: string = ''
 
 function getAccessToken() {
+  if (mockAuth) return getMockToken()
   return accessToken
 }
 
 function getProfile() {
+  if (mockAuth) return mockUser
   return profile
 }
 

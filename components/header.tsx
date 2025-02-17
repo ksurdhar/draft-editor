@@ -2,17 +2,20 @@
 
 import { DocumentData } from '@typez/globals'
 import { useUser } from '@wrappers/auth-wrapper-client'
-import Link from 'next/link'
-import { Fragment, useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState, useRef } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useAPI, useMouse, useNavigation } from './providers'
-
-import { useSyncHybridDoc } from '@lib/hooks'
+import { useSyncHybridDoc, useFolderSync } from '@lib/hooks'
+import { importFiles } from '@lib/import-utils'
 import { Divider, List, ListItem, ListItemButton, ListItemText } from '@mui/material'
 import Box from '@mui/material/Box'
 import Drawer from '@mui/material/Drawer'
 import ShareModal from './share-modal'
-import VersionModal from './version-modal'
+
+interface DirectoryInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  webkitdirectory?: string
+  directory?: string
+}
 
 const useScrollPosition = () => {
   const [scrollPosition, setScrollPosition] = useState(0)
@@ -63,6 +66,7 @@ const HeaderComponent = ({ id }: HeaderProps) => {
   const { user } = useUser()
   const { navigateTo, signOut } = useNavigation()
   const { post, get } = useAPI()
+  const { mutate: mutateFolders } = useFolderSync()
 
   const fetcher = useCallback(
     async (path: string) => {
@@ -86,13 +90,6 @@ const HeaderComponent = ({ id }: HeaderProps) => {
   const openShareModal = () => setIsShareModalOpen(true)
   const closeShareModal = () => setIsShareModalOpen(false)
 
-  const [isVersionModalOpen, setIsVersionModalOpen] = useState(false)
-  const openVersionModal = () => {
-    mutate(`/documents/${id}/versions`)
-    setIsVersionModalOpen(true)
-  }
-  const closeVersionModal = () => setIsVersionModalOpen(false)
-
   const { mouseMoved, hoveringOverMenu } = useMouse()
   const [initFadeIn, fadeOut] = useEditorFades(!mouseMoved)
 
@@ -104,14 +101,66 @@ const HeaderComponent = ({ id }: HeaderProps) => {
 
   const isOwner = user && hybridDoc && hybridDoc.userId === user.sub
 
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleImport = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click()
+    }
+  }
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files || !user?.sub) return
+
+    try {
+      await importFiles(files, user.sub, { post }, () => {
+        Promise.all([
+          mutate('/documents'),
+          mutateFolders()
+        ])
+      })
+    } catch (error: any) {
+      console.error('Error importing files:', error)
+    }
+    
+    setMenuOpen(false)
+    event.target.value = ''
+  }
+
   return (
     <>
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileSelect}
+        style={{ display: 'none' }}
+        {...({
+          webkitdirectory: '',
+          directory: '',
+          multiple: true
+        } as DirectoryInputProps)}
+      />
       <header
         className={`${initFadeIn ? 'header-gradient' : 'bg-transparent'} ${
           fadeOut && !menuOpen ? 'opacity-0' : 'opacity-100'
         } fixed top-0 z-[39] flex w-[100vw] flex-row justify-between p-5 pb-[30px] transition-opacity duration-700 hover:opacity-100`}>
         <h1 className="lowercase">
-          <Link href={'/'}>Whetstone</Link>
+          {user ? (
+            <button 
+              onClick={() => navigateTo('/documents')}
+              className="hover:opacity-80"
+            >
+              whetstone
+            </button>
+          ) : (
+            <button 
+              onClick={() => navigateTo('/')}
+              className="hover:opacity-80"
+            >
+              whetstone
+            </button>
+          )}
         </h1>
       </header>
 
@@ -139,13 +188,23 @@ const HeaderComponent = ({ id }: HeaderProps) => {
                     onClick={async () => {
                       setMenuOpen(!menuOpen)
                       try {
-                        const { id } = await post(`/documents`, { userId: user?.sub })
-                        navigateTo(`/documents/${id}`)
+                        const response = await post(`/documents`, { userId: user?.sub })
+                        const docId = response._id || response.id
+                        if (!docId) {
+                          console.error('No document ID in response:', response)
+                          return
+                        }
+                        navigateTo(`/documents/${docId}`)
                       } catch (e) {
-                        console.log(e)
+                        console.error('Error creating document:', e)
                       }
                     }}>
                     <ListItemText primary={'Create Document'} sx={{ fontFamily: 'Mukta' }} />
+                  </ListItemButton>
+                </ListItem>
+                <ListItem disablePadding>
+                  <ListItemButton onClick={handleImport}>
+                    <ListItemText primary={'Import Folder'} />
                   </ListItemButton>
                 </ListItem>
                 <ListItem disablePadding>
@@ -171,19 +230,11 @@ const HeaderComponent = ({ id }: HeaderProps) => {
                       <ListItemText primary={'Share'} />
                     </ListItemButton>
                   </ListItem>
-                  <ListItem disablePadding>
-                    <ListItemButton onClick={openVersionModal}>
-                      <ListItemText primary={'Versions'} />
-                    </ListItemButton>
-                  </ListItem>
                 </List>
               )}
             </Box>
           </Drawer>
           {isOwner && <ShareModal open={isShareModalOpen} onClose={closeShareModal} document={hybridDoc} />}
-          {isOwner && (
-            <VersionModal open={isVersionModalOpen} onClose={closeVersionModal} document={hybridDoc} />
-          )}
         </Fragment>
       </div>
     </>

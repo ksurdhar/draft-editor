@@ -1,4 +1,6 @@
-import { BrowserWindow, app, ipcMain } from 'electron'
+import { BrowserWindow, app, ipcMain, dialog } from 'electron'
+import * as fs from 'fs'
+import * as path from 'path'
 import apiService from './api-service'
 import { createAppWindow } from './app'
 import { createAuthWindow, createLogoutWindow } from './auth-process'
@@ -6,13 +8,26 @@ import authService from './auth-service'
 
 let mainWindow: BrowserWindow | null = null
 
+const envPath = path.resolve(__dirname, '../../env-electron.json')
+const env = JSON.parse(fs.readFileSync(envPath, 'utf-8'))
+const mockAuth = env.MOCK_AUTH || false
+
 async function createWindow() {
   try {
-    // if previously authorized, get refresh tokens
-    await authService.refreshTokens()
-    mainWindow = await createAppWindow()
+    if (mockAuth) {
+      // Skip auth in mock mode
+      mainWindow = await createAppWindow()
+    } else {
+      // Normal auth flow
+      await authService.refreshTokens()
+      mainWindow = await createAppWindow()
+    }
   } catch (err) {
-    await createAuthWindow()
+    if (!mockAuth) {
+      await createAuthWindow()
+    } else {
+      mainWindow = await createAppWindow()
+    }
   }
 }
 
@@ -32,10 +47,17 @@ app
     ipcMain.handle('api:get-documents', apiService.getDocuments)
     ipcMain.handle('api:delete-document', (_, id) => apiService.deleteDocument(id))
     ipcMain.handle('api:rename-document', (_, id, data) => apiService.updateDocument(id, data))
+    ipcMain.handle('api:create-document', (_, data) => apiService.post('documents', data))
     ipcMain.handle('api:post', (_, url, body) => apiService.post(url, body))
     ipcMain.handle('api:patch', (_, url, body) => apiService.patch(url, body))
     ipcMain.handle('api:delete', (_, url) => apiService.destroy(url))
     ipcMain.handle('api:get', (_, url) => apiService.get(url))
+    ipcMain.handle('dialog:open-folder', async () => {
+      const result = await dialog.showOpenDialog({
+        properties: ['openDirectory', 'multiSelections']
+      })
+      return result.filePaths
+    })
     ipcMain.on('auth:log-out', () => {
       BrowserWindow.getAllWindows().forEach(window => window.close())
       createLogoutWindow()
@@ -47,4 +69,4 @@ app
       if (mainWindow === null) createWindow()
     })
   })
-  .catch(console.log)
+  .catch(console.trace)
