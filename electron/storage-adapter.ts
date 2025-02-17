@@ -1,8 +1,9 @@
 import { FileStorageAdapter } from '../lib/storage/file-storage'
+import { YjsStorageAdapter } from '../lib/storage/yjs-storage'
 import { VersionStorage } from '../lib/storage/version-storage'
 import * as path from 'path'
 import * as os from 'os'
-import * as crypto from 'crypto'
+import { v4 as uuidv4 } from 'uuid'
 import * as fs from 'fs-extra'
 import { app } from 'electron'
 
@@ -11,9 +12,9 @@ const envPath = path.resolve(__dirname, '../../env-electron.json')
 const env = JSON.parse(fs.readFileSync(envPath, 'utf-8'))
 const useLocalDb = env.LOCAL_DB || false
 
-// Generate a UUID using Node's crypto module
+// Generate a UUID using uuid package
 const generateUUID = () => {
-  return crypto.randomBytes(16).toString('hex')
+  return uuidv4()
 }
 
 // Set storage path based on mode
@@ -36,6 +37,24 @@ console.log('Folders path:', path.join(storagePath, 'folders'))
 console.log('Versions path:', path.join(storagePath, 'versions'))
 
 // Create a custom storage adapter that uses generateUUID for IDs
+class ElectronYjsStorageAdapter extends YjsStorageAdapter {
+  async create(collection: string, data: any): Promise<any> {
+    if (!collection) {
+      throw new Error('Collection name is required')
+    }
+
+    const newDoc = await super.create(collection, {
+      ...data,
+      _id: generateUUID(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    })
+
+    return newDoc
+  }
+}
+
+// For folders, we'll still use the file-based storage
 class ElectronFileStorageAdapter extends FileStorageAdapter {
   async create(collection: string, data: any): Promise<any> {
     if (!collection) {
@@ -66,7 +85,9 @@ class ElectronVersionStorage extends VersionStorage {
   }
 }
 
-export const documentStorage = new ElectronFileStorageAdapter()
+// Use YJS for documents, file storage for folders
+export const documentStorage = new ElectronYjsStorageAdapter()
+export const folderStorage = new ElectronFileStorageAdapter()
 export const versionStorage = new ElectronVersionStorage()
 
 export default documentStorage 

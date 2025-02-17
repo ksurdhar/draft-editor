@@ -16,7 +16,8 @@
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "start-socket": "node websocket/server.js",
-    "migrate-storage": "ts-node scripts/migrate-to-files.ts"
+    "migrate-storage": "ts-node scripts/migrate-to-files.ts",
+    "migrate-to-yjs": "ts-node scripts/migrate-to-yjs.ts"
   },
   "engines": {
     "node": "^20.0.0"
@@ -72,7 +73,8 @@
     "use-debounce": "^8.0.1",
     "utf-8-validate": "^6.0.5",
     "uuid": "^9.0.1",
-    "wouter": "^2.12.1"
+    "wouter": "^2.12.1",
+    "yjs": "^13.6.23"
   },
   "devDependencies": {
     "@electron-forge/cli": "^6.4.2",
