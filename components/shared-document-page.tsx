@@ -83,7 +83,7 @@ export default function SharedDocumentPage() {
   // Use the current document's content or fall back to hybrid doc
   const documentContent = currentContent || hybridDoc?.content
   
-  // Handle document content updates
+  // Handle document content updates - split into two effects
   useEffect(() => {
     const loadDocument = async (docId: string) => {
       console.log('Loading document:', {
@@ -132,8 +132,10 @@ export default function SharedDocumentPage() {
     if (documentId) {
       loadDocument(documentId)
     }
+  }, [documentId, id, get]) // Removed currentContent and isTransitioning from deps
 
-    // Listen for document changes
+  // Separate effect for document change event listener
+  useEffect(() => {
     const handleDocumentChange = () => {
       const newParams = new URLSearchParams(window.location.search)
       const newDocId = newParams.get('documentId') || id
@@ -149,7 +151,6 @@ export default function SharedDocumentPage() {
         // Reset state before loading new document
         setCurrentContent(null)
         setIsTransitioning(false)
-        loadDocument(newDocId)
       }
     }
 
@@ -157,7 +158,7 @@ export default function SharedDocumentPage() {
     return () => {
       window.removeEventListener('documentChanged', handleDocumentChange)
     }
-  }, [documentId, id, get, currentContent, isTransitioning])
+  }, [documentId, id])
 
   // Track document state changes
   useEffect(() => {
