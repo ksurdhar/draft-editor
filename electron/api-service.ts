@@ -200,10 +200,11 @@ const makeRequest = async (
       return { data: null }
     }
 
-    // Handle version operations
-    if (endpoint.startsWith('documents/') && endpoint.endsWith('/versions')) {
-      const documentId = endpoint.split('documents/')[1].split('/versions')[0]
-      console.log('Version operation for document:', documentId)
+    // Handle version operations - check this before document operations
+    const versionMatch = endpoint.match(/^documents\/([^\/]+)\/versions(?:\?versionId=(.+))?$/)
+    if (versionMatch) {
+      const [, documentId, versionId] = versionMatch
+      console.log('Version operation:', { documentId, versionId })
 
       switch (method) {
         case 'get':
@@ -214,18 +215,20 @@ const makeRequest = async (
           console.log('Creating version:', data)
           return { data: await versionStorage.createVersion(data as Omit<VersionData, 'id'>) }
         case 'delete':
-          // Extract versionId from the endpoint or URL parameters
-          const urlParams = new URLSearchParams(endpoint.split('?')[1] || '')
-          const versionId = urlParams.get('versionId')
-          if (!versionId) return { data: null }
-          console.log('Deleting version:', versionId)
-          return { data: await versionStorage.deleteVersion(documentId, versionId) }
+          if (!versionId) {
+            console.log('No version ID provided for deletion')
+            return { data: { success: false, error: 'No version ID provided' } }
+          }
+          console.log('Deleting version:', { documentId, versionId })
+          const success = await versionStorage.deleteVersion(documentId, versionId)
+          return { data: { success } }
       }
     }
 
     // Handle document operations
-    if (endpoint.startsWith('documents/')) {
-      const id = endpoint.split('documents/')[1]
+    const documentMatch = endpoint.match(/^documents\/([^\/]+)$/)
+    if (documentMatch) {
+      const [, id] = documentMatch
       console.log('Document operation:', { id, collection: DOCUMENTS_COLLECTION })
       if (!id) {
         console.log('No document ID found in endpoint')
@@ -253,8 +256,9 @@ const makeRequest = async (
     }
 
     // Handle folder operations
-    if (endpoint.startsWith('folders/')) {
-      const id = endpoint.split('folders/')[1]
+    const folderMatch = endpoint.match(/^folders\/([^\/]+)$/)
+    if (folderMatch) {
+      const [, id] = folderMatch
       console.log('Folder operation:', { id, collection: FOLDERS_COLLECTION })
       if (!id) {
         console.log('No folder ID found in endpoint')
