@@ -68,7 +68,7 @@ export class VersionStorage {
 
   async createVersion(version: Omit<VersionData, 'id'>): Promise<VersionData> {
     if (!this.useFileStorage) {
-      throw new Error('File storage is not enabled')
+      throw new Error('File storage is not enabled - use MongoDB adapter for version management')
     }
 
     const versionsPath = this.getVersionsPath(version.documentId)

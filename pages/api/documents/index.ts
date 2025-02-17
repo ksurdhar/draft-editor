@@ -1,8 +1,9 @@
 import withHybridAuth, { ExtendedApiRequest } from '@lib/with-hybrid-auth'
-import { DocumentData } from '@typez/globals'
+import { DocumentData, UserPermission } from '@typez/globals'
 import type { NextApiResponse } from 'next'
 import { storage } from '@lib/storage'
 import { DEFAULT_DOCUMENT_CONTENT, DEFAULT_DOCUMENT_TITLE } from '@lib/constants'
+import { createPermission } from '@lib/mongo-utils'
 
 const handlers = {
   async POST(req: ExtendedApiRequest, res: NextApiResponse) {
@@ -15,6 +16,19 @@ const handlers = {
       comments: [],
       lastUpdated: now
     })
+
+    // Create permission record for the document
+    try {
+      await createPermission({
+        documentId: newDocument._id,
+        ownerId: req.user!.sub,
+        globalPermission: UserPermission.None
+      })
+    } catch (error) {
+      console.error('Error creating permission record:', error)
+      // Don't fail the request if permission creation fails
+    }
+
     res.status(200).json(newDocument)
   },
 

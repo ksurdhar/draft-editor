@@ -39,13 +39,28 @@ const VersionList = ({
 
   const handleCreateVersion = async () => {
     try {
+      if (!documentId) {
+        console.error('Document ID is required to create a version')
+        return
+      }
+
+      console.log('Fetching document for version creation:', documentId)
       const doc = await api.get(`/documents/${documentId}`)
+      
+      if (!doc) {
+        console.error('Document not found')
+        return
+      }
+
+      console.log('Creating version for document:', documentId)
       await api.post(`/documents/${documentId}/versions`, {
         documentId,
         content: doc.content,
         createdAt: Date.now(),
         name: ''
       })
+
+      console.log('Version created successfully')
       mutate(`/documents/${documentId}/versions`)
     } catch (error) {
       console.error('Error creating version:', error)
