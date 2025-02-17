@@ -3,7 +3,7 @@ import { YjsStorageAdapter } from '../lib/storage/yjs-storage'
 import { VersionStorage } from '../lib/storage/version-storage'
 import * as path from 'path'
 import * as os from 'os'
-import * as crypto from 'crypto'
+import { v4 as uuidv4 } from 'uuid'
 import * as fs from 'fs-extra'
 import { app } from 'electron'
 
@@ -12,9 +12,9 @@ const envPath = path.resolve(__dirname, '../../env-electron.json')
 const env = JSON.parse(fs.readFileSync(envPath, 'utf-8'))
 const useLocalDb = env.LOCAL_DB || false
 
-// Generate a UUID using Node's crypto module
+// Generate a UUID using uuid package
 const generateUUID = () => {
-  return crypto.randomBytes(16).toString('hex')
+  return uuidv4()
 }
 
 // Set storage path based on mode

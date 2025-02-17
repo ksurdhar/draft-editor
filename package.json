@@ -73,7 +73,8 @@
     "use-debounce": "^8.0.1",
     "utf-8-validate": "^6.0.5",
     "uuid": "^9.0.1",
-    "wouter": "^2.12.1"
+    "wouter": "^2.12.1",
+    "yjs": "^13.6.23"
   },
   "devDependencies": {
     "@electron-forge/cli": "^6.4.2",
