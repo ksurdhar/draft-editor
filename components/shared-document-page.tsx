@@ -46,6 +46,9 @@ const useSave = () => {
 }
 
 export default function SharedDocumentPage() {
+  // Check if we're in Electron mode
+  const isElectron = typeof window !== 'undefined' && !!(window as any).electron
+
   const { getLocation, navigateTo } = useNavigation()
   const location = getLocation()
   const id = location.split('/').pop()?.split('?')[0] || ''
@@ -63,6 +66,9 @@ export default function SharedDocumentPage() {
   const documentId = searchParams.get('documentId') || id
   const documentPath = `/documents/${documentId}`
 
+  // Use appropriate endpoint based on platform
+  const documentsEndpoint = isElectron ? '/documents' : '/documents/metadata'
+  
   // Update URL when document ID changes
   useEffect(() => {
     if (documentId && documentId !== id) {
@@ -72,7 +78,7 @@ export default function SharedDocumentPage() {
   }, [documentId, id])
 
   const { data: databaseDoc } = useSWR<DocumentData, Error>(documentPath, fetcher)
-  const { data: allDocs } = useSWR<DocumentData[], Error>('/documents/metadata', fetcher)
+  const { data: allDocs } = useSWR<DocumentData[], Error>(documentsEndpoint, fetcher)
   const { data: allFolders } = useSWR<DocumentData[], Error>('/folders', fetcher)
   
   const [hybridDoc, setHybridDoc] = useState<DocumentData | null>()

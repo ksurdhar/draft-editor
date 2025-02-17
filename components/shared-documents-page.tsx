@@ -19,6 +19,9 @@ import useSWR, { mutate } from 'swr'
 
 
 const SharedDocumentsPage = () => {
+  // Check if we're in Electron mode
+  const isElectron = typeof window !== 'undefined' && !!(window as any).electron
+
   const { navigateTo } = useNavigation()
   const { get, post, patch } = useAPI()
   const { user, isLoading: userLoading } = useUser()
@@ -31,8 +34,11 @@ const SharedDocumentsPage = () => {
   const [selectedItems, setSelectedItems] = useState<string[]>([])
   const [initAnimate, setInitAnimate] = useState(false)
 
+  // Use appropriate endpoint based on platform
+  const documentsEndpoint = isElectron ? '/documents' : '/documents/metadata'
+
   // Fetch documents and folders
-  const { data: docs, mutate: mutateDocs, isLoading: docsLoading } = useSWR<DocumentData[]>('/documents/metadata', get)
+  const { data: docs, mutate: mutateDocs, isLoading: docsLoading } = useSWR<DocumentData[]>(documentsEndpoint, get)
   const { data: folders, mutate: mutateFolders, isLoading: foldersLoading } = useSWR<FolderData[]>('/folders', get)
 
   const operations = useMemo<DocumentOperations>(() => ({
