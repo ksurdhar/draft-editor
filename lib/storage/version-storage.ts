@@ -1,10 +1,9 @@
 import fs from 'fs-extra'
 import path from 'path'
-import { v4 as uuidv4 } from 'uuid'
-import { VersionData } from '@typez/globals'
 import os from 'os'
 import { randomUUID } from 'crypto'
 import * as Y from 'yjs'
+import { VersionData } from '@typez/globals'
 
 export class VersionStorage {
   private storagePath = ''

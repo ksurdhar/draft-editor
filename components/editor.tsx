@@ -127,7 +127,7 @@ const EditorComponent = ({
         titleRef.current.selectionStart = titleRef.current.selectionEnd = titleRef.current.value.length
       }
     }
-  }, [])
+  }, [shouldFocusTitle, title])
 
   // Handle keyboard shortcuts
   useEffect(() => {
