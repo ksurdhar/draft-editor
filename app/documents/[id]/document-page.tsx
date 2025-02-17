@@ -4,7 +4,7 @@ import Layout from '@components/layout'
 import { Loader } from '@components/loader'
 import { useAPI, useNavigation } from '@components/providers'
 import { CloudIcon } from '@heroicons/react/solid'
-import { useSpinner, useSyncHybridDoc } from '@lib/hooks'
+import { useSyncHybridDoc } from '@lib/hooks'
 import DocumentTree, { createTreeItems } from '@components/document-tree'
 import { DocumentData, VersionData } from '@typez/globals'
 import { useUser } from '@wrappers/auth-wrapper-client'
@@ -14,7 +14,6 @@ import { useDebouncedCallback } from 'use-debounce'
 import { motion, AnimatePresence } from 'framer-motion'
 import { EyeIcon, EyeOffIcon, ClockIcon, SearchIcon } from '@heroicons/react/outline'
 import VersionList from '@components/version-list'
-import { Dialog } from '@mui/material'
 import GlobalFind from '@components/global-find'
 
 const backdropStyles = `
@@ -61,7 +60,6 @@ export default function DocumentPage() {
   )
 
   const searchParams = new URLSearchParams(window.location.search)
-  const shouldFocusTitle = searchParams.get('focus') === 'title'
   const documentId = searchParams.get('documentId') || id
   const documentPath = `/documents/${documentId}`
 
@@ -73,7 +71,7 @@ export default function DocumentPage() {
     }
   }, [documentId, id])
 
-  const { data: databaseDoc, mutate: mutateDoc } = useSWR<DocumentData, Error>(documentPath, fetcher)
+  const { data: databaseDoc } = useSWR<DocumentData, Error>(documentPath, fetcher)
   const { data: allDocs } = useSWR<DocumentData[], Error>('/documents', fetcher)
   const { data: allFolders } = useSWR<DocumentData[], Error>('/folders', fetcher)
   
@@ -159,7 +157,7 @@ export default function DocumentPage() {
     return () => {
       window.removeEventListener('documentChanged', handleDocumentChange)
     }
-  }, [documentId, id, get])
+  }, [documentId, id, get, currentContent, isTransitioning])
 
   // Track document state changes
   useEffect(() => {

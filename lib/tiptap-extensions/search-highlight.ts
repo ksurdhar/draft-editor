@@ -75,7 +75,8 @@ export const SearchHighlight = Extension.create<SearchHighlightOptions>({
         },
         props: {
           decorations(state) {
-            return this.getState(state).decorations
+            const pluginState = this.getState(state)
+            return pluginState?.decorations || DecorationSet.empty
           },
         },
       }),

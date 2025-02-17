@@ -16,15 +16,14 @@ const handlers = {
 
     try {
       // Verify user has access to all documents
-      const docs = await Promise.all(
-        updates.map(update => storage.findById('documents', update.documentId))
+      await Promise.all(
+        updates.map(async (update) => {
+          const doc = await storage.findById('documents', update.documentId)
+          if (!doc || doc.userId !== userId) {
+            throw new Error('Access denied to one or more documents')
+          }
+        })
       )
-
-      // Check if any documents don't exist or user doesn't have access
-      const invalidDocs = docs.filter((doc, i) => !doc || doc.userId !== userId)
-      if (invalidDocs.length > 0) {
-        return res.status(403).json({ error: 'Access denied to one or more documents' })
-      }
 
       // Perform updates
       const results = await Promise.all(

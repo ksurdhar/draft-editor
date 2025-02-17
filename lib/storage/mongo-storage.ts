@@ -1,6 +1,5 @@
 import { MongoClient, ObjectId } from 'mongodb'
 import { StorageAdapter, Document, MongoDocument } from './types'
-import { Doc, Folder } from '../mongo-models'
 
 export class MongoStorageAdapter implements StorageAdapter {
   private client: MongoClient

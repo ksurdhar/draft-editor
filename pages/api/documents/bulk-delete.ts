@@ -22,7 +22,12 @@ async function deleteFolder(folderId: string, userId: string) {
   if (subfolders.length > 0) {
     console.log(`Deleting ${subfolders.length} subfolders of ${folderId}`)
     await Promise.all(
-      subfolders.map(folder => deleteFolder(folder._id, userId))
+      subfolders.map(folder => {
+        if (!folder._id) {
+          throw new Error('Folder ID is undefined')
+        }
+        return deleteFolder(folder._id, userId)
+      })
     )
   }
 

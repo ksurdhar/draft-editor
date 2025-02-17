@@ -31,8 +31,7 @@ export const calculateMoveUpdates = (
   
   // Get the moved item
   const movedDoc = docs.find(d => d._id === itemId)
-  const movedFolder = folders.find(f => f._id === itemId)
-  const movedItem = movedDoc || movedFolder
+  const movedItem = movedDoc || folders.find(f => f._id === itemId)
   
   if (!movedItem) {
     throw new Error(`Could not find item to move: ${itemId}`)
@@ -50,7 +49,6 @@ export const calculateMoveUpdates = (
 
   return {
     movedDoc,
-    movedFolder,
     updates
   }
 }
@@ -65,7 +63,7 @@ export const moveItem = async (
   onUpdateState: (updatedDocs: DocumentData[], updatedFolders: FolderData[]) => void
 ) => {
   try {
-    const { movedDoc, movedFolder, updates } = calculateMoveUpdates(
+    const { movedDoc, updates } = calculateMoveUpdates(
       itemId,
       targetFolderId,
       targetIndex,

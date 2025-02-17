@@ -77,7 +77,7 @@ export function computeTiptapDiff(oldDoc: any, newDoc: any): TiptapDiff {
   }
 
   // Split diffs into paragraphs
-  let paragraphs: DiffTuple[][] = [[]]
+  const paragraphs: DiffTuple[][] = [[]]
   let currentParagraphDiffs = paragraphs[0]
 
   diffs.forEach(([operation, text]) => {

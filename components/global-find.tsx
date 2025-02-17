@@ -1,6 +1,5 @@
 'use client'
-import { XIcon, ChevronDownIcon as ChevronExpandIcon } from '@heroicons/react/outline'
-import { motion } from 'framer-motion'
+import { ChevronDownIcon as ChevronExpandIcon } from '@heroicons/react/outline'
 import { useState, useEffect, useMemo } from 'react'
 import { ListItem } from './list-item'
 import { useAPI } from './providers'
@@ -35,7 +34,7 @@ interface DocumentUpdate {
   }[]
 }
 
-export default function GlobalFind({ onClose }: GlobalFindProps) {
+export default function GlobalFind({ onClose: _onClose }: GlobalFindProps) {
   const { get, post, patch } = useAPI()
   const { navigateTo } = useNavigation()
   const [searchTerm, setSearchTerm] = useState('')

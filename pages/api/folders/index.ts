@@ -25,10 +25,12 @@ export default async function handler(
         }
 
         const folder: Omit<FolderData, 'id'> = {
+          _id: '',
           title,
           parentId,
           userId,
-          lastUpdated: Date.now()
+          lastUpdated: Date.now(),
+          folderIndex: 0
         }
 
         const newFolder = await storage.create('folders', folder)

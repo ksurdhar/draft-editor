@@ -94,7 +94,7 @@ const EditorComponent = ({
     onUpdate: ({ editor }) => {
       if (diffMode) return // Prevent updates in diff mode
       const json = editor.getJSON()
-      onUpdate({ content: json })
+      onUpdate({ content: json as { type: 'doc', content: any[] } })
     },
     onCreate: ({ editor }) => {
       console.log('Editor onCreate - initial content:', editor.getJSON())
@@ -142,6 +142,12 @@ const EditorComponent = ({
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
+
+  useEffect(() => {
+    if (shouldFocusTitle) {
+      titleRef.current?.focus()
+    }
+  }, [shouldFocusTitle])
 
   return (
     <div className='flex-grow normal-case animate-fadein'>

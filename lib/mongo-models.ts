@@ -22,6 +22,7 @@ global.db.on('error', (error) => {
 })
 
 global.db.once('open', () => {
+  if (!global.db) return
   console.log('\nMongoDB Connected Successfully')
   console.log('Database:', global.db.name)
   console.log('Host:', global.db.host)
@@ -206,19 +207,19 @@ export interface IDoc {
   folderIndex: number
 }
 
-export interface IDocDocument extends IDoc, Document {}
+export interface IDocDocument extends Document, IDoc {}
 export interface IDocModel extends Model<IDocDocument> {}
-export const Doc = Mongoose.models && Mongoose.models.Document || Mongoose.model<IDocDocument>('Document', DocumentSchema) 
+export const Doc = Mongoose.models && Mongoose.models.Document || Mongoose.model<IDocDocument>('Document', DocumentSchema)
 
 export interface IPermission {
   globalPermission: string
-  users: string[] // not quite true
+  users: string[]
   ownerId: string
   documentId: string
 }
-export interface IPermissionDocument extends IPermission, Document {}
+export interface IPermissionDocument extends Document, IPermission {}
 export interface IPermissionModel extends Model<IPermissionDocument> {}
-export const Permission = Mongoose.models && Mongoose.models.Permission || Mongoose.model<IPermissionDocument>('Permission', PermissionSchema) 
+export const Permission = Mongoose.models && Mongoose.models.Permission || Mongoose.model<IPermissionDocument>('Permission', PermissionSchema)
 
 export interface IVersion {
   ownerId: string
@@ -229,11 +230,10 @@ export interface IVersion {
   wordCount: number
   content: string
 }
-export interface IVersionDocument extends IVersion, Document {}
+export interface IVersionDocument extends Document, IVersion {}
 export interface IVersionModel extends Model<IVersionDocument> {}
-export const Version = Mongoose.models && Mongoose.models.Version || Mongoose.model<IVersionDocument>('Version', VersionSchema) 
+export const Version = Mongoose.models && Mongoose.models.Version || Mongoose.model<IVersionDocument>('Version', VersionSchema)
 
-// Add Folder interfaces
 export interface IFolder {
   title: string
   parentId: string
@@ -241,7 +241,6 @@ export interface IFolder {
   lastUpdated: number
   folderIndex: number
 }
-export interface IFolderDocument extends IFolder, Document {}
+export interface IFolderDocument extends Document, IFolder {}
 export interface IFolderModel extends Model<IFolderDocument> {}
-
 export const Folder = Mongoose.models && Mongoose.models.Folder || Mongoose.model<IFolderDocument>('Folder', FolderSchema) 

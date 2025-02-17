@@ -192,9 +192,9 @@ const makeRequest = async (
 
           console.log('Bulk delete operation completed successfully')
           return { data: { success: true } }
-        } catch (error) {
+        } catch (error: any) {
           console.error('Error during bulk delete:', error)
-          return { data: { success: false, error: error.message } }
+          return { data: { success: false, error: error.message || 'Unknown error occurred' } }
         }
       }
       return { data: null }

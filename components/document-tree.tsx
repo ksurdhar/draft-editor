@@ -5,7 +5,6 @@ import MoreHorizIcon from '@mui/icons-material/MoreHoriz'
 import { useState } from 'react'
 import { DocumentData, FolderData } from '@typez/globals'
 import { ListItem } from './list-item'
-import { TreeItemRenderContext } from 'react-complex-tree'
 
 export interface TreeItemData {
   index: TreeItemIndex
@@ -99,8 +98,9 @@ export const createTreeItems = (docs: DocumentData[], folders: FolderData[]): Re
     const parentId = folder.parentId || 'root'
     if (treeItems[parentId]) {
       treeItems[parentId].children = treeItems[parentId].children || []
-      if (!treeItems[parentId].children.includes(folderId)) {
-        treeItems[parentId].children.push(folderId)
+      const children = treeItems[parentId].children
+      if (children && !children.includes(folderId)) {
+        children.push(folderId)
       }
     }
   })
@@ -111,8 +111,9 @@ export const createTreeItems = (docs: DocumentData[], folders: FolderData[]): Re
     const parentId = doc.parentId || 'root'
     if (treeItems[parentId]) {
       treeItems[parentId].children = treeItems[parentId].children || []
-      if (!treeItems[parentId].children.includes(docId)) {
-        treeItems[parentId].children.push(docId)
+      const children = treeItems[parentId].children
+      if (children && !children.includes(docId)) {
+        children.push(docId)
       }
     }
   })

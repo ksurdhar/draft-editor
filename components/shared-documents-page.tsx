@@ -6,8 +6,6 @@ import { useSpinner } from '@lib/hooks'
 import { DocumentData, FolderData } from '@typez/globals'
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import CreateNewFolderIcon from '@mui/icons-material/CreateNewFolder'
-import ExpandLessIcon from '@mui/icons-material/ExpandLess'
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import NoteAddIcon from '@mui/icons-material/NoteAdd'
 import { IconButton, Menu, MenuItem, Tooltip } from '@mui/material'
 import RenameModal from './rename-modal'
@@ -19,20 +17,17 @@ import { useUser } from '@wrappers/auth-wrapper-client'
 import { moveItem, bulkDelete, createDocument, DocumentOperations } from '@lib/document-operations'
 import useSWR, { mutate } from 'swr'
 
-export interface SharedDocumentsPageProps {
-  className?: string
-}
 
-const SharedDocumentsPage = ({ className = '' }: SharedDocumentsPageProps) => {
+const SharedDocumentsPage = () => {
   const { navigateTo } = useNavigation()
-  const { get, post, patch, destroy } = useAPI()
+  const { get, post, patch } = useAPI()
   const { user, isLoading: userLoading } = useUser()
   const [selectedDocId, setSelectedDoc] = useState<string | null>(null)
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [renameModalOpen, setRenameModalOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [createFolderModalOpen, setCreateFolderModalOpen] = useState(false)
-  const [newFolderParentId, setNewFolderParentId] = useState<string | undefined>()
+  const [newFolderParentId] = useState<string | undefined>()
   const [selectedItems, setSelectedItems] = useState<string[]>([])
   const [initAnimate, setInitAnimate] = useState(false)
 
@@ -132,7 +127,7 @@ const SharedDocumentsPage = ({ className = '' }: SharedDocumentsPageProps) => {
         mutateDocs()
       }
     },
-    [mutateDocs, docs, operations, mutate],
+    [mutateDocs, docs, operations],
   )
 
   const createFolder = useCallback(

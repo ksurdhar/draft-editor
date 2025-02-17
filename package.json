@@ -45,6 +45,7 @@
     "@types/slate": "^0.47.11",
     "axios": "^1.5.1",
     "bufferutil": "^4.0.9",
+    "compromise": "^14.14.4",
     "date-fns": "^2.28.0",
     "diff-match-patch": "^1.0.5",
     "dotenv": "^16.4.7",

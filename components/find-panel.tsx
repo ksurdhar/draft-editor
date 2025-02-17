@@ -1,7 +1,6 @@
 'use client'
 import { XIcon, ChevronDownIcon as ChevronExpandIcon } from '@heroicons/react/outline'
 import { ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/solid'
-import { motion } from 'framer-motion'
 import { Editor } from '@tiptap/react'
 import { useEffect, useState, useCallback } from 'react'
 import { findAllMatches } from '../lib/search'
@@ -32,13 +31,20 @@ export default function FindPanel({ editor, onClose }: FindPanelProps) {
     wholeWord: false
   })
 
+  const scrollToMatch = useCallback((_match: Match) => {
+    const element = document.querySelector('.search-result-current')
+    if (element) {
+      element.scrollIntoView({ block: 'center' })
+    }
+  }, [])
+
   const selectNextMatch = useCallback(() => {
     if (matches.length === 0) return
     const nextMatch = (currentMatch + 1) % matches.length
     setCurrentMatch(nextMatch)
     editor.commands.setSearchHighlight(matches, nextMatch)
     scrollToMatch(matches[nextMatch])
-  }, [matches, currentMatch, editor])
+  }, [matches, currentMatch, editor, scrollToMatch])
 
   const selectPreviousMatch = useCallback(() => {
     if (matches.length === 0) return
@@ -46,14 +52,7 @@ export default function FindPanel({ editor, onClose }: FindPanelProps) {
     setCurrentMatch(prevMatch)
     editor.commands.setSearchHighlight(matches, prevMatch)
     scrollToMatch(matches[prevMatch])
-  }, [matches, currentMatch, editor])
-
-  const scrollToMatch = useCallback((_match: Match) => {
-    const element = document.querySelector('.search-result-current')
-    if (element) {
-      element.scrollIntoView({ block: 'center' })
-    }
-  }, [])
+  }, [matches, currentMatch, editor, scrollToMatch])
 
   const handleClose = useCallback(() => {
     editor.commands.unsetSearchHighlight()

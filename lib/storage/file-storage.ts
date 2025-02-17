@@ -51,6 +51,10 @@ export class FileStorageAdapter implements StorageAdapter {
     }
     console.log('Created new document:', newDoc)
 
+    if (!newDoc._id) {
+      throw new Error('Document ID is undefined')
+    }
+
     const filePath = this.getDocumentPath(collection, newDoc._id)
     console.log('Writing to file path:', filePath)
     await fs.writeFile(filePath, JSON.stringify(newDoc, null, 2))
@@ -110,53 +114,31 @@ export class FileStorageAdapter implements StorageAdapter {
     }
   }
 
-  async update(collection: string, id: string, data: Partial<Document>): Promise<Document | null> {
-    console.log('\n=== FileStorageAdapter.update ===')
-    console.log('Collection:', collection)
-    console.log('Document ID:', id)
-    console.log('Update data:', data)
-
-    const filePath = this.getDocumentPath(collection, id)
-    console.log('File path:', filePath)
-    
-    if (!fs.existsSync(filePath)) {
-      console.log('File not found')
-      return null
-    }
-
+  async update(collection: string, id: string, data: any) {
     try {
-      const content = await fs.readFile(filePath, 'utf-8')
-      const existingDoc = JSON.parse(content) as Document
-      console.log('Existing document:', existingDoc)
-      
-      // Only include defined fields in the update
-      const definedUpdates = Object.entries(data).reduce((acc, [key, value]) => {
-        if (value !== undefined) {
-          acc[key] = value
-        }
-        return acc
-      }, {} as Record<string, any>)
-
-      const updatedDoc = {
-        ...existingDoc,
-        ...definedUpdates,
-        updatedAt: new Date().toISOString()
+      const doc = await this.findById(collection, id)
+      if (!doc) {
+        throw new Error(`Document not found: ${id}`)
       }
-      console.log('Updated document:', updatedDoc)
 
+      const updatedDoc = { ...doc, ...data }
+      if (!updatedDoc._id) {
+        throw new Error('Document ID is undefined')
+      }
+
+      const filePath = this.getDocumentPath(collection, updatedDoc._id)
       await fs.writeFile(filePath, JSON.stringify(updatedDoc, null, 2))
-      console.log('Successfully wrote updated document to file')
       return updatedDoc
     } catch (error) {
       console.error('Error updating document:', error)
-      return null
+      throw error
     }
   }
 
   async delete(collection: string, query: Record<string, any>): Promise<boolean> {
-    if (!collection) {
-      throw new Error('Collection name is required')
-    }
+    console.log('\n=== FileStorageAdapter.delete ===')
+    console.log('Collection:', collection)
+    console.log('Query:', query)
 
     try {
       const documents = await this.find(collection, query)
@@ -166,14 +148,17 @@ export class FileStorageAdapter implements StorageAdapter {
       }
 
       await Promise.all(
-        documents.map(doc => 
-          fs.unlink(this.getDocumentPath(collection, doc._id))
-        )
+        documents.map(doc => {
+          if (!doc._id) {
+            throw new Error('Document ID is undefined')
+          }
+          return fs.unlink(this.getDocumentPath(collection, doc._id))
+        })
       )
 
       return true
     } catch (error) {
-      console.error('Error deleting document:', error)
+      console.error('Error deleting documents:', error)
       return false
     }
   }

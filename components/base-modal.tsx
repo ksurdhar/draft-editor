@@ -1,5 +1,4 @@
 import { Modal, Button } from '@mui/material'
-import { ReactNode } from 'react'
 import { useEffect } from 'react'
 
 export interface BaseModalProps {
