@@ -1,5 +1,6 @@
 import { MongoClient, ObjectId } from 'mongodb'
 import { StorageAdapter, Document, MongoDocument } from './types'
+import { Doc, Folder } from '../mongo-models'
 
 export class MongoStorageAdapter implements StorageAdapter {
   private client: MongoClient
@@ -7,7 +8,8 @@ export class MongoStorageAdapter implements StorageAdapter {
   private connected = false
 
   constructor() {
-    const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_CLUSTER}`
+    const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_CLUSTER}.mongodb.net` // do we need the .mongodb.net?
+    console.log('Initializing MongoDB connection:', uri.replace(process.env.DB_PASS || '', '[REDACTED]'))
     this.client = new MongoClient(uri)
     this.dbName = process.env.DB_NAME || 'whetstone'
   }
@@ -16,6 +18,7 @@ export class MongoStorageAdapter implements StorageAdapter {
     if (!this.connected) {
       await this.client.connect()
       this.connected = true
+      console.log('Connected to MongoDB')
     }
   }
 
@@ -23,6 +26,7 @@ export class MongoStorageAdapter implements StorageAdapter {
     if (this.connected) {
       await this.client.close()
       this.connected = false
+      console.log('Disconnected from MongoDB')
     }
   }
 
@@ -52,12 +56,16 @@ export class MongoStorageAdapter implements StorageAdapter {
     return {
       ...doc,
       _id: doc._id?.toString(),
-      createdAt: doc.createdAt.toISOString(),
-      updatedAt: doc.updatedAt.toISOString()
+      createdAt: doc.createdAt?.toISOString(),
+      updatedAt: doc.updatedAt?.toISOString()
     }
   }
 
   async create(collection: string, data: Omit<Document, '_id'>): Promise<Document> {
+    console.log('\n=== MongoStorageAdapter.create ===')
+    console.log('Collection:', collection)
+    console.log('Data:', data)
+
     try {
       const col = await this.getCollection(collection)
       const mongoDoc = {
@@ -75,17 +83,25 @@ export class MongoStorageAdapter implements StorageAdapter {
   }
 
   async findById(collection: string, id: string): Promise<Document | null> {
+    console.log('\n=== MongoStorageAdapter.findById ===')
+    console.log('Collection:', collection)
+    console.log('ID:', id)
+
     try {
       const col = await this.getCollection(collection)
-      const result = await col.findOne({ _id: new ObjectId(id) } as any)
+      const result = await col.findOne({ _id: new ObjectId(id) })
       return result ? this.toDocument(result) : null
     } catch (error) {
-      console.error('Error finding document by id:', error)
+      console.error('Error finding document:', error)
       throw error
     }
   }
 
-  async find(collection: string, query: object = {}): Promise<Document[]> {
+  async find(collection: string, query: Record<string, any> = {}): Promise<Document[]> {
+    console.log('\n=== MongoStorageAdapter.find ===')
+    console.log('Collection:', collection)
+    console.log('Query:', query)
+
     try {
       const col = await this.getCollection(collection)
       const results = await col.find(query).toArray()
@@ -97,6 +113,11 @@ export class MongoStorageAdapter implements StorageAdapter {
   }
 
   async update(collection: string, id: string, data: Partial<Document>): Promise<Document | null> {
+    console.log('\n=== MongoStorageAdapter.update ===')
+    console.log('Collection:', collection)
+    console.log('ID:', id)
+    console.log('Update data:', data)
+
     try {
       const col = await this.getCollection(collection)
       const mongoUpdate = {
@@ -105,10 +126,11 @@ export class MongoStorageAdapter implements StorageAdapter {
       }
       
       const result = await col.findOneAndUpdate(
-        { _id: new ObjectId(id) } as any,
+        { _id: new ObjectId(id) },
         { $set: mongoUpdate },
         { returnDocument: 'after' }
       )
+
       return result ? this.toDocument(result) : null
     } catch (error) {
       console.error('Error updating document:', error)
@@ -116,13 +138,21 @@ export class MongoStorageAdapter implements StorageAdapter {
     }
   }
 
-  async delete(collection: string, id: string): Promise<boolean> {
+  async delete(collection: string, query: Record<string, any>): Promise<boolean> {
+    console.log('\n=== MongoStorageAdapter.delete ===')
+    console.log('Collection:', collection)
+    console.log('Query:', query)
+
     try {
       const col = await this.getCollection(collection)
-      const result = await col.deleteOne({ _id: new ObjectId(id) } as any)
-      return result.deletedCount === 1
+      // Convert string _id to ObjectId if present
+      if (query._id) {
+        query._id = new ObjectId(query._id)
+      }
+      const result = await col.deleteMany(query)
+      return result.deletedCount > 0
     } catch (error) {
-      console.error('Error deleting document:', error)
+      console.error('Error deleting documents:', error)
       throw error
     }
   }

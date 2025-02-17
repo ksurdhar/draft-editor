@@ -3,15 +3,29 @@ import Mongoose, { Document, Model } from 'mongoose'
 // Mongo Init Code
 if (!global.db) {
   const MONGO_DB = process.env.MOCK_AUTH === 'true' 
-  ? 'mongodb://localhost:27017/whetstone'
-  : `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_CLUSTER}.mongodb.net/${process.env.DB_NAME}?retryWrites=true&w=majority`
+    ? 'mongodb://localhost:27017/whetstone'
+    : `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_CLUSTER}.mongodb.net/${process.env.DB_NAME}?retryWrites=true&w=majority`
+  
+  console.log('\n=== MongoDB Connection ===')
+  console.log('MOCK_AUTH:', process.env.MOCK_AUTH)
+  console.log('LOCAL_DB:', process.env.LOCAL_DB)
+  console.log('Storage Type:', process.env.NEXT_PUBLIC_STORAGE_TYPE)
+  console.log('Connection string:', MONGO_DB.replace(process.env.DB_PASS || '', '[REDACTED]'))
+  
   Mongoose.set('strictQuery', true)
   Mongoose.connect(MONGO_DB)
   global.db = Mongoose.connection
 }
-global.db.on('error', console.error.bind(console, 'connection error: '))
+
+global.db.on('error', (error) => {
+  console.error('\nMongoDB Connection Error:', error)
+})
+
 global.db.once('open', () => {
-  console.log('Connected successfully')  
+  console.log('\nMongoDB Connected Successfully')
+  console.log('Database:', global.db.name)
+  console.log('Host:', global.db.host)
+  console.log('Port:', global.db.port)
 })
 
 const DocumentSchema = new Mongoose.Schema({
