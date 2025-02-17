@@ -1,5 +1,5 @@
 import Providers, { APIProvider, NavigationProvider } from '@components/providers'
-import DocumentPage from 'app/documents/[id]/document-page'
+import SharedDocumentPage from '@components/shared-document-page'
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation } from 'wouter'
 import SharedDocumentsPage from '@components/shared-documents-page'
@@ -47,7 +47,7 @@ function ElectronApp() {
           <Providers>
             {location === '/' && <LandingPage />}
             {location === '/documents' && <SharedDocumentsPage />}
-            {isDocumentLocation() && <DocumentPage />}
+            {isDocumentLocation() && <SharedDocumentPage />}
           </Providers>
         </APIProvider>
       </NavigationProvider>

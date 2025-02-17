@@ -45,7 +45,7 @@ const useSave = () => {
   return save
 }
 
-export default function DocumentPage() {
+export default function SharedDocumentPage() {
   const { getLocation, navigateTo } = useNavigation()
   const location = getLocation()
   const id = location.split('/').pop()?.split('?')[0] || ''
@@ -229,7 +229,9 @@ export default function DocumentPage() {
         lastUpdated: Date.now()
       }
 
-      if (process.env.NEXT_PUBLIC_STORAGE_TYPE !== 'json') {
+      // Use window.env for Electron environment variables
+      const storageType = window.env?.NEXT_PUBLIC_STORAGE_TYPE || 'mongo'
+      if (storageType !== 'json') {
         sessionStorage.setItem(documentId, JSON.stringify(updatedDoc))
       }
       

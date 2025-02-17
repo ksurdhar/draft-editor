@@ -1,4 +1,4 @@
-import DocumentPage from './document-page'
+import SharedDocumentPage from '../../../components/shared-document-page'
 
 // Title: `whetstone - ${hybridDoc?.title}`
 
@@ -10,5 +10,5 @@ import DocumentPage from './document-page'
 
 // maybe move where we call withPageAuth
 export default async function Page() {
-  return <DocumentPage />
+  return <SharedDocumentPage />
 }

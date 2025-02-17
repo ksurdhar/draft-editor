@@ -1,7 +1,6 @@
 import withHybridAuth, { ExtendedApiRequest } from '@lib/with-hybrid-auth'
 import type { NextApiResponse } from 'next'
 import { createVersion, getVersionsForDoc, getDocument, deleteVersion } from '@lib/mongo-utils'
-import { VersionData } from '@typez/globals'
 
 export default withHybridAuth(async function versionsHandler(req: ExtendedApiRequest, res: NextApiResponse) {
   const { query, method, user } = req

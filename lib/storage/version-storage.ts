@@ -29,6 +29,7 @@ export class VersionStorage {
   private initialize() {
     if (!this.useFileStorage) return
     
+    // Ensure the base versions directory exists
     const versionsPath = path.join(this.storagePath, 'versions')
     fs.ensureDirSync(versionsPath)
     console.log('Initialized versions directory:', versionsPath)
@@ -38,7 +39,9 @@ export class VersionStorage {
     if (!this.useFileStorage) {
       throw new Error('File storage is not enabled')
     }
-    return path.join(this.storagePath, 'versions', documentId)
+    const versionsPath = path.join(this.storagePath, 'versions', documentId)
+    fs.ensureDirSync(versionsPath) // Ensure document's version directory exists
+    return versionsPath
   }
 
   async getVersions(documentId: string): Promise<VersionData[]> {
@@ -46,18 +49,20 @@ export class VersionStorage {
       return [] // In mongo mode, versions should be handled by mongo adapter
     }
 
+    console.log('Getting versions for document:', documentId)
     const versionsPath = this.getVersionsPath(documentId)
-    if (!fs.existsSync(versionsPath)) {
-      return []
-    }
 
     try {
       const files = await fs.readdir(versionsPath)
+      console.log('Found version files:', files)
+      
       const versions = await Promise.all(
-        files.map(async (file) => {
-          const content = await fs.readFile(path.join(versionsPath, file), 'utf-8')
-          return JSON.parse(content) as VersionData
-        })
+        files
+          .filter(file => file.endsWith('.json'))
+          .map(async (file) => {
+            const content = await fs.readFile(path.join(versionsPath, file), 'utf-8')
+            return JSON.parse(content) as VersionData
+          })
       )
       return versions.sort((a, b) => b.createdAt - a.createdAt)
     } catch (error) {
@@ -71,16 +76,17 @@ export class VersionStorage {
       throw new Error('File storage is not enabled - use MongoDB adapter for version management')
     }
 
+    console.log('Creating version for document:', version.documentId)
     const versionsPath = this.getVersionsPath(version.documentId)
-    fs.ensureDirSync(versionsPath)
 
     const newVersion: VersionData = {
       ...version,
-      id: uuidv4()
+      id: this.generateId()
     }
 
     const filePath = path.join(versionsPath, `${newVersion.id}.json`)
     await fs.writeFile(filePath, JSON.stringify(newVersion, null, 2))
+    console.log('Version created:', newVersion.id)
 
     return newVersion
   }
@@ -110,18 +116,25 @@ export class VersionStorage {
       return false // In mongo mode, versions should be handled by mongo adapter
     }
 
+    console.log('Deleting version:', { documentId, versionId })
     const filePath = path.join(this.getVersionsPath(documentId), `${versionId}.json`)
     
     if (!fs.existsSync(filePath)) {
+      console.log('Version file not found:', filePath)
       return false
     }
 
     try {
       await fs.unlink(filePath)
+      console.log('Version deleted successfully')
       return true
     } catch (error) {
       console.error('Error deleting version:', error)
       return false
     }
+  }
+
+  generateId() {
+    return uuidv4()
   }
 } 

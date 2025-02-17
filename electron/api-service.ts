@@ -200,6 +200,29 @@ const makeRequest = async (
       return { data: null }
     }
 
+    // Handle version operations
+    if (endpoint.startsWith('documents/') && endpoint.endsWith('/versions')) {
+      const documentId = endpoint.split('documents/')[1].split('/versions')[0]
+      console.log('Version operation for document:', documentId)
+
+      switch (method) {
+        case 'get':
+          console.log('Getting versions for document:', documentId)
+          return { data: await versionStorage.getVersions(documentId) }
+        case 'post':
+          if (!data) return { data: null }
+          console.log('Creating version:', data)
+          return { data: await versionStorage.createVersion(data as Omit<VersionData, 'id'>) }
+        case 'delete':
+          // Extract versionId from the endpoint or URL parameters
+          const urlParams = new URLSearchParams(endpoint.split('?')[1] || '')
+          const versionId = urlParams.get('versionId')
+          if (!versionId) return { data: null }
+          console.log('Deleting version:', versionId)
+          return { data: await versionStorage.deleteVersion(documentId, versionId) }
+      }
+    }
+
     // Handle document operations
     if (endpoint.startsWith('documents/')) {
       const id = endpoint.split('documents/')[1]
