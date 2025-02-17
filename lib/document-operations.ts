@@ -71,6 +71,26 @@ export const moveItem = async (
       folders
     )
 
+    // Apply optimistic updates
+    const optimisticDocs = docs.map(doc => {
+      const update = updates.find(u => u.id === doc._id && u.isDocument)
+      if (doc._id === itemId) {
+        return { ...doc, parentId: targetFolderId || 'root', folderIndex: targetIndex || 0 }
+      }
+      return update ? { ...doc, folderIndex: update.folderIndex } : doc
+    })
+
+    const optimisticFolders = folders.map(folder => {
+      const update = updates.find(u => u.id === folder._id && !u.isDocument)
+      if (folder._id === itemId) {
+        return { ...folder, parentId: targetFolderId || 'root', folderIndex: targetIndex || 0 }
+      }
+      return update ? { ...folder, folderIndex: update.folderIndex } : folder
+    })
+
+    // Update UI optimistically
+    onUpdateState(optimisticDocs, optimisticFolders)
+
     // First update the moved item's parent and position
     const patchOperation = movedDoc ? operations.patchDocument : operations.patchFolder
 
@@ -89,25 +109,6 @@ export const moveItem = async (
         lastUpdated: Date.now()
       })
     }))
-
-    // Update local state
-    const updatedDocs = docs.map(doc => {
-      const update = updates.find(u => u.id === doc._id && u.isDocument)
-      if (doc._id === itemId) {
-        return { ...doc, parentId: targetFolderId || 'root', folderIndex: targetIndex || 0 }
-      }
-      return update ? { ...doc, folderIndex: update.folderIndex } : doc
-    })
-
-    const updatedFolders = folders.map(folder => {
-      const update = updates.find(u => u.id === folder._id && !u.isDocument)
-      if (folder._id === itemId) {
-        return { ...folder, parentId: targetFolderId || 'root', folderIndex: targetIndex || 0 }
-      }
-      return update ? { ...folder, folderIndex: update.folderIndex } : folder
-    })
-
-    onUpdateState(updatedDocs, updatedFolders)
   } catch (error) {
     console.error('Error during move operation:', error)
     throw error

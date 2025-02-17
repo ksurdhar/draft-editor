@@ -69,7 +69,8 @@ const SharedDocumentsPage = () => {
           }
         )
       } catch (error) {
-        // Revert on error
+        console.error('Move failed:', error)
+        // Revert on error by triggering revalidation
         mutateDocs()
         mutateFolders()
       }
