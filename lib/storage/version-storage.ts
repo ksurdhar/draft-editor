@@ -2,25 +2,50 @@ import fs from 'fs-extra'
 import path from 'path'
 import { v4 as uuidv4 } from 'uuid'
 import { VersionData } from '@typez/globals'
+import os from 'os'
 
 export class VersionStorage {
-  private storagePath: string
+  private storagePath = ''
+  private useFileStorage: boolean
 
   constructor() {
-    this.storagePath = process.env.JSON_STORAGE_PATH || './data'
-    this.initialize()
+    this.useFileStorage = process.env.NEXT_PUBLIC_STORAGE_TYPE !== 'mongo'
+    
+    // Only set up file storage if we're not using mongo
+    if (this.useFileStorage) {
+      this.storagePath = process.env.NODE_ENV === 'production'
+        ? path.join(os.tmpdir(), 'draft-editor-data')
+        : (process.env.JSON_STORAGE_PATH || './data')
+      
+      console.log('\n=== VersionStorage Initialization ===')
+      console.log('Environment:', process.env.NODE_ENV)
+      console.log('Storage path:', this.storagePath)
+      console.log('Storage type:', process.env.NEXT_PUBLIC_STORAGE_TYPE)
+      
+      this.initialize()
+    }
   }
 
   private initialize() {
+    if (!this.useFileStorage) return
+    
     const versionsPath = path.join(this.storagePath, 'versions')
     fs.ensureDirSync(versionsPath)
+    console.log('Initialized versions directory:', versionsPath)
   }
 
   private getVersionsPath(documentId: string) {
+    if (!this.useFileStorage) {
+      throw new Error('File storage is not enabled')
+    }
     return path.join(this.storagePath, 'versions', documentId)
   }
 
   async getVersions(documentId: string): Promise<VersionData[]> {
+    if (!this.useFileStorage) {
+      return [] // In mongo mode, versions should be handled by mongo adapter
+    }
+
     const versionsPath = this.getVersionsPath(documentId)
     if (!fs.existsSync(versionsPath)) {
       return []
@@ -42,6 +67,10 @@ export class VersionStorage {
   }
 
   async createVersion(version: Omit<VersionData, 'id'>): Promise<VersionData> {
+    if (!this.useFileStorage) {
+      throw new Error('File storage is not enabled')
+    }
+
     const versionsPath = this.getVersionsPath(version.documentId)
     fs.ensureDirSync(versionsPath)
 
@@ -57,6 +86,10 @@ export class VersionStorage {
   }
 
   async getVersion(documentId: string, versionId: string): Promise<VersionData | null> {
+    if (!this.useFileStorage) {
+      return null // In mongo mode, versions should be handled by mongo adapter
+    }
+
     const filePath = path.join(this.getVersionsPath(documentId), `${versionId}.json`)
     
     if (!fs.existsSync(filePath)) {
@@ -73,6 +106,10 @@ export class VersionStorage {
   }
 
   async deleteVersion(documentId: string, versionId: string): Promise<boolean> {
+    if (!this.useFileStorage) {
+      return false // In mongo mode, versions should be handled by mongo adapter
+    }
+
     const filePath = path.join(this.getVersionsPath(documentId), `${versionId}.json`)
     
     if (!fs.existsSync(filePath)) {

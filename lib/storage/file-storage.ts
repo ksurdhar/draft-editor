@@ -2,18 +2,34 @@ import fs from 'fs-extra'
 import path from 'path'
 import { v4 as uuidv4 } from 'uuid'
 import { StorageAdapter, Document } from './types'
+import os from 'os'
 
 export class FileStorageAdapter implements StorageAdapter {
   private storagePath: string
 
   constructor() {
-    this.storagePath = process.env.JSON_STORAGE_PATH || './data'
+    // In production, use the system's temp directory
+    // In development, use the configured path or ./data
+    this.storagePath = process.env.NODE_ENV === 'production'
+      ? path.join(os.tmpdir(), 'draft-editor-data')
+      : (process.env.JSON_STORAGE_PATH || './data')
+    
+    console.log('\n=== FileStorageAdapter Initialization ===')
+    console.log('Environment:', process.env.NODE_ENV)
+    console.log('Storage path:', this.storagePath)
+    
     this.initialize()
   }
 
   private initialize() {
+    // Ensure both the base storage path and documents directory exist
+    fs.ensureDirSync(this.storagePath)
     const documentsPath = path.join(this.storagePath, 'documents')
     fs.ensureDirSync(documentsPath)
+    console.log('Initialized storage directories:', {
+      base: this.storagePath,
+      documents: documentsPath
+    })
   }
 
   private getDocumentsPath(collection: string) {
