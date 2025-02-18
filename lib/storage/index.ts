@@ -4,7 +4,7 @@ import { MongoStorageAdapter } from './mongo-storage'
 
 console.log('\n=== Storage Initialization ===')
 console.log('Storage Type:', process.env.NEXT_PUBLIC_STORAGE_TYPE)
-console.log('LOCAL_DB:', process.env.LOCAL_DB)
+console.log('SYNC_ENABLED:', process.env.SYNC_ENABLED)
 console.log('MOCK_AUTH:', process.env.MOCK_AUTH)
 
 export const storage = process.env.NEXT_PUBLIC_STORAGE_TYPE === 'mongo'
