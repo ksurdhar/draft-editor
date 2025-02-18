@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron'
 import { createAppWindow } from './app'
 import authService from './auth-service'
+import { initializeSyncService } from './storage-adapter'
 
 let win: BrowserWindow | null = null
 
@@ -27,6 +28,7 @@ export const createAuthWindow = async () => {
 
   webRequest?.onBeforeRequest(filter, async ({ url }) => {
     await authService.loadTokens(url)
+    await initializeSyncService()
     createAppWindow()
     return destroyAuthWin()
   })

@@ -5,7 +5,7 @@ import { VersionStorage } from '../lib/storage/version-storage'
 import { SyncService } from './sync-service'
 import * as path from 'path'
 import * as os from 'os'
-import { v4 as uuidv4 } from 'uuid'
+import * as crypto from 'crypto'
 import * as fs from 'fs-extra'
 import { app } from 'electron'
 
@@ -14,9 +14,9 @@ const envPath = path.resolve(__dirname, '../../env-electron.json')
 const env = JSON.parse(fs.readFileSync(envPath, 'utf-8'))
 const useLocalDb = env.LOCAL_DB || false
 
-// Generate a UUID using uuid package
+// Generate a UUID using Node's crypto module
 const generateUUID = () => {
-  return uuidv4()
+  return crypto.randomUUID()
 }
 
 // Set storage path based on mode
@@ -108,19 +108,28 @@ export const documentStorage = new ElectronYjsStorageAdapter()
 export const folderStorage = new ElectronFileStorageAdapter()
 export const versionStorage = new ElectronVersionStorage()
 
-// Initialize MongoDB storage and sync service if not in local mode
-const mongoStorage = !useLocalDb ? new MongoStorageAdapter() : null
-export const syncService = !useLocalDb ? new SyncService(documentStorage, mongoStorage!) : null
+// Initialize MongoDB storage without sync
+const mongoStorage = !useLocalDb ? new MongoStorageAdapter({
+  dbName: env.DB_NAME,
+  dbCluster: env.DB_CLUSTER,
+  dbUser: env.DB_USER,
+  dbPass: env.DB_PASS
+}) : null
 
-// Start periodic sync if sync service is enabled
-if (syncService) {
-  // Sync every 5 minutes
-  setInterval(() => {
-    syncService.syncAll()
-  }, 5 * 60 * 1000)
-  
-  // Initial sync
-  syncService.syncAll()
+// Create sync service but don't initialize it yet
+export let syncService: SyncService | null = !useLocalDb ? new SyncService(documentStorage, mongoStorage!) : null
+
+// Function to initialize sync service after authentication
+export async function initializeSyncService() {
+  if (syncService) {
+    try {
+      await syncService.initialize()
+      console.log('Sync service initialized successfully')
+    } catch (error) {
+      console.error('Failed to initialize sync service:', error)
+      // Don't throw the error - we'll retry on subsequent operations
+    }
+  }
 }
 
 export default documentStorage 

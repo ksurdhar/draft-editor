@@ -1,8 +1,8 @@
 import * as Y from 'yjs'
 import * as fs from 'fs-extra'
 import * as path from 'path'
+import * as crypto from 'crypto'
 import { StorageAdapter, Document, JsonDocument } from './types'
-import { v4 as uuidv4 } from 'uuid'
 
 export class YjsStorageAdapter implements StorageAdapter {
   private docs: Map<string, Y.Doc>
@@ -57,7 +57,7 @@ export class YjsStorageAdapter implements StorageAdapter {
     // Create document metadata
     const newDoc = this.ensureStringDates({
       ...data as any,
-      _id: uuidv4(),
+      _id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     })

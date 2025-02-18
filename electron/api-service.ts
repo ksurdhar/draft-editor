@@ -313,16 +313,38 @@ const makeRequest = async (
   // Remote request
   endpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
   const url = `${BASE_URL}${endpoint}`
-  const config: AxiosRequestConfig = {
-    headers: {
-      Authorization: `Bearer ${authService.getAccessToken()}`,
-    },
-  }
+  
+  try {
+    // Check if token is expired and refresh if needed
+    const token = authService.getAccessToken()
+    if (!token) {
+      throw new Error('No access token available')
+    }
 
-  if (method === 'patch' || method === 'post') {
-    return axios[method](url, data, config)
+    const config: AxiosRequestConfig = {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+
+    if (method === 'patch' || method === 'post') {
+      return axios[method](url, data, config)
+    }
+    return axios[method](url, config)
+  } catch (error: any) {
+    if (error.response?.status === 401) {
+      // Token might be expired, try to refresh
+      try {
+        await authService.refreshTokens()
+        // Retry the request with new token
+        return makeRequest(method, endpoint, data)
+      } catch (refreshError) {
+        console.error('Failed to refresh token:', refreshError)
+        throw refreshError
+      }
+    }
+    throw error
   }
-  return axios[method](url, config)
 }
 
 export default apiService

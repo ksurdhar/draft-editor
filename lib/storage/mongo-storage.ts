@@ -1,16 +1,29 @@
-import { MongoClient, ObjectId } from 'mongodb'
-import { StorageAdapter, Document, MongoDocument } from './types'
+import { MongoClient } from 'mongodb'
+import { StorageAdapter, Document } from './types'
+import * as crypto from 'crypto'
+
+interface MongoConfig {
+  dbName: string
+  dbCluster: string
+  dbUser: string
+  dbPass: string
+}
 
 export class MongoStorageAdapter implements StorageAdapter {
   private client: MongoClient
   private dbName: string
   private connected = false
+  private userId: string | null = null
 
-  constructor() {
-    const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_CLUSTER}.mongodb.net` // do we need the .mongodb.net?
-    console.log('Initializing MongoDB connection:', uri.replace(process.env.DB_PASS || '', '[REDACTED]'))
+  constructor(config: MongoConfig) {
+    const uri = `mongodb+srv://${config.dbUser}:${config.dbPass}@${config.dbCluster}.mongodb.net`
+    console.log('Initializing MongoDB connection:', uri.replace(config.dbPass, '[REDACTED]'))
     this.client = new MongoClient(uri)
-    this.dbName = process.env.DB_NAME || 'whetstone'
+    this.dbName = config.dbName
+  }
+
+  setUserId(userId: string) {
+    this.userId = userId
   }
 
   private async connect() {
@@ -31,32 +44,30 @@ export class MongoStorageAdapter implements StorageAdapter {
 
   private async getCollection(collection: string) {
     await this.connect()
-    return this.client.db(this.dbName).collection<MongoDocument>(collection)
+    return this.client.db(this.dbName).collection<Document>(collection)
   }
 
-  private toMongoDoc(data: Partial<Document>): Partial<MongoDocument> {
+  private toMongoDoc(data: Partial<Document>): Partial<Document> {
     const doc: Record<string, unknown> = { ...data }
-    delete doc._id // Remove string _id if it exists
     
-    if (data._id) {
-      // Add ObjectId _id if string _id existed
-      doc._id = new ObjectId(data._id)
-    }
     if (data.createdAt) {
       doc.createdAt = new Date(data.createdAt)
     }
     if (data.updatedAt) {
       doc.updatedAt = new Date(data.updatedAt)
     }
-    return doc as Partial<MongoDocument>
+    return doc as Partial<Document>
   }
 
-  private toDocument(doc: MongoDocument): Document {
+  private toDocument(doc: Document): Document {
+    const createdAt = doc.createdAt instanceof Date ? doc.createdAt.toISOString() : doc.createdAt
+    const updatedAt = doc.updatedAt instanceof Date ? doc.updatedAt.toISOString() : doc.updatedAt
+    
     return {
       ...doc,
-      _id: doc._id?.toString(),
-      createdAt: doc.createdAt?.toISOString(),
-      updatedAt: doc.updatedAt?.toISOString()
+      _id: doc._id,
+      createdAt,
+      updatedAt
     }
   }
 
@@ -65,16 +76,22 @@ export class MongoStorageAdapter implements StorageAdapter {
     console.log('Collection:', collection)
     console.log('Data:', data)
 
+    if (!this.userId && collection === 'documents') {
+      throw new Error('User ID is required to create documents')
+    }
+
     try {
       const col = await this.getCollection(collection)
       const mongoDoc = {
         ...this.toMongoDoc(data),
+        _id: crypto.randomUUID(),
+        userId: this.userId,
         createdAt: new Date(),
         updatedAt: new Date()
-      } as MongoDocument
+      } as Document
 
-      const result = await col.insertOne(mongoDoc)
-      return this.toDocument({ ...mongoDoc, _id: result.insertedId })
+      await col.insertOne(mongoDoc)
+      return this.toDocument(mongoDoc)
     } catch (error) {
       console.error('Error creating document:', error)
       throw error
@@ -88,7 +105,10 @@ export class MongoStorageAdapter implements StorageAdapter {
 
     try {
       const col = await this.getCollection(collection)
-      const result = await col.findOne({ _id: new ObjectId(id) })
+      const query = collection === 'documents' && this.userId
+        ? { _id: id, userId: this.userId }
+        : { _id: id }
+      const result = await col.findOne(query)
       return result ? this.toDocument(result) : null
     } catch (error) {
       console.error('Error finding document:', error)
@@ -100,10 +120,15 @@ export class MongoStorageAdapter implements StorageAdapter {
     console.log('\n=== MongoStorageAdapter.find ===')
     console.log('Collection:', collection)
     console.log('Query:', query)
+    console.log('User ID:', this.userId)
 
     try {
       const col = await this.getCollection(collection)
-      const results = await col.find(query).toArray()
+      const finalQuery = collection === 'documents' && this.userId
+        ? { ...query, userId: this.userId }
+        : query
+      console.log('Final query:', finalQuery)
+      const results = await col.find(finalQuery).toArray()
       return results.map(doc => this.toDocument(doc))
     } catch (error) {
       console.error('Error finding documents:', error)
@@ -119,13 +144,16 @@ export class MongoStorageAdapter implements StorageAdapter {
 
     try {
       const col = await this.getCollection(collection)
+      const query = collection === 'documents' && this.userId
+        ? { _id: id, userId: this.userId }
+        : { _id: id }
       const mongoUpdate = {
         ...this.toMongoDoc(data),
         updatedAt: new Date()
       }
       
       const result = await col.findOneAndUpdate(
-        { _id: new ObjectId(id) },
+        query,
         { $set: mongoUpdate },
         { returnDocument: 'after' }
       )
@@ -144,11 +172,11 @@ export class MongoStorageAdapter implements StorageAdapter {
 
     try {
       const col = await this.getCollection(collection)
-      // Convert string _id to ObjectId if present
-      if (query._id) {
-        query._id = new ObjectId(query._id)
-      }
-      const result = await col.deleteMany(query)
+      const finalQuery = collection === 'documents' && this.userId
+        ? { ...query, userId: this.userId }
+        : query
+      console.log('Final query:', finalQuery)
+      const result = await col.deleteMany(finalQuery)
       return result.deletedCount > 0
     } catch (error) {
       console.error('Error deleting documents:', error)
