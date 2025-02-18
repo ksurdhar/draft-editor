@@ -52,18 +52,44 @@ const VersionList = ({
         return
       }
 
-      console.log('Creating version for document:', documentId)
-      await api.post(`/documents/${documentId}/versions`, {
+      // Create optimistic version
+      const optimisticVersion: VersionData = {
+        id: `temp-${Date.now()}`, // Temporary ID
         documentId,
         content: doc.content,
         createdAt: Date.now(),
+        name: '',
+        ownerId: doc.ownerId // Use the document's owner ID
+      }
+
+      // Optimistically update the versions list
+      mutate(
+        `/documents/${documentId}/versions`,
+        (currentVersions: VersionData[] = []) => [optimisticVersion, ...currentVersions],
+        false
+      )
+
+      console.log('Creating version for document:', documentId)
+      const newVersion = await api.post(`/documents/${documentId}/versions`, {
+        documentId,
+        content: doc.content,
+        createdAt: optimisticVersion.createdAt,
         name: ''
       })
 
+      // Update with the real version from the server, without we cant delete properly
+      mutate(
+        `/documents/${documentId}/versions`,
+        (currentVersions: VersionData[] = []) => 
+          currentVersions.map(v => v.id === optimisticVersion.id ? newVersion : v),
+        false
+      )
+
       console.log('Version created successfully')
-      mutate(`/documents/${documentId}/versions`)
     } catch (error) {
       console.error('Error creating version:', error)
+      // Revert on error by triggering revalidation
+      mutate(`/documents/${documentId}/versions`)
     }
   }
 
