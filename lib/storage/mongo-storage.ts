@@ -127,8 +127,12 @@ export class MongoStorageAdapter implements StorageAdapter {
       const finalQuery = collection === 'documents' && this.userId
         ? { ...query, userId: this.userId }
         : query
-      console.log('Final query:', finalQuery)
+      console.log('Final MongoDB query:', finalQuery)
       const results = await col.find(finalQuery).toArray()
+      console.log(`Found ${results.length} documents in MongoDB`)
+      if (results.length > 0) {
+        console.log('MongoDB document IDs:', results.map(doc => doc._id))
+      }
       return results.map(doc => this.toDocument(doc))
     } catch (error) {
       console.error('Error finding documents:', error)

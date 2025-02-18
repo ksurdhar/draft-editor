@@ -39,22 +39,28 @@ export class SyncService {
       if (!profile?.sub) {
         throw new Error('No user profile available')
       }
+      console.log('\n=== Sync Service Initialization ===')
+      console.log('User ID:', profile.sub)
       this.mongoStorage.setUserId(profile.sub)
 
       // Initial sync from MongoDB to local
-      console.log('Performing initial sync from MongoDB...')
+      console.log('\n=== Initial MongoDB Sync ===')
       const remoteDocuments = await this.mongoStorage.find('documents', {})
-      console.log(`Found ${remoteDocuments.length} documents in MongoDB`)
+      console.log(`Found ${remoteDocuments.length} documents in MongoDB:`)
+      console.log('Remote document IDs:', remoteDocuments.map(d => d._id))
 
       for (const doc of remoteDocuments) {
         if (doc._id) {
+          console.log(`\nProcessing remote document: ${doc._id}`)
           const localDoc = await this.localStorage.findById('documents', doc._id)
           if (!localDoc) {
             // Document doesn't exist locally, create it
             console.log(`Creating local copy of document ${doc._id}`)
             await this.localStorage.create('documents', doc)
+            console.log('Local copy created successfully')
           } else {
             // Document exists locally, queue for merge
+            console.log(`Document ${doc._id} exists locally, queueing for sync`)
             this.queueForSync(doc._id)
           }
         }
@@ -63,7 +69,7 @@ export class SyncService {
       // Start periodic sync
       this.startPeriodicSync()
       this.isInitialized = true
-      console.log('Sync service initialized successfully')
+      console.log('\nSync service initialized successfully')
     } catch (error) {
       console.error('Failed to initialize sync service:', error)
       throw error

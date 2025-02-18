@@ -28,17 +28,32 @@ const makeRequest = async (
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint
   console.log(`Cleaned endpoint: ${cleanEndpoint}`)
 
+  // Get the current user ID
+  const profile = authService.getProfile()
+  if (!profile?.sub) {
+    throw new Error('No user profile available')
+  }
+  const userId = profile.sub
+
   // Handle collection-level operations
   if (cleanEndpoint === 'documents') {
     console.log('Handling collection-level documents request')
     if (method === 'get') {
-      return { data: await documentStorage.find(DOCUMENTS_COLLECTION, {}) }
+      console.log('\n=== Getting Documents ===')
+      console.log('User ID:', userId)
+      const docs = await documentStorage.find(DOCUMENTS_COLLECTION, { userId })
+      console.log(`Found ${docs.length} documents for user`)
+      if (docs.length > 0) {
+        console.log('Document IDs:', docs.map(d => d._id))
+      }
+      return { data: docs }
     }
     if (method === 'post' && data) {
       console.log('Creating new document:', data)
       const now = Date.now()
       const newDocument = await documentStorage.create(DOCUMENTS_COLLECTION, {
         ...data,
+        userId,
         content: DEFAULT_DOCUMENT_CONTENT,
         comments: [],
         lastUpdated: now
@@ -253,45 +268,7 @@ const makeRequest = async (
     }
   }
 
-  // If no local operation matched and sync is enabled, try remote request
-  if (syncEnabled) {
-    const remoteEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
-    const url = `${BASE_URL}${remoteEndpoint}`
-    
-    try {
-      // Check if token is expired and refresh if needed
-      const token = authService.getAccessToken()
-      if (!token) {
-        throw new Error('No access token available')
-      }
-
-      const config: AxiosRequestConfig = {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-
-      if (method === 'patch' || method === 'post') {
-        return await axios[method](url, data, config)
-      }
-      return await axios[method](url, config)
-    } catch (error: any) {
-      if (error.response?.status === 401) {
-        // Token might be expired, try to refresh
-        try {
-          await authService.refreshTokens()
-          // Retry the request with new token
-          return await makeRequest(method, endpoint, data)
-        } catch (refreshError) {
-          console.error('Failed to refresh token:', refreshError)
-          throw refreshError
-        }
-      }
-      throw error
-    }
-  }
-
-  // If sync is disabled and no local operation matched, return null
+  // If no local operation matched, return null
   console.log('No matching operation found')
   return { data: null }
 }

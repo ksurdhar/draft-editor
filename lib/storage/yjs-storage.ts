@@ -130,6 +130,43 @@ export class YjsStorageAdapter implements StorageAdapter {
 
     try {
       const files = await fs.readdir(documentsPath)
+      
+      // If we're filtering by userId, let's optimize by checking the file contents first
+      if (query.userId) {
+        const userId = query.userId
+        const documents: JsonDocument[] = []
+
+        for (const file of files.filter(f => f.endsWith('.json'))) {
+          try {
+            // Read file but don't deserialize YJS content yet
+            const content = await fs.readFile(path.join(documentsPath, file), 'utf-8')
+            const doc = JSON.parse(content)
+            
+            // Only process document if it matches the userId
+            if (doc.userId === userId) {
+              const id = file.replace('.json', '')
+              // Now we can safely get the full document with YJS content
+              const fullDoc = await this.findById(collection, id)
+              if (fullDoc) {
+                // Check other query criteria if any
+                const matchesQuery = Object.entries(query)
+                  .every(([key, value]) => key === 'userId' || fullDoc[key] === value)
+                
+                if (matchesQuery) {
+                  documents.push(fullDoc)
+                }
+              }
+            }
+          } catch (error) {
+            console.error(`Error reading document ${file}:`, error)
+            // Continue with other files
+          }
+        }
+        
+        return documents
+      }
+
+      // If no userId filter, fall back to loading all documents
       const documents = await Promise.all(
         files
           .filter(file => file.endsWith('.json'))
