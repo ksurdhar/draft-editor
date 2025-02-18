@@ -148,7 +148,7 @@ const VersionList = ({
         </button>
       </div>
 
-      {versions.map((version) => (
+      {[...versions].sort((a, b) => b.createdAt - a.createdAt).map((version) => (
         <ListItem
           key={version.id}
           label={new Date(version.createdAt).toLocaleString()}

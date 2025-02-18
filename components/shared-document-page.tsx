@@ -261,14 +261,6 @@ export default function SharedDocumentPage() {
     setDiffContent(null)
   }, [documentId])
 
-  if (!hybridDoc) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="animate-pulse text-black/50">Loading document...</div>
-      </div>
-    )
-  }
-
   return (
     <Layout documentId={id} onToggleGlobalSearch={handleToggleGlobalSearch}>
       {!skipAnimation && (
@@ -392,33 +384,39 @@ export default function SharedDocumentPage() {
 
         {/* Editor Container */}
         <div className="flex-1 flex justify-center lg:justify-center">
-          <div
-            id="editor-container"
-            className={`overflow-y-scroll p-[20px] pb-10 font-editor2 text-black/[.79] w-full lg:w-[740px]`}>
-            <div className={`flex transition-flex duration-500 ease-in ${showSpinner ? 'mt-[-36px] flex-col justify-center' : ''} relative pb-10`}>
-              {showSpinner && <Loader />}
-              <AnimatePresence mode="wait">
-                {documentContent && (
-                  <motion.div
-                    key={documentId}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <Editor
-                      key={documentId}
-                      content={diffContent || documentContent}
-                      title={hybridDoc?.title || ''}
-                      onUpdate={debouncedSave}
-                      canEdit={!diffContent}
-                      hideFooter={!!diffContent}
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
+          {!hybridDoc ? (
+            <div className="flex h-[calc(100vh_-_44px)] items-center justify-center">
+              <Loader />
             </div>
-          </div>
+          ) : (
+            <div
+              id="editor-container"
+              className={`overflow-y-scroll p-[20px] pb-10 font-editor2 text-black/[.79] w-full lg:w-[740px]`}>
+              <div className={`flex transition-flex duration-500 ease-in ${showSpinner ? 'mt-[-36px] flex-col justify-center' : ''} relative pb-10`}>
+                {showSpinner && <Loader />}
+                <AnimatePresence mode="wait">
+                  {documentContent && (
+                    <motion.div
+                      key={documentId}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <Editor
+                        key={documentId}
+                        content={diffContent || documentContent}
+                        title={hybridDoc?.title || ''}
+                        onUpdate={debouncedSave}
+                        canEdit={!diffContent}
+                        hideFooter={!!diffContent}
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </Layout>

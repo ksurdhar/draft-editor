@@ -262,7 +262,7 @@ const SharedDocumentsPage = () => {
             {(!docsLoading && !foldersLoading && (docs?.length || folders?.length)) && (
               <DocumentTree
                 items={items}
-                onPrimaryAction={item => navigateTo(`/documents/${item.index}?from=tree`)}
+                onPrimaryAction={item => navigateTo(`/documents/${item.index}`)}
                 onMove={handleMoveItem}
                 showActionButton={true}
                 onActionButtonClick={handleMenuClick}
