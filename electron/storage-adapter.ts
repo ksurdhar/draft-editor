@@ -1,6 +1,8 @@
 import { FileStorageAdapter } from '../lib/storage/file-storage'
 import { YjsStorageAdapter } from '../lib/storage/yjs-storage'
+import { MongoStorageAdapter } from '../lib/storage/mongo-storage'
 import { VersionStorage } from '../lib/storage/version-storage'
+import { SyncService } from './sync-service'
 import * as path from 'path'
 import * as os from 'os'
 import { v4 as uuidv4 } from 'uuid'
@@ -50,7 +52,23 @@ class ElectronYjsStorageAdapter extends YjsStorageAdapter {
       updatedAt: new Date().toISOString()
     })
 
+    // Queue for sync if we're in sync mode
+    if (syncService) {
+      syncService.queueForSync(newDoc._id)
+    }
+
     return newDoc
+  }
+
+  async update(collection: string, id: string, data: any): Promise<any> {
+    const result = await super.update(collection, id, data)
+    
+    // Queue for sync if we're in sync mode
+    if (syncService && result) {
+      syncService.queueForSync(id)
+    }
+
+    return result
   }
 }
 
@@ -89,5 +107,20 @@ class ElectronVersionStorage extends VersionStorage {
 export const documentStorage = new ElectronYjsStorageAdapter()
 export const folderStorage = new ElectronFileStorageAdapter()
 export const versionStorage = new ElectronVersionStorage()
+
+// Initialize MongoDB storage and sync service if not in local mode
+const mongoStorage = !useLocalDb ? new MongoStorageAdapter() : null
+export const syncService = !useLocalDb ? new SyncService(documentStorage, mongoStorage!) : null
+
+// Start periodic sync if sync service is enabled
+if (syncService) {
+  // Sync every 5 minutes
+  setInterval(() => {
+    syncService.syncAll()
+  }, 5 * 60 * 1000)
+  
+  // Initial sync
+  syncService.syncAll()
+}
 
 export default documentStorage 
