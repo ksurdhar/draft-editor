@@ -56,14 +56,18 @@ const withHybridAuth = (handler: (req: ExtendedApiRequest, res: NextApiResponse)
   return async (req: ExtendedApiRequest, res: NextApiResponse) => {
     try {
       const userFromToken = await extractBearerToken(req)
+      console.log('userFromToken', userFromToken)
       if (userFromToken) {
         // token-based authentication
+        console.log('found user from token, using token-based authentication')
         req.user = userFromToken
         await handler(req, res)
       } else {
+        console.log('no user from token, using session-based authentication')
         const session = await getSession(req, res)
         req.user = session?.user
         if (!req.user) {
+          console.log('no user from session, returning 401')
           return res.status(401).end('Unauthorized')
         }
 
