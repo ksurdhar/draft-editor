@@ -107,6 +107,13 @@ export default withHybridAuth(async function documentsHandler(req: ExtendedApiRe
   console.log('user', user)
 
   if (!user) {
+    // Log the auth failure with details
+    console.error('Auth failed:', {
+      headers: req.headers,
+      method,
+      url: req.url,
+      timestamp: new Date().toISOString()
+    })
     res.status(401).end('Unauthorized')
     return
   }
@@ -122,7 +129,14 @@ export default withHybridAuth(async function documentsHandler(req: ExtendedApiRe
   try {
     await handler(req, res)
   } catch (error) {
-    console.error('Unexpected error:', error)
+    // Log the full error details
+    console.error('API Error:', {
+      error: error instanceof Error ? error.message : error,
+      method,
+      url: req.url,
+      user: user.sub,
+      timestamp: new Date().toISOString()
+    })
     res.status(500).end('Internal Server Error')
   }
 })
