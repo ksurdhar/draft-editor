@@ -27,23 +27,29 @@ const getPublicKey = async (kid: string): Promise<string> => {
 }
 
 const extractBearerToken = async (req: ExtendedApiRequest): Promise<Claims | null> => {
+  console.log('Incoming request headers:', req.headers)
+  console.log('Raw authorization header:', req.headers.authorization)
+  
   const authHeader = req.headers.authorization
-  console.log('Auth header:', authHeader)
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.log('No valid auth header found or does not start with Bearer')
+    console.log('Authorization header validation failed:', {
+      exists: !!authHeader,
+      startsWith: authHeader ? authHeader.startsWith('Bearer ') : false,
+      value: authHeader ? `${authHeader.substring(0, 20)}...` : 'none'
+    })
     return null
   }
 
   const token = authHeader.split(' ')[1]
-  console.log('Extracted token:', token.substring(0, 20) + '...')
-
+  console.log('Successfully extracted token:', token.substring(0, 20) + '...')
+  
   const decodedHeader = jwt.decode(token, { complete: true })
-  console.log('Decoded header:', decodedHeader?.header)
+  console.log('Decoded token header:', decodedHeader?.header)
 
   if (!decodedHeader || typeof decodedHeader === 'string' || !decodedHeader.header.kid) {
-    console.log('Invalid token format:', { 
-      decodedHeader: !!decodedHeader,
+    console.log('Token decode failed:', {
+      hasDecodedHeader: !!decodedHeader,
       isString: typeof decodedHeader === 'string',
       hasKid: decodedHeader && typeof decodedHeader !== 'string' ? !!decodedHeader.header.kid : false
     })
