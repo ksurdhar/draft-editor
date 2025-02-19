@@ -28,28 +28,54 @@ const getPublicKey = async (kid: string): Promise<string> => {
 
 const extractBearerToken = async (req: ExtendedApiRequest): Promise<Claims | null> => {
   const authHeader = req.headers.authorization
+  console.log('Auth header:', authHeader)
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return null
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.log('No valid auth header found or does not start with Bearer')
+    return null
+  }
 
   const token = authHeader.split(' ')[1]
+  console.log('Extracted token:', token.substring(0, 20) + '...')
+
   const decodedHeader = jwt.decode(token, { complete: true })
+  console.log('Decoded header:', decodedHeader?.header)
 
   if (!decodedHeader || typeof decodedHeader === 'string' || !decodedHeader.header.kid) {
+    console.log('Invalid token format:', { 
+      decodedHeader: !!decodedHeader,
+      isString: typeof decodedHeader === 'string',
+      hasKid: decodedHeader && typeof decodedHeader !== 'string' ? !!decodedHeader.header.kid : false
+    })
     throw new Error('Invalid token format')
   }
 
+  console.log('Attempting to get public key with kid:', decodedHeader.header.kid)
   const publicKey = await getPublicKey(decodedHeader.header.kid)
-  const decodedUser = jwt.verify(token, publicKey, {
-    algorithms: ['RS256'],
-    audience: 'https://www.whetstone-writer.com/api',
-    issuer: `${process.env.AUTH0_ISSUER_BASE_URL}/`,
-  }) as Claims
+  console.log('Retrieved public key successfully')
 
-  if (!decodedUser) {
-    throw new Error('Invalid token payload')
+  try {
+    const decodedUser = jwt.verify(token, publicKey, {
+      algorithms: ['RS256'],
+      audience: 'https://www.whetstone-writer.com/api',
+      issuer: `${process.env.AUTH0_ISSUER_BASE_URL}/`,
+    }) as Claims
+    console.log('Token verification successful')
+    console.log('Verification options:', {
+      audience: 'https://www.whetstone-writer.com/api',
+      issuer: `${process.env.AUTH0_ISSUER_BASE_URL}/`
+    })
+
+    if (!decodedUser) {
+      console.log('No decoded user after verification')
+      throw new Error('Invalid token payload')
+    }
+
+    return decodedUser
+  } catch (error) {
+    console.error('Token verification failed:', (error as Error).message)
+    throw error
   }
-
-  return decodedUser
 }
 
 const withHybridAuth = (handler: (req: ExtendedApiRequest, res: NextApiResponse) => Promise<void>) => {
