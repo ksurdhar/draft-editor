@@ -337,7 +337,7 @@ const makeRequest = async (
 
   const config: AxiosRequestConfig = {
     headers: {
-      Authorization: `Bearer ${token}`,
+      'x-whetstone-authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
   }

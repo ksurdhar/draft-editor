@@ -29,20 +29,30 @@ const getPublicKey = async (kid: string): Promise<string> => {
 const extractBearerToken = async (req: ExtendedApiRequest): Promise<Claims | null> => {
   console.log('Incoming request headers:', req.headers)
   
+  // First try the direct authorization header
   let authHeader = req.headers.authorization
-  
-  // Try to get the auth header from Vercel's special header if direct auth header is missing
+  console.log('Direct authorization header:', authHeader ? 'found' : 'not found')
+
+  // Then try custom header that might bypass Vercel's header handling
+  if (!authHeader && req.headers['x-whetstone-authorization']) {
+    authHeader = req.headers['x-whetstone-authorization'] as string
+    console.log('Found custom x-whetstone-authorization header')
+  }
+
+  // Finally, try the Vercel SC headers as a last resort
   if (!authHeader && req.headers['x-vercel-sc-headers']) {
     try {
       const scHeaders = JSON.parse(req.headers['x-vercel-sc-headers'] as string)
-      authHeader = scHeaders.Authorization
-      console.log('Retrieved authorization from x-vercel-sc-headers:', authHeader ? 'found' : 'not found')
+      if (scHeaders['x-whetstone-authorization']) {
+        authHeader = scHeaders['x-whetstone-authorization']
+        console.log('Retrieved authorization from x-vercel-sc-headers custom header')
+      }
     } catch (error) {
       console.error('Failed to parse x-vercel-sc-headers:', error)
     }
   }
 
-  console.log('Final authorization header:', authHeader)
+  console.log('Final authorization header:', authHeader ? `${authHeader.substring(0, 20)}...` : 'none')
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     console.log('Authorization header validation failed:', {
