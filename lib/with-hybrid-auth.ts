@@ -28,9 +28,21 @@ const getPublicKey = async (kid: string): Promise<string> => {
 
 const extractBearerToken = async (req: ExtendedApiRequest): Promise<Claims | null> => {
   console.log('Incoming request headers:', req.headers)
-  console.log('Raw authorization header:', req.headers.authorization)
   
-  const authHeader = req.headers.authorization
+  let authHeader = req.headers.authorization
+  
+  // Try to get the auth header from Vercel's special header if direct auth header is missing
+  if (!authHeader && req.headers['x-vercel-sc-headers']) {
+    try {
+      const scHeaders = JSON.parse(req.headers['x-vercel-sc-headers'] as string)
+      authHeader = scHeaders.Authorization
+      console.log('Retrieved authorization from x-vercel-sc-headers:', authHeader ? 'found' : 'not found')
+    } catch (error) {
+      console.error('Failed to parse x-vercel-sc-headers:', error)
+    }
+  }
+
+  console.log('Final authorization header:', authHeader)
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     console.log('Authorization header validation failed:', {

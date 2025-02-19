@@ -313,16 +313,57 @@ const makeRequest = async (
   // Remote request
   endpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
   const url = `${BASE_URL}${endpoint}`
+  
+  // Get fresh access token
+  let token = authService.getAccessToken()
+  
+  // If we have a token and it's expired, try to refresh
+  if (token && authService.isTokenExpired(token)) {
+    console.log('Token expired, attempting to refresh...')
+    try {
+      await authService.refreshTokens()
+      token = authService.getAccessToken() // Get fresh token after refresh
+      console.log('Token refreshed successfully')
+    } catch (error) {
+      console.error('Failed to refresh token:', error)
+      throw new Error('Authentication expired. Please log in again.')
+    }
+  }
+
+  if (!token) {
+    console.error('No access token available')
+    throw new Error('No authentication token available. Please log in.')
+  }
+
   const config: AxiosRequestConfig = {
     headers: {
-      Authorization: `Bearer ${authService.getAccessToken()}`,
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
     },
   }
 
-  if (method === 'patch' || method === 'post') {
-    return axios[method](url, data, config)
+  console.log('Making request to URL:', url)
+  console.log('Request config:', {
+    method,
+    url,
+    headers: config.headers,
+    data: method === 'post' || method === 'patch' ? data : undefined
+  })
+
+  try {
+    if (method === 'patch' || method === 'post') {
+      return axios[method](url, data, config)
+    }
+    return axios[method](url, config)
+  } catch (error: any) {
+    console.error('API request failed:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      headers: error.response?.headers,
+    })
+    throw error
   }
-  return axios[method](url, config)
 }
 
 export default apiService

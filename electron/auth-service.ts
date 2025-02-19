@@ -37,6 +37,9 @@ let refreshToken: string = ''
 
 function getAccessToken() {
   if (mockAuth) return getMockToken()
+  console.log('Current access token:', accessToken ? 'exists' : 'empty', 
+              'Length:', accessToken?.length || 0,
+              'First 20 chars:', accessToken?.substring(0, 20))
   return accessToken
 }
 
@@ -171,5 +174,6 @@ const authService = {
   loadTokens,
   logout,
   refreshTokens,
+  isTokenExpired
 }
 export default authService
