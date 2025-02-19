@@ -103,6 +103,9 @@ const handlers = {
 export default withHybridAuth(async function documentsHandler(req: ExtendedApiRequest, res: NextApiResponse) {
   const { method, user } = req
 
+  console.log('req', req)
+  console.log('user', user)
+
   if (!user) {
     res.status(401).end('Unauthorized')
     return
