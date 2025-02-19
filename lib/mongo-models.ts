@@ -8,7 +8,7 @@ if (!global.db) {
   
   console.log('\n=== MongoDB Connection ===')
   console.log('MOCK_AUTH:', process.env.MOCK_AUTH)
-  console.log('LOCAL_DB:', process.env.LOCAL_DB)
+  console.log('SYNC_ENABLED:', process.env.SYNC_ENABLED)
   console.log('Storage Type:', process.env.NEXT_PUBLIC_STORAGE_TYPE)
   console.log('Connection string:', MONGO_DB.replace(process.env.DB_PASS || '', '[REDACTED]'))
   

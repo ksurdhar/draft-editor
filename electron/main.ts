@@ -5,6 +5,7 @@ import apiService from './api-service'
 import { createAppWindow } from './app'
 import { createAuthWindow, createLogoutWindow } from './auth-process'
 import authService from './auth-service'
+import { initializeSyncService } from './storage-adapter'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -20,6 +21,7 @@ async function createWindow() {
     } else {
       // Normal auth flow
       await authService.refreshTokens()
+      await initializeSyncService()
       mainWindow = await createAppWindow()
     }
   } catch (err) {

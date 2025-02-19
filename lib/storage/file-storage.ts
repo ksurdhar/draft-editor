@@ -1,7 +1,7 @@
-import fs from 'fs-extra'
-import path from 'path'
-import { v4 as uuidv4 } from 'uuid'
-import { StorageAdapter, Document } from './types'
+import * as fs from 'fs-extra'
+import * as path from 'path'
+import * as crypto from 'crypto'
+import { StorageAdapter, Document, JsonDocument } from './types'
 import os from 'os'
 
 export class FileStorageAdapter implements StorageAdapter {
@@ -61,7 +61,7 @@ export class FileStorageAdapter implements StorageAdapter {
 
     const newDoc: Document = {
       ...data,
-      _id: uuidv4(),
+      _id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }
