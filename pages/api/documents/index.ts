@@ -69,27 +69,34 @@ const handlers = {
     console.log('\n=== Fetching Documents ===')
     console.log('User ID:', req.user!.sub)
     
+    const { metadataOnly } = req.query
+    console.log('Metadata only:', metadataOnly)
+    
     const documents = await storage.find('documents', { userId: req.user!.sub })
     console.log('Found documents:', documents.length)
 
     // Convert YJS state to readable content for each document
     const docsWithPermissions = await Promise.all(documents.map(async doc => {
       let content = ''
-      const docContent = doc.content as { type?: string; state?: number[] } | string | undefined
       
-      if (docContent && typeof docContent === 'object' && 
-          docContent.type === 'yjs' && Array.isArray(docContent.state)) {
-        const ydoc = new Y.Doc()
-        Y.applyUpdate(ydoc, new Uint8Array(docContent.state))
-        content = ydoc.getText('content').toString()
-      } else {
-        content = typeof docContent === 'string' ? docContent : JSON.stringify(docContent)
+      // Only load content if metadataOnly is not set to true
+      if (metadataOnly !== 'true') {
+        const docContent = doc.content as { type?: string; state?: number[] } | string | undefined
+        
+        if (docContent && typeof docContent === 'object' && 
+            docContent.type === 'yjs' && Array.isArray(docContent.state)) {
+          const ydoc = new Y.Doc()
+          Y.applyUpdate(ydoc, new Uint8Array(docContent.state))
+          content = ydoc.getText('content').toString()
+        } else {
+          content = typeof docContent === 'string' ? docContent : JSON.stringify(docContent)
+        }
       }
 
       return {
         ...doc,
         id: doc._id,
-        content,
+        content: metadataOnly === 'true' ? undefined : content,
         canEdit: true,
         canComment: true,
         lastUpdated: doc.lastUpdated || Date.now()

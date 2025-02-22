@@ -27,8 +27,6 @@ const getPublicKey = async (kid: string): Promise<string> => {
 }
 
 const extractBearerToken = async (req: ExtendedApiRequest): Promise<Claims | null> => {
-  console.log('Incoming request headers:', req.headers)
-  
   // First try the direct authorization header
   let authHeader = req.headers.authorization
   console.log('Direct authorization header:', authHeader ? 'found' : 'not found')
