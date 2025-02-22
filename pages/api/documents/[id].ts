@@ -60,9 +60,9 @@ export default withHybridAuth(async function documentHandler(req: ExtendedApiReq
         return res.status(404).json({ error: 'Document not found' })
       }
 
-      // Convert content to YJS state if needed
+      // Only process content if it's being updated
       let content = req.body.content
-      if (content) {
+      if (content !== undefined) {
         console.log('Converting content to YJS state')
         const ydoc = new Y.Doc()
         const ytext = ydoc.getText('content')
@@ -82,27 +82,34 @@ export default withHybridAuth(async function documentHandler(req: ExtendedApiReq
         }
       }
 
-      const updatedDocument = await storage.update('documents', documentId, {
+      const updateData = {
         ...req.body,
-        content,
         updatedAt: new Date().toISOString(),
         lastUpdated: Date.now()
-      })
+      }
+
+      // Only include content in update if it was provided
+      if (content !== undefined) {
+        updateData.content = content
+      }
+
+      const updatedDocument = await storage.update('documents', documentId, updateData)
 
       if (!updatedDocument) {
         return res.status(500).json({ error: 'Failed to update document' })
       }
 
       // Convert YJS state back to readable content for response
-      if (content && typeof content === 'object' && content.type === 'yjs') {
+      let responseContent = updatedDocument.content
+      if (responseContent && typeof responseContent === 'object' && responseContent.type === 'yjs') {
         const ydoc = new Y.Doc()
-        Y.applyUpdate(ydoc, new Uint8Array(content.state))
-        content = ydoc.getText('content').toString()
+        Y.applyUpdate(ydoc, new Uint8Array(responseContent.state))
+        responseContent = ydoc.getText('content').toString()
       }
 
       res.status(200).json({
         ...updatedDocument,
-        content
+        content: responseContent
       })
       break
     }

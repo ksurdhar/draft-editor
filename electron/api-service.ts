@@ -10,7 +10,7 @@ const envPath = path.resolve(__dirname, '../../env-electron.json')
 const env = JSON.parse(fs.readFileSync(envPath, 'utf-8'))
 const useLocalDb = env.LOCAL_DB || false
 
-const BASE_URL = 'https://whetstone-writer.com/api'
+const BASE_URL = 'https://www.whetstone-writer.com/api'
 const DOCUMENTS_COLLECTION = 'documents'
 const FOLDERS_COLLECTION = 'folders'
 
