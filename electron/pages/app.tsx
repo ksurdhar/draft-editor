@@ -2,8 +2,8 @@ import Providers, { APIProvider, NavigationProvider } from '@components/provider
 import SharedDocumentPage from '@components/shared-document-page'
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation } from 'wouter'
-import SharedDocumentsPage from '@components/shared-documents-page'
 import LandingPage from './landing-page'
+import ElectronDocumentsPage from './documents-page'
 
 interface Profile {
   name: string
@@ -46,7 +46,7 @@ function ElectronApp() {
           delete={window.electronAPI.destroy}>
           <Providers>
             {location === '/' && <LandingPage />}
-            {location === '/documents' && <SharedDocumentsPage />}
+            {location === '/documents' && <ElectronDocumentsPage />}
             {isDocumentLocation() && <SharedDocumentPage />}
           </Providers>
         </APIProvider>
