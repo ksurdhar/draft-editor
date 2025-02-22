@@ -16,51 +16,41 @@ const FOLDERS_COLLECTION = 'folders'
 
 const apiService = {
   getDocuments: async () => {
-    // console.log('getDocuments called')
     const result = await makeRequest('get', '/documents')
     return result.data
   },
 
   getFolders: async () => {
-    // console.log('getFolders called')
     const result = await makeRequest('get', '/folders')
     return result.data
   },
 
   deleteDocument: async (id: string) => {
-    console.log('\n=== Deleting Document ===')
-    console.log('Document ID:', id)
     const result = await makeRequest('delete', `/documents/${id}`)
-    console.log('Delete result:', result)
     return result.data
   },
 
   updateDocument: async (id: string, data: Partial<DocumentData>) => {
-    // console.log('updateDocument called:', id)
     const result = await makeRequest('patch', `/documents/${id}`, data)
     return result.data
   },
 
   post: async (url: string, body: any) => {
-    // console.log('post called:', url)
     const result = await makeRequest('post', url, body)
     return result.data
   },
 
   patch: async (url: string, body: any) => {
-    console.log('patch called:', url)
     const result = await makeRequest('patch', url, body)
     return result.data
   },
 
   get: async (url: string) => {
-    console.log('\nGET request:', { url })
     const result = await makeRequest('get', url)
     return result.data
   },
 
   destroy: async (url: string) => {
-    console.log('destroy called:', url)
     const result = await makeRequest('delete', url)
     return result.data
   }

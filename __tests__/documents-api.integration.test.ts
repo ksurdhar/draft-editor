@@ -148,4 +148,116 @@ describe('Documents API Integration Tests', () => {
       expect(response.data).toHaveLength(0)
     }, 10000)
   })
-}) 
+
+  describe('POST /api/documents/bulk-fetch', () => {
+    beforeEach(async () => {
+      // Clear the documents collection before each test
+      await Doc.deleteMany({})
+    }, 10000)
+
+    afterAll(async () => {
+      // Clean up all test data
+      await Doc.deleteMany({})
+    }, 10000)
+
+    it('should fetch multiple documents with content', async () => {
+      // Create multiple test documents
+      const docs = await Promise.all([
+        Doc.create({
+          title: 'Doc 1',
+          content: {
+            type: 'yjs',
+            state: Array.from(createYjsState('Content 1'))
+          },
+          userId: mockUser.sub
+        }),
+        Doc.create({
+          title: 'Doc 2',
+          content: {
+            type: 'yjs',
+            state: Array.from(createYjsState('Content 2'))
+          },
+          userId: mockUser.sub
+        }),
+        Doc.create({
+          title: 'Doc 3',
+          content: {
+            type: 'yjs',
+            state: Array.from(createYjsState('Content 3'))
+          },
+          userId: mockUser.sub
+        })
+      ])
+
+      // Fetch only the first and third documents
+      const response = await axios.post(`${API_URL}/documents/bulk-fetch`, {
+        ids: [docs[0]._id, docs[2]._id]
+      })
+      
+      const data = response.data
+      expect(data).toHaveLength(2)
+      expect(data.map((d: any) => d.title)).toEqual(['Doc 1', 'Doc 3'])
+      expect(data.map((d: any) => d.content)).toEqual(['Content 1', 'Content 3'])
+    }, 10000)
+
+    it('should fetch documents without content when metadataOnly is true', async () => {
+      const doc = await Doc.create({
+        title: 'Test Doc',
+        content: {
+          type: 'yjs',
+          state: Array.from(createYjsState('Test Content'))
+        },
+        userId: mockUser.sub
+      })
+
+      const response = await axios.post(`${API_URL}/documents/bulk-fetch`, {
+        ids: [doc._id],
+        metadataOnly: true
+      })
+      
+      const data = response.data
+      expect(data).toHaveLength(1)
+      expect(data[0].content).toBeUndefined()
+      expect(data[0].id).toBe(doc._id.toString())
+      expect(data[0].title).toBe('Test Doc')
+    }, 10000)
+
+    it('should handle invalid document IDs gracefully', async () => {
+      const response = await axios.post(`${API_URL}/documents/bulk-fetch`, {
+        ids: ['invalid-id', '']
+      })
+      .catch(error => error.response)
+
+      expect(response.status).toBe(400)
+      expect(response.data.error).toBe('No valid document IDs provided')
+    }, 10000)
+
+    it('should validate ids is an array', async () => {
+      const response = await axios.post(`${API_URL}/documents/bulk-fetch`, {
+        ids: 'not-an-array'
+      })
+      .catch(error => error.response)
+
+      expect(response.status).toBe(400)
+      expect(response.data.error).toBe('ids must be an array')
+    }, 10000)
+
+    it('should handle empty ids array', async () => {
+      const response = await axios.post(`${API_URL}/documents/bulk-fetch`, {
+        ids: []
+      })
+      .catch(error => error.response)
+
+      expect(response.status).toBe(400)
+      expect(response.data.error).toBe('No document IDs provided')
+    }, 10000)
+  })
+})
+
+// Helper function to create YJS state
+function createYjsState(content: string): Uint8Array {
+  const ydoc = new Y.Doc()
+  const ytext = ydoc.getText('content')
+  ytext.insert(0, content)
+  return Y.encodeStateAsUpdate(ydoc)
+} 
