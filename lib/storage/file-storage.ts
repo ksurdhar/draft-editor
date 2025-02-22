@@ -1,6 +1,6 @@
 import fs from 'fs-extra'
 import path from 'path'
-import { v4 as uuidv4 } from 'uuid'
+import { ObjectId } from 'mongodb'
 import { StorageAdapter, Document } from './types'
 import os from 'os'
 
@@ -61,7 +61,7 @@ export class FileStorageAdapter implements StorageAdapter {
 
     const newDoc: Document = {
       ...data,
-      _id: uuidv4(),
+      _id: new ObjectId().toString(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }

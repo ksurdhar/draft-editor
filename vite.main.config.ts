@@ -16,6 +16,16 @@ export default defineConfig({
     rollupOptions: {
       external: [
         'electron',
+        'mongodb',
+        'kerberos',
+        'bson',
+        'aws4',
+        'mongodb-client-encryption',
+        'snappy',
+        '@mongodb-js/zstd',
+        'gcp-metadata',
+        '@aws-sdk/credential-providers',
+        '@mongodb-js/saslprep',
         ...builtinModules,
       ]
     }

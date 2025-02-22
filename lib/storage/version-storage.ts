@@ -1,7 +1,7 @@
 import fs from 'fs-extra'
 import path from 'path'
 import os from 'os'
-import { randomUUID } from 'crypto'
+import { ObjectId } from 'mongodb'
 import * as Y from 'yjs'
 import { VersionData } from '@typez/globals'
 
@@ -196,7 +196,7 @@ export class VersionStorage {
 
     const newVersion: VersionData = {
       ...version,
-      id: randomUUID(),
+      id: new ObjectId().toString(),
       content: {
         type: 'yjs',
         state: Array.from(state)
@@ -242,6 +242,6 @@ export class VersionStorage {
   }
 
   generateId() {
-    return randomUUID()
+    return new ObjectId().toString()
   }
 } 

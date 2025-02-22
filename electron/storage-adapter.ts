@@ -2,8 +2,7 @@ import { FileStorageAdapter } from '../lib/storage/file-storage'
 import { YjsStorageAdapter } from '../lib/storage/yjs-storage'
 import { VersionStorage } from '../lib/storage/version-storage'
 import * as path from 'path'
-import * as os from 'os'
-import { v4 as uuidv4 } from 'uuid'
+import { ObjectId } from 'mongodb'
 import * as fs from 'fs-extra'
 import { app } from 'electron'
 
@@ -12,9 +11,9 @@ const envPath = path.resolve(__dirname, '../../env-electron.json')
 const env = JSON.parse(fs.readFileSync(envPath, 'utf-8'))
 const useLocalDb = env.LOCAL_DB || false
 
-// Generate a UUID using uuid package
+// Generate a MongoDB-compatible ID
 const generateUUID = () => {
-  return uuidv4()
+  return new ObjectId().toString()
 }
 
 // Set storage path based on mode

@@ -1,8 +1,8 @@
+import fs from 'fs-extra'
+import path from 'path'
+import { ObjectId } from 'mongodb'
 import * as Y from 'yjs'
-import * as fs from 'fs-extra'
-import * as path from 'path'
 import { StorageAdapter, Document, JsonDocument } from './types'
-import { v4 as uuidv4 } from 'uuid'
 
 export class YjsStorageAdapter implements StorageAdapter {
   private docs: Map<string, Y.Doc>
@@ -55,12 +55,12 @@ export class YjsStorageAdapter implements StorageAdapter {
     console.log('Input data:', data)
 
     // Create document metadata
-    const newDoc = this.ensureStringDates({
+    const newDoc: JsonDocument = {
       ...data as any,
-      _id: uuidv4(),
+      _id: new ObjectId().toString(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
-    })
+    }
 
     // Create YDoc for content
     const ydoc = this.getYDoc(newDoc._id)
