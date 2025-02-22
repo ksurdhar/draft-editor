@@ -2,7 +2,7 @@ import { FileStorageAdapter } from './file-storage'
 import { VersionStorage } from './version-storage'
 import { MongoStorageAdapter } from './mongo-storage'
 
-console.log('\n=== Storage Initialization ===')
+console.log('\n=== Web Storage Initialization ===')
 console.log('Storage Type:', process.env.NEXT_PUBLIC_STORAGE_TYPE)
 console.log('LOCAL_DB:', process.env.LOCAL_DB)
 console.log('MOCK_AUTH:', process.env.MOCK_AUTH)

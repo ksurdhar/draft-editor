@@ -9,17 +9,17 @@ import { app } from 'electron'
 // Read env config to check if we're in local mode
 const envPath = path.resolve(__dirname, '../../env-electron.json')
 const env = JSON.parse(fs.readFileSync(envPath, 'utf-8'))
-const useLocalDb = env.LOCAL_DB || false
-
+const useAppStorage = env.APP_STORAGE || false
 // Generate a MongoDB-compatible ID
 const generateUUID = () => {
   return new ObjectId().toString()
 }
 
 // Set storage path based on mode
-const storagePath = useLocalDb 
-  ? path.resolve(process.cwd(), 'data') // Use web app's storage path in local mode
-  : path.join(app.getPath('userData'), 'data') // Use electron's storage path otherwise
+const storagePath = useAppStorage 
+  ? path.join(app.getPath('userData'), 'data') // Use electron's storage path otherwise
+  : path.resolve(process.cwd(), 'data') // Use web app's storage path in local mode 
+  
 
 process.env.JSON_STORAGE_PATH = storagePath
 
@@ -29,7 +29,7 @@ fs.ensureDirSync(path.join(storagePath, 'folders'))
 fs.ensureDirSync(path.join(storagePath, 'versions'))
 
 console.log('\n=== Storage Adapter Initialization ===')
-console.log('Storage mode:', useLocalDb ? 'local (web)' : 'electron')
+console.log('Project or app storage:', useAppStorage ? 'app' : 'project')
 console.log('Storage path:', storagePath)
 console.log('Documents path:', path.join(storagePath, 'documents'))
 console.log('Folders path:', path.join(storagePath, 'folders'))
