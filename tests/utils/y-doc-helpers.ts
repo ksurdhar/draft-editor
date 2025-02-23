@@ -69,12 +69,20 @@ export function serializeDocument(doc: Y.Doc): Uint8Array {
 }
 
 /**
+ * Creates a new Y.Doc from binary data
+ */
+export function createYDocFromBinary(binary: Uint8Array): Y.Doc {
+  const doc = new Y.Doc()
+  Y.applyUpdate(doc, binary)
+  return doc
+}
+
+/**
  * Creates a new Y.Doc from a serialized state
+ * @deprecated Use createYDocFromBinary instead
  */
 export function deserializeDocument(serialized: Uint8Array): Y.Doc {
-  const doc = new Y.Doc()
-  Y.applyUpdate(doc, serialized)
-  return doc
+  return createYDocFromBinary(serialized)
 }
 
 /**
@@ -93,4 +101,27 @@ export function verifyDocumentEquality(docs: Y.Doc[], schema: Schema) {
   contents.forEach(content => {
     expect(content).toEqual(firstContent)
   })
+}
+
+/**
+ * Applies Tiptap JSON changes to a serialized Y.doc state and returns the new serialized state
+ */
+export function applyTiptapChangesToSerializedYDoc(
+  serializedYDoc: Uint8Array,
+  tiptapChanges: any,
+  schema: Schema
+): Uint8Array {
+  // Create a new Y.doc and apply the serialized state
+  const yDoc = new Y.Doc()
+  Y.applyUpdate(yDoc, serializedYDoc)
+
+  // Convert Tiptap changes to Y.doc updates
+  const pmDoc = schema.nodeFromJSON(tiptapChanges)
+  const yDocFromChanges = prosemirrorToYDoc(pmDoc)
+  
+  // Apply the changes
+  Y.applyUpdate(yDoc, Y.encodeStateAsUpdate(yDocFromChanges))
+
+  // Return the new serialized state
+  return Y.encodeStateAsUpdate(yDoc)
 } 

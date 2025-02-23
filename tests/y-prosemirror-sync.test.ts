@@ -9,7 +9,9 @@ import {
   serializeDocument,
   deserializeDocument,
   getDocumentJSON,
-  verifyDocumentEquality
+  verifyDocumentEquality,
+  applyTiptapChangesToSerializedYDoc,
+  createYDocFromBinary
 } from './utils/y-doc-helpers'
 import {prosemirrorToYDoc, yDocToProsemirror } from 'y-prosemirror'
 
@@ -542,17 +544,24 @@ describe('Y.js document merging', () => {
       ]
     }
 
-    // Convert Tiptap JSON changes to ProseMirror documents
-    const pmDocA = schema.nodeFromJSON(userAChanges)
-    const pmDocB = schema.nodeFromJSON(userBChanges)
+    // Convert Tiptap JSON changes to Y.doc updates
+    const serializedInitial = Y.encodeStateAsUpdate(docA)
+    const serializedWithAChanges = applyTiptapChangesToSerializedYDoc(
+      serializedInitial,
+      userAChanges,
+      schema
+    )
 
-    // Convert ProseMirror changes to Y.doc updates
-    const yDocAFromChanges = prosemirrorToYDoc(pmDocA)
-    const yDocBFromChanges = prosemirrorToYDoc(pmDocB)
+    // Meanwhile, User B makes changes at the Tiptap JSON level
+    const serializedWithBChanges = applyTiptapChangesToSerializedYDoc(
+      serializedInitial,
+      userBChanges,
+      schema
+    )
 
     // Apply the updates to the respective Y.docs
-    Y.applyUpdate(docA, Y.encodeStateAsUpdate(yDocAFromChanges))
-    Y.applyUpdate(docB, Y.encodeStateAsUpdate(yDocBFromChanges))
+    Y.applyUpdate(docA, serializedWithAChanges)
+    Y.applyUpdate(docB, serializedWithBChanges)
 
     // Sync the documents
     syncDocs(docA, docB)
@@ -680,9 +689,6 @@ describe('Y.js document merging', () => {
       initialFragment.insert(0, [paragraph])
     })
 
-    // Convert to Tiptap JSON format
-    // const tiptapJSON = yDocToProsemirror(schema, initialYDoc).toJSON()
-
     // User A makes changes at the Tiptap JSON level
     const userAChanges = {
       type: 'doc',
@@ -699,14 +705,12 @@ describe('Y.js document merging', () => {
     }
 
     // Convert Tiptap JSON changes to Y.doc updates
-    const pmDocA = schema.nodeFromJSON(userAChanges)
-    const yDocAFromChanges = prosemirrorToYDoc(pmDocA)
-    const yDocA = new Y.Doc()
-    Y.applyUpdate(yDocA, Y.encodeStateAsUpdate(initialYDoc))
-    Y.applyUpdate(yDocA, Y.encodeStateAsUpdate(yDocAFromChanges))
-
-    // Serialize A's document state
-    const serializedA = Y.encodeStateAsUpdate(yDocA)
+    const serializedInitial = Y.encodeStateAsUpdate(initialYDoc)
+    const serializedWithAChanges = applyTiptapChangesToSerializedYDoc(
+      serializedInitial,
+      userAChanges,
+      schema
+    )
 
     // Meanwhile, User B makes changes at the Tiptap JSON level
     const userBChanges = {
@@ -724,15 +728,16 @@ describe('Y.js document merging', () => {
     }
 
     // Convert B's Tiptap changes to Y.doc updates
-    const pmDocB = schema.nodeFromJSON(userBChanges)
-    const yDocBFromChanges = prosemirrorToYDoc(pmDocB)
-    const yDocB = new Y.Doc()
-    Y.applyUpdate(yDocB, Y.encodeStateAsUpdate(initialYDoc))
-    Y.applyUpdate(yDocB, Y.encodeStateAsUpdate(yDocBFromChanges))
+    const yDocB = createYDocFromBinary(serializedInitial)
+    const serializedWithBChanges = applyTiptapChangesToSerializedYDoc(
+      serializedInitial,
+      userBChanges,
+      schema
+    )
+    Y.applyUpdate(yDocB, serializedWithBChanges)
 
     // Deserialize A's document and sync with B
-    const deserializedA = new Y.Doc()
-    Y.applyUpdate(deserializedA, serializedA)
+    const deserializedA = createYDocFromBinary(serializedWithAChanges)
     syncDocs(deserializedA, yDocB)
 
     // Convert final state to JSON and verify
