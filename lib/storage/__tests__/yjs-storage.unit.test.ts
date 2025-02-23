@@ -19,10 +19,16 @@ describe('YjsStorageAdapter', () => {
   })
 
   it('should create and read a document with YJS content', async () => {
-    // Create a document
+    // Create a document with Tiptap format
     const doc = await storage.create('documents', {
       title: 'Test Document',
-      content: 'Hello, World!',
+      content: {
+        type: 'doc',
+        content: [{
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Hello, World!' }]
+        }]
+      },
       userId: 'test-user'
     })
 
@@ -42,24 +48,48 @@ describe('YjsStorageAdapter', () => {
     // Read the document back
     const retrievedDoc = await storage.findById('documents', doc._id)
     expect(retrievedDoc).not.toBeNull()
-    expect(retrievedDoc?.content).toBe('Hello, World!')
+    expect(retrievedDoc!.content).toEqual({
+      type: 'doc',
+      content: [{
+        type: 'paragraph',
+        content: [{ type: 'text', text: 'Hello, World!' }]
+      }]
+    })
   })
 
   it('should update document content using YJS', async () => {
-    // Create initial document
+    // Create initial document with Tiptap format
     const doc = await storage.create('documents', {
       title: 'Test Document',
-      content: 'Initial content',
+      content: {
+        type: 'doc',
+        content: [{
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Initial content' }]
+        }]
+      },
       userId: 'test-user'
     })
 
-    // Update the document
+    // Update the document with new Tiptap content
     const updatedDoc = await storage.update('documents', doc._id, {
-      content: 'Updated content'
+      content: {
+        type: 'doc',
+        content: [{
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Updated content' }]
+        }]
+      }
     })
 
     // Verify the update
-    expect(updatedDoc.content).toBe('Updated content')
+    expect(updatedDoc.content).toEqual({
+      type: 'doc',
+      content: [{
+        type: 'paragraph',
+        content: [{ type: 'text', text: 'Updated content' }]
+      }]
+    })
 
     // Read the raw file to verify YJS state was updated
     const filePath = path.join(TEST_DIR, 'documents', `${doc._id}.json`)
@@ -71,17 +101,28 @@ describe('YjsStorageAdapter', () => {
 
     // Read it back to verify the content
     const retrievedDoc = await storage.findById('documents', doc._id)
-    expect(retrievedDoc?.content).toBe('Updated content')
+    expect(retrievedDoc).not.toBeNull()
+    expect(retrievedDoc!.content).toEqual({
+      type: 'doc',
+      content: [{
+        type: 'paragraph',
+        content: [{ type: 'text', text: 'Updated content' }]
+      }]
+    })
   })
 
   it('should handle structured content', async () => {
-    // Create a document with structured content
+    // Create a document with structured Tiptap content
     const structuredContent = {
       type: 'doc',
       content: [
         {
           type: 'paragraph',
-          content: [{ type: 'text', text: 'Hello, World!' }]
+          content: [{ type: 'text', text: 'First paragraph' }]
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Second paragraph' }]
         }
       ]
     }
@@ -96,8 +137,7 @@ describe('YjsStorageAdapter', () => {
     const retrievedDoc = await storage.findById('documents', doc._id)
     expect(retrievedDoc).not.toBeNull()
     
-    // Content should be stringified JSON
-    const parsedContent = JSON.parse(retrievedDoc!.content as string)
-    expect(parsedContent).toEqual(structuredContent)
+    // Content should be Tiptap JSON
+    expect(retrievedDoc!.content).toEqual(structuredContent)
   })
 }) 
