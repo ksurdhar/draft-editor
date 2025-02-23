@@ -90,7 +90,7 @@ async function startServer(): Promise<boolean> {
 
     server = spawn('npm', ['run', 'dev'], {
       env,
-      stdio: process.platform === 'win32' ? 'pipe' : ['ignore', 'ignore', 'ignore']
+      stdio: 'inherit'
     })
 
     // Wait for server to be ready

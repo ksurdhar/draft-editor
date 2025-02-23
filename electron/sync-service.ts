@@ -93,23 +93,39 @@ class SyncService {
       const doc = await documentStorage.findById(this.DOCUMENTS_COLLECTION, id)
       if (!doc) return null
 
+      console.log('\n=== getLocalDocument ===')
+      console.log('Raw document from storage:', doc)
+      console.log('Raw content type:', typeof doc.content)
+      console.log('Raw content:', doc.content)
+
       // Handle YJS content
       let content: any = doc.content
       if (typeof content === 'string') {
         try {
-          const parsedContent = JSON.parse(content)
-          if (parsedContent.type === 'yjs') {
-            content = parsedContent.content
-          }
+          content = JSON.parse(content)
+          console.log('Parsed string content:', content)
         } catch (e) {
-          // If parsing fails, use the content as is
+          console.log('Failed to parse string content, using as is:', content)
+        }
+      } else if (typeof content === 'object' && content.type === 'yjs') {
+        console.log('Found YJS content wrapper:', content)
+        try {
+          content = JSON.parse(content.content)
+          console.log('Successfully parsed YJS content:', content)
+        } catch (e) {
+          console.log('Failed to parse YJS content, using as is:', content.content)
+          content = content.content
         }
       }
 
-      return {
+      // Always return content as a string
+      const result = {
         ...this.mapToDocumentData(doc)!,
         content: typeof content === 'string' ? content : JSON.stringify(content)
       }
+      console.log('Final document to return:', result)
+      console.log('Final content type:', typeof result.content)
+      return result
     } catch (error) {
       console.error('Error getting local document:', error)
       throw error
@@ -207,7 +223,7 @@ class SyncService {
 
   async syncRemoteToLocal(): Promise<void> {
     try {
-      console.log('Starting remote to local sync...')
+      console.log('\n=== Starting remote to local sync ===')
       
       // Get all remote documents
       const remoteDocs = await this.getRemoteDocuments()
@@ -224,14 +240,21 @@ class SyncService {
 
       // Create missing documents locally
       for (const doc of docsToSync) {
-        console.log(`Syncing document: ${doc._id}`)
+        console.log('\n=== Processing document for sync ===')
+        console.log('Document ID:', doc._id)
+        console.log('Document title:', doc.title)
+        console.log('Content type:', typeof doc.content)
+        console.log('Raw content:', doc.content)
+        
+        // Preserve the original content structure
+        const contentToStore = doc.content
+
+        console.log('Content to store:', contentToStore)
+        console.log('Content type to store:', typeof contentToStore)
+
         await documentStorage.create(this.DOCUMENTS_COLLECTION, {
           ...doc,
-          content: {
-            type: 'yjs',
-            content: doc.content, // Pass the content directly without stringifying
-            state: []
-          },
+          content: contentToStore,
           updatedBy: 'remote'
         } as any)
       }

@@ -93,7 +93,7 @@ const makeRequest = async (
         const now = Date.now()
         const newDocument = await documentStorage.create(DOCUMENTS_COLLECTION, {
           ...data,
-          content: DEFAULT_DOCUMENT_CONTENT,
+          content: data?.content || DEFAULT_DOCUMENT_CONTENT,
           comments: [],
           lastUpdated: now
         })
