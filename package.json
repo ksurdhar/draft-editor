@@ -1,6 +1,7 @@
 {
   "name": "whetstone-writer",
   "version": "0.1.0",
+  "type": "module",
   "private": true,
   "description": "Whetstone Writer",
   "main": ".vite/build/main.js",
@@ -77,6 +78,8 @@
     "utf-8-validate": "^6.0.5",
     "uuid": "^9.0.1",
     "wouter": "^2.12.1",
+    "y-prosemirror": "^1.2.2",
+    "y-protocols": "^1.0.6",
     "yjs": "^13.6.23"
   },
   "devDependencies": {
