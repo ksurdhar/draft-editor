@@ -115,8 +115,30 @@ export function applyTiptapChangesToSerializedYDoc(
   const yDoc = new Y.Doc()
   Y.applyUpdate(yDoc, serializedYDoc)
 
+  // Ensure the content has valid text nodes
+  const validContent = {
+    type: 'doc',
+    content: tiptapChanges.content.map((node: any) => {
+      if (node.type === 'paragraph') {
+        return {
+          type: 'paragraph',
+          content: (node.content || []).map((contentNode: any) => {
+            if (contentNode.type === 'text') {
+              return {
+                type: 'text',
+                text: contentNode.text || ' ' // Use space instead of empty string
+              }
+            }
+            return contentNode
+          })
+        }
+      }
+      return node
+    })
+  }
+
   // Convert Tiptap changes to Y.doc updates
-  const pmDoc = schema.nodeFromJSON(tiptapChanges)
+  const pmDoc = schema.nodeFromJSON(validContent)
   const yDocFromChanges = prosemirrorToYDoc(pmDoc)
   
   // Apply the changes

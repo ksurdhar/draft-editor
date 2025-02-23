@@ -140,4 +140,77 @@ describe('YjsStorageAdapter', () => {
     // Content should be Tiptap JSON
     expect(retrievedDoc!.content).toEqual(structuredContent)
   })
+
+  it('should handle empty paragraphs', async () => {
+    // Test cases for different empty paragraph scenarios
+    const testCases = [
+      {
+        name: 'empty paragraph with no content array',
+        input: {
+          type: 'doc',
+          content: [{
+            type: 'paragraph'
+          }]
+        },
+        expected: {
+          type: 'doc',
+          content: [{
+            type: 'paragraph',
+            content: [{ type: 'text', text: ' ' }]
+          }]
+        }
+      },
+      {
+        name: 'empty paragraph with empty content array',
+        input: {
+          type: 'doc',
+          content: [{
+            type: 'paragraph',
+            content: []
+          }]
+        },
+        expected: {
+          type: 'doc',
+          content: [{
+            type: 'paragraph',
+            content: [{ type: 'text', text: ' ' }]
+          }]
+        }
+      },
+      {
+        name: 'multiple empty paragraphs',
+        input: {
+          type: 'doc',
+          content: [
+            { type: 'paragraph', content: [] },
+            { type: 'paragraph' }
+          ]
+        },
+        expected: {
+          type: 'doc',
+          content: [
+            { type: 'paragraph', content: [{ type: 'text', text: ' ' }] },
+            { type: 'paragraph', content: [{ type: 'text', text: ' ' }] }
+          ]
+        }
+      }
+    ]
+
+    for (const testCase of testCases) {
+      console.log(`Testing: ${testCase.name}`)
+      
+      const doc = await storage.create('documents', {
+        title: 'Test Document',
+        content: testCase.input,
+        userId: 'test-user'
+      })
+
+      // Read it back
+      const retrievedDoc = await storage.findById('documents', doc._id)
+      expect(retrievedDoc).not.toBeNull()
+      
+      // Content should match expected structure
+      expect(retrievedDoc!.content).toEqual(testCase.expected)
+    }
+  })
 }) 

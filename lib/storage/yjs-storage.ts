@@ -17,14 +17,39 @@ const schema = new Schema({
       content: 'paragraph+'
     },
     paragraph: {
-      content: 'text*',
-      toDOM() { return ['p', 0] }
+      content: 'text*',  // Allow zero or more text nodes
+      toDOM() { return ['p', 0] },
+      parseDOM: [{ tag: 'p' }]
     },
     text: {
-      group: 'inline'
+      group: 'inline',
+      inline: true
     }
   }
 })
+
+interface ProsemirrorNode {
+  type: string;
+  content?: ProsemirrorNode[];
+  text?: string;
+}
+
+interface ProsemirrorDoc {
+  type: 'doc';
+  content: ProsemirrorNode[];
+}
+
+// Default empty document structure
+const DEFAULT_DOCUMENT: ProsemirrorDoc = {
+  type: 'doc',
+  content: [{
+    type: 'paragraph',
+    content: [{
+      type: 'text',
+      text: ''
+    }]
+  }]
+}
 
 export class YjsStorageAdapter implements StorageAdapter {
   private docs: Map<string, Y.Doc>
@@ -71,6 +96,53 @@ export class YjsStorageAdapter implements StorageAdapter {
     Y.applyUpdate(ydoc, state)
   }
 
+  private ensureValidProsemirrorDoc(content: any): ProsemirrorDoc {
+    // If it's not a proper document structure, wrap it in one
+    if (!content || typeof content !== 'object') {
+      return DEFAULT_DOCUMENT
+    }
+
+    if (content.type !== 'doc' || !Array.isArray(content.content)) {
+      return DEFAULT_DOCUMENT
+    }
+
+    // Process each paragraph to ensure it has valid content
+    const processedContent = content.content.map((node: ProsemirrorNode) => {
+      if (node.type !== 'paragraph') {
+        return {
+          type: 'paragraph',
+          content: [{ type: 'text', text: '' }]
+        }
+      }
+
+      // Ensure paragraph has content array with at least one text node
+      if (!node.content || !Array.isArray(node.content) || node.content.length === 0) {
+        return {
+          ...node,
+          content: [{ type: 'text', text: '' }]
+        }
+      }
+
+      // Process each content node to ensure it's valid
+      const validContent = node.content.map((contentNode: ProsemirrorNode) => {
+        if (contentNode.type !== 'text' || typeof contentNode.text !== 'string') {
+          return { type: 'text', text: '' }
+        }
+        return contentNode
+      })
+
+      return {
+        ...node,
+        content: validContent
+      }
+    })
+
+    return {
+      type: 'doc',
+      content: processedContent
+    }
+  }
+
   async create(collection: string, data: Omit<Document, '_id'>): Promise<JsonDocument> {
     console.log('\n=== YjsStorageAdapter.create ===')
     console.log('Collection:', collection)
@@ -87,16 +159,16 @@ export class YjsStorageAdapter implements StorageAdapter {
     // Create YDoc for content
     const ydoc = this.getYDoc(newDoc._id)
     
-    // If there's content, set it in the YDoc
-    if (data.content) {
-      // Apply content as Tiptap changes
-      const state = applyTiptapChangesToSerializedYDoc(
-        this.serializeYDoc(ydoc),
-        data.content,
-        schema
-      )
-      this.deserializeYDoc(ydoc, state)
-    }
+    // Ensure content is valid before applying
+    const contentToApply = this.ensureValidProsemirrorDoc(data.content)
+    
+    // Apply content as Tiptap changes
+    const state = applyTiptapChangesToSerializedYDoc(
+      this.serializeYDoc(ydoc),
+      contentToApply,
+      schema
+    )
+    this.deserializeYDoc(ydoc, state)
 
     // Serialize the complete document
     const documentToSave = {
@@ -115,7 +187,7 @@ export class YjsStorageAdapter implements StorageAdapter {
     console.log('Created new document:', newDoc._id)
     return {
       ...newDoc,
-      content: data.content
+      content: contentToApply
     }
   }
 
