@@ -1,7 +1,6 @@
 {
   "name": "whetstone-writer",
   "version": "0.1.0",
-  "type": "module",
   "private": true,
   "description": "Whetstone Writer",
   "main": ".vite/build/main.js",

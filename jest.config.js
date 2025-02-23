@@ -1,9 +1,11 @@
 /** @type {import('ts-jest').JestConfigWithTsJest} */
-export default {
+module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   transform: {
-    '^.+\\.(ts|tsx)$': 'ts-jest',
+    '^.+\\.(ts|tsx)$': ['ts-jest', {
+      useESM: true,
+    }],
   },
   moduleNameMapper: {
     '^@lib/(.*)$': '<rootDir>/lib/$1',
@@ -13,5 +15,6 @@ export default {
     '^@styles/(.*)$': '<rootDir>/styles/$1',
     '^(\\.{1,2}/.*)\\.js$': '$1'
   },
+  extensionsToTreatAsEsm: ['.ts', '.tsx'],
   setupFiles: ['<rootDir>/jest.setup.js']
 } 
