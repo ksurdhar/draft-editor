@@ -328,5 +328,119 @@ describe('SyncService Integration Tests', () => {
         }]
       }))
     })
+
+    it('should update local documents when remote changes are detected', async () => {
+      // Create initial documents
+      const doc1 = await SyncService.uploadDocument({
+        title: 'Update Test Doc 1',
+        content: JSON.stringify({
+          type: 'doc',
+          content: [{
+            type: 'paragraph',
+            content: [{
+              type: 'text',
+              text: 'Initial content 1'
+            }]
+          }]
+        }),
+        userId: 'test-user'
+      } as DocumentData)
+
+      const doc2 = await SyncService.uploadDocument({
+        title: 'Update Test Doc 2',
+        content: JSON.stringify({
+          type: 'doc',
+          content: [{
+            type: 'paragraph',
+            content: [{
+              type: 'text',
+              text: 'Initial content 2'
+            }]
+          }]
+        }),
+        userId: 'test-user'
+      } as DocumentData)
+
+      // Initial sync to create local copies
+      await SyncService.syncRemoteToLocal()
+
+      // Verify initial state
+      const initialLocal1 = await SyncService.getLocalDocument(doc1._id)
+      const initialLocal2 = await SyncService.getLocalDocument(doc2._id)
+      expect(initialLocal1).toBeDefined()
+      expect(initialLocal2).toBeDefined()
+
+      // Simulate remote updates
+      const updatedDoc1 = await SyncService.uploadDocument({
+        ...doc1,
+        content: JSON.stringify({
+          type: 'doc',
+          content: [{
+            type: 'paragraph',
+            content: [{
+              type: 'text',
+              text: 'Updated content 1'
+            }]
+          }]
+        }),
+        lastUpdated: Date.now() + 1000 // Ensure newer timestamp
+      } as DocumentData)
+
+      // Update local doc2's updatedBy field to 'remote' to test the second condition
+      await documentStorage.update('documents', doc2._id, {
+        updatedBy: 'remote'
+      } as any)
+
+      const updatedDoc2 = await SyncService.uploadDocument({
+        ...doc2,
+        content: JSON.stringify({
+          type: 'doc',
+          content: [{
+            type: 'paragraph',
+            content: [{
+              type: 'text',
+              text: 'Updated content 2'
+            }]
+          }]
+        })
+      } as DocumentData)
+
+      // Run sync again
+      await SyncService.syncRemoteToLocal()
+
+      // Verify updates
+      const finalLocal1 = await SyncService.getLocalDocument(doc1._id)
+      const finalLocal2 = await SyncService.getLocalDocument(doc2._id)
+
+      // Doc1 should be updated due to newer timestamp
+      const content1 = typeof finalLocal1?.content === 'string' ? 
+        JSON.parse(finalLocal1.content) : 
+        finalLocal1?.content
+      expect(content1).toEqual({
+        type: 'doc',
+        content: [{
+          type: 'paragraph',
+          content: [{
+            type: 'text',
+            text: 'Updated content 1'
+          }]
+        }]
+      })
+
+      // Doc2 should be updated due to updatedBy: 'remote'
+      const content2 = typeof finalLocal2?.content === 'string' ? 
+        JSON.parse(finalLocal2.content) : 
+        finalLocal2?.content
+      expect(content2).toEqual({
+        type: 'doc',
+        content: [{
+          type: 'paragraph',
+          content: [{
+            type: 'text',
+            text: 'Updated content 2'
+          }]
+        }]
+      })
+    })
   })
 })

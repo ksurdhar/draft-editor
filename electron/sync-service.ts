@@ -61,17 +61,17 @@ class SyncService {
         doc.content : 
         JSON.stringify(doc.content)
       
-      // Then save locally with YJS content
+      // Then save locally with YJS content structure
       const localDoc = await documentStorage.create(this.DOCUMENTS_COLLECTION, {
         ...doc,
         _id: remoteDoc._id,
         lastUpdated: Date.now(),
         content: {
           type: 'yjs',
-          content: contentString, // Now always a string
-          state: [] // Initial empty state, YJS adapter will handle serialization
+          content: contentString,
+          state: []
         },
-        updatedBy: 'local' // Mark as locally updated
+        updatedBy: 'local'
       } as any)
 
       const mappedDoc = this.mapToDocumentData(localDoc)
@@ -104,24 +104,44 @@ class SyncService {
         try {
           content = JSON.parse(content)
           console.log('Parsed string content:', content)
+          
+          // If it's a YJS wrapper, extract the actual content
+          if (content.type === 'yjs') {
+            console.log('Found YJS wrapper, extracting content')
+            content = content.content
+            // If the content is still a string, try to parse it
+            if (typeof content === 'string') {
+              try {
+                content = JSON.parse(content)
+                console.log('Parsed YJS content:', content)
+              } catch (e) {
+                console.log('Failed to parse YJS content string, using as is')
+              }
+            }
+          }
         } catch (e) {
-          console.log('Failed to parse string content, using as is:', content)
+          console.log('Failed to parse string content, using as is')
         }
-      } else if (typeof content === 'object' && content.type === 'yjs') {
-        console.log('Found YJS content wrapper:', content)
-        try {
-          content = JSON.parse(content.content)
-          console.log('Successfully parsed YJS content:', content)
-        } catch (e) {
-          console.log('Failed to parse YJS content, using as is:', content.content)
+      } else if (typeof content === 'object') {
+        if (content.type === 'yjs') {
+          console.log('Found YJS content object:', content)
           content = content.content
+          // If the content is a string, try to parse it
+          if (typeof content === 'string') {
+            try {
+              content = JSON.parse(content)
+              console.log('Parsed YJS content:', content)
+            } catch (e) {
+              console.log('Failed to parse YJS content string, using as is')
+            }
+          }
         }
       }
 
-      // Always return content as a string
+      // Return the content in its original format
       const result = {
         ...this.mapToDocumentData(doc)!,
-        content: typeof content === 'string' ? content : JSON.stringify(content)
+        content: typeof content === 'object' ? JSON.stringify(content) : content
       }
       console.log('Final document to return:', result)
       console.log('Final content type:', typeof result.content)
@@ -231,32 +251,58 @@ class SyncService {
 
       // Get all local documents
       const localDocs = await this.getAllLocalDocuments()
-      const localDocIds = new Set(localDocs.map(doc => doc._id))
       console.log(`Found ${localDocs.length} local documents`)
 
-      // Find documents that exist remotely but not locally
-      const docsToSync = remoteDocs.filter(doc => !localDocIds.has(doc._id))
-      console.log(`Found ${docsToSync.length} documents to sync`)
+      // Create a map of local documents for faster lookup
+      const localDocsMap = new Map(localDocs.map(doc => [doc._id, doc]))
+
+      // Separate documents into new and existing
+      const docsToCreate = remoteDocs.filter(doc => !localDocsMap.has(doc._id))
+      const docsToUpdate = remoteDocs.filter(doc => localDocsMap.has(doc._id))
+
+      console.log(`Found ${docsToCreate.length} documents to create`)
+      console.log(`Found ${docsToUpdate.length} documents to check for updates`)
 
       // Create missing documents locally
-      for (const doc of docsToSync) {
-        console.log('\n=== Processing document for sync ===')
+      for (const doc of docsToCreate) {
+        console.log('\n=== Creating new document ===')
         console.log('Document ID:', doc._id)
         console.log('Document title:', doc.title)
         console.log('Content type:', typeof doc.content)
-        console.log('Raw content:', doc.content)
         
-        // Preserve the original content structure
-        const contentToStore = doc.content
-
-        console.log('Content to store:', contentToStore)
-        console.log('Content type to store:', typeof contentToStore)
-
         await documentStorage.create(this.DOCUMENTS_COLLECTION, {
           ...doc,
-          content: contentToStore,
+          content: doc.content,
           updatedBy: 'remote'
         } as any)
+      }
+
+      // Update existing documents if needed
+      for (const remoteDoc of docsToUpdate) {
+        const localDoc = localDocsMap.get(remoteDoc._id)
+        if (!localDoc) continue // TypeScript safety check
+
+        console.log('\n=== Checking document for updates ===')
+        console.log('Document ID:', remoteDoc._id)
+        console.log('Document title:', remoteDoc.title)
+        console.log('Local lastUpdated:', localDoc.lastUpdated)
+        console.log('Remote lastUpdated:', remoteDoc.lastUpdated)
+        console.log('Local updatedBy:', (localDoc as any).updatedBy)
+
+        // Update if:
+        // 1. Remote is newer OR
+        // 2. Local was last updated by remote (meaning it's safe to update)
+        if (remoteDoc.lastUpdated > localDoc.lastUpdated || 
+            (localDoc as any).updatedBy === 'remote') {
+          console.log('Updating local document with remote changes')
+          await documentStorage.update(this.DOCUMENTS_COLLECTION, remoteDoc._id, {
+            ...remoteDoc,
+            content: remoteDoc.content,
+            updatedBy: 'remote'
+          } as any)
+        } else {
+          console.log('Local document is newer or was updated locally, skipping update')
+        }
       }
 
       console.log('Remote to local sync completed')
@@ -267,4 +313,4 @@ class SyncService {
   }
 }
 
-export default SyncService.getInstance() 
+export default SyncService.getInstance()
