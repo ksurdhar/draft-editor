@@ -6,34 +6,48 @@ import { ObjectId } from 'mongodb'
 import * as fs from 'fs-extra'
 import { app } from 'electron'
 
-// Read env config to check if we're in local mode
-const envPath = path.resolve(__dirname, '../../env-electron.json')
+// Read env config based on environment
+const envPath = process.env.NODE_ENV === 'test' 
+  ? path.join(process.cwd(), 'env-electron.test.json')
+  : path.resolve(__dirname, '../../env-electron.json')
+
+console.log('\n=== Storage Adapter Environment ===')
+console.log('Environment:', process.env.NODE_ENV)
+console.log('Config path:', envPath)
+
 const env = JSON.parse(fs.readFileSync(envPath, 'utf-8'))
 const useAppStorage = env.APP_STORAGE || false
+
+// Set storage path based on environment
+const storagePath = process.env.NODE_ENV === 'test'
+  ? process.env.JSON_STORAGE_PATH || path.join(process.cwd(), 'test-data') // Use test path
+  : useAppStorage 
+    ? path.join(app.getPath('userData'), 'data') // Use electron's storage path
+    : path.join(process.cwd(), 'data') // Use web app's storage path
+
+// Ensure storage path is absolute
+const absoluteStoragePath = path.isAbsolute(storagePath) 
+  ? storagePath 
+  : path.join(process.cwd(), storagePath)
+
+process.env.JSON_STORAGE_PATH = absoluteStoragePath
+
+// Ensure storage directories exist
+fs.ensureDirSync(path.join(absoluteStoragePath, 'documents'))
+fs.ensureDirSync(path.join(absoluteStoragePath, 'folders'))
+fs.ensureDirSync(path.join(absoluteStoragePath, 'versions'))
+
+console.log('\n=== Storage Adapter Initialization ===')
+console.log('Project or app storage:', useAppStorage ? 'app' : 'project')
+console.log('Storage path:', absoluteStoragePath)
+console.log('Documents path:', path.join(absoluteStoragePath, 'documents'))
+console.log('Folders path:', path.join(absoluteStoragePath, 'folders'))
+console.log('Versions path:', path.join(absoluteStoragePath, 'versions'))
+
 // Generate a MongoDB-compatible ID
 const generateUUID = () => {
   return new ObjectId().toString()
 }
-
-// Set storage path based on mode
-const storagePath = useAppStorage 
-  ? path.join(app.getPath('userData'), 'data') // Use electron's storage path otherwise
-  : path.resolve(process.cwd(), 'data') // Use web app's storage path in local mode 
-  
-
-process.env.JSON_STORAGE_PATH = storagePath
-
-// Ensure storage directories exist
-fs.ensureDirSync(path.join(storagePath, 'documents'))
-fs.ensureDirSync(path.join(storagePath, 'folders'))
-fs.ensureDirSync(path.join(storagePath, 'versions'))
-
-console.log('\n=== Storage Adapter Initialization ===')
-console.log('Project or app storage:', useAppStorage ? 'app' : 'project')
-console.log('Storage path:', storagePath)
-console.log('Documents path:', path.join(storagePath, 'documents'))
-console.log('Folders path:', path.join(storagePath, 'folders'))
-console.log('Versions path:', path.join(storagePath, 'versions'))
 
 // Create a custom storage adapter that uses generateUUID for IDs
 class ElectronYjsStorageAdapter extends YjsStorageAdapter {

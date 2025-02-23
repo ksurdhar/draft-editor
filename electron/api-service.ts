@@ -6,11 +6,22 @@ import authService from './auth-service'
 import { documentStorage, folderStorage, versionStorage } from './storage-adapter'
 import { DEFAULT_DOCUMENT_CONTENT } from '../lib/constants'
 
-const envPath = path.resolve(__dirname, '../../env-electron.json')
+// Read env config based on environment
+const envPath = process.env.NODE_ENV === 'test' 
+  ? path.join(process.cwd(), 'env-electron.test.json')
+  : path.resolve(__dirname, '../../env-electron.json')
+
+console.log('\n=== API Service Environment ===')
+console.log('Environment:', process.env.NODE_ENV)
+console.log('Config path:', envPath)
+
 const env = JSON.parse(fs.readFileSync(envPath, 'utf-8'))
 const useLocalDb = env.LOCAL_DB || false
 
-const BASE_URL = 'https://www.whetstone-writer.com/api'
+const BASE_URL = process.env.NODE_ENV === 'test'
+  ? 'http://localhost:3000/api'
+  : 'https://www.whetstone-writer.com/api'
+
 const DOCUMENTS_COLLECTION = 'documents'
 const FOLDERS_COLLECTION = 'folders'
 
@@ -107,6 +118,20 @@ const makeRequest = async (
         return { data: newFolder }
       }
       return { data: null }
+    }
+
+    // Handle bulk fetch operation
+    if (endpoint === 'documents/bulk-fetch') {
+      console.log('Handling bulk fetch request')
+      if (method === 'post' && data) {
+        const { ids } = data as { ids: string[] }
+        console.log('Bulk fetching documents:', ids)
+        const documents = await Promise.all(
+          ids.map(id => documentStorage.findById(DOCUMENTS_COLLECTION, id))
+        )
+        return { data: documents.filter(Boolean) }
+      }
+      return { data: [] }
     }
 
     // Handle bulk delete operation

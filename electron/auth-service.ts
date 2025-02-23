@@ -9,7 +9,15 @@ import * as url from 'url'
 import { getMockToken, mockUser } from '../lib/mock-auth'
 import tokenStore from './token-store'
 
-const envPath = path.resolve(__dirname, '../../env-electron.json')
+// Read env config based on environment
+const envPath = process.env.NODE_ENV === 'test' 
+  ? path.join(process.cwd(), 'env-electron.test.json')
+  : path.resolve(__dirname, '../../env-electron.json')
+
+console.log('\n=== Auth Service Environment ===')
+console.log('Environment:', process.env.NODE_ENV)
+console.log('Config path:', envPath)
+
 const env = JSON.parse(fs.readFileSync(envPath, 'utf-8'))
 
 const apiIdentifier = env.API_IDENTIFIER
