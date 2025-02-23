@@ -1,7 +1,48 @@
-import { DocumentData } from '@typez/globals'
-import { documentStorage } from './storage-adapter'
-import apiService from './api-service'
 import axios from 'axios'
+import * as Y from 'yjs'
+import { Document } from '../lib/storage/types'
+import { FileStorageAdapter } from '../lib/storage/file-storage'
+import { YjsStorageAdapter } from '../lib/storage/yjs-storage'
+import { documentStorage, folderStorage } from './storage-adapter'
+import apiService from './api-service'
+import DiffMatchPatch from 'diff-match-patch'
+import { DocumentData } from '@typez/globals'
+
+interface YjsContent {
+  type: 'yjs'
+  content: any
+  state: any[]
+}
+
+interface ParagraphContent {
+  type: 'text';
+  text: string;
+}
+
+interface Paragraph {
+  type: 'paragraph';
+  content: ParagraphContent[];
+}
+
+interface DocumentContent {
+  type: 'doc';
+  content: Paragraph[];
+}
+
+// Update the content type in DocumentData
+type ExtendedDocumentData = Omit<DocumentData, 'content'> & {
+  content: DocumentContent
+  updatedBy?: 'local' | 'remote'
+}
+
+function isYjsContent(content: any): content is YjsContent {
+  return content && 
+         typeof content === 'object' && 
+         'type' in content && 
+         content.type === 'yjs' &&
+         'state' in content && 
+         Array.isArray(content.state)
+}
 
 class SyncService {
   private static instance: SyncService
@@ -9,8 +50,14 @@ class SyncService {
   private API_BASE_URL = process.env.NODE_ENV === 'test' 
     ? 'http://localhost:3000/api'
     : 'https://www.whetstone-writer.com/api'
+  private ydocs: Map<string, Y.Doc> = new Map()
+  private fileStorage: FileStorageAdapter
+  private yjsStorage: YjsStorageAdapter
 
-  private constructor() {}
+  private constructor() {
+    this.fileStorage = folderStorage
+    this.yjsStorage = documentStorage
+  }
 
   static getInstance(): SyncService {
     if (!SyncService.instance) {
@@ -32,6 +79,126 @@ class SyncService {
       folderIndex: doc.folderIndex || 0,
       parentId: doc.parentId || 'root'
     }
+  }
+
+  private getYDoc(id: string): Y.Doc {
+    let ydoc = this.ydocs.get(id)
+    if (!ydoc) {
+      ydoc = new Y.Doc()
+      this.ydocs.set(id, ydoc)
+    }
+    return ydoc
+  }
+
+  private getYText(ydoc: Y.Doc): Y.Text {
+    return ydoc.getText('content')
+  }
+
+  private parseContent(content: any): string {
+    if (typeof content === 'string') {
+      return content
+    }
+    return JSON.stringify(content)
+  }
+
+  mergeContent(content1: any, content2: any): DocumentContent {
+    console.log('\n=== Merging Content ===')
+    console.log('Content 1 type:', typeof content1)
+    console.log('Content 2 type:', typeof content2)
+    console.log('Raw Content 1:', content1)
+    console.log('Raw Content 2:', content2)
+
+    // Parse string inputs
+    const parsed1 = typeof content1 === 'string' ? JSON.parse(content1) : content1
+    const parsed2 = typeof content2 === 'string' ? JSON.parse(content2) : content2
+
+    console.log('\nParsed contents:')
+    console.log('Parsed Content 1:', JSON.stringify(parsed1, null, 2))
+    console.log('Parsed Content 2:', JSON.stringify(parsed2, null, 2))
+
+    // Validate document types
+    if (parsed1.type !== 'doc' || !Array.isArray(parsed1.content)) {
+      console.log('\nInvalid doc type, returning second content')
+      return parsed2 as DocumentContent
+    }
+    if (parsed2.type !== 'doc' || !Array.isArray(parsed2.content)) {
+      return parsed1 as DocumentContent
+    }
+
+    // Create merged result with initial structure
+    const mergedResult: DocumentContent = {
+      type: 'doc',
+      content: []
+    }
+
+    // Initialize diff-match-patch
+    const dmp = new DiffMatchPatch()
+
+    // Create a map of text content to paragraph structure
+    const paragraphMap = new Map<string, Paragraph>()
+
+    // Add all paragraphs from both documents to the map
+    parsed1.content.forEach((p: Paragraph) => {
+      const text = this.paragraphToText(p)
+      paragraphMap.set(text, p)
+    })
+    parsed2.content.forEach((p: Paragraph) => {
+      const text = this.paragraphToText(p)
+      paragraphMap.set(text, p)
+    })
+
+    // Get text versions of both documents
+    const text1 = this.paragraphsToText(parsed1.content)
+    const text2 = this.paragraphsToText(parsed2.content)
+
+    // Compute diffs
+    const diffs = dmp.diff_main(text1, text2)
+    dmp.diff_cleanupSemantic(diffs)
+
+    // Process diffs to reconstruct paragraphs
+    const seenTexts = new Set<string>()
+    
+    // First, add the initial content from the first document if it exists
+    if (parsed1.content.length > 0) {
+      const initialText = this.paragraphToText(parsed1.content[0])
+      mergedResult.content.push(parsed1.content[0])
+      seenTexts.add(initialText)
+    }
+
+    // Then add remaining content from first document
+    for (let i = 1; i < parsed1.content.length; i++) {
+      const text = this.paragraphToText(parsed1.content[i])
+      if (!seenTexts.has(text)) {
+        mergedResult.content.push(parsed1.content[i])
+        seenTexts.add(text)
+      }
+    }
+
+    // Finally add content from second document
+    parsed2.content.forEach((p: Paragraph) => {
+      const text = this.paragraphToText(p)
+      if (!seenTexts.has(text)) {
+        mergedResult.content.push(p)
+        seenTexts.add(text)
+      }
+    })
+
+    console.log('\nMerged result:', JSON.stringify(mergedResult, null, 2))
+    return mergedResult
+  }
+
+  private paragraphToText(paragraph: Paragraph): string {
+    return paragraph.content.map(c => c.text).join('')
+  }
+
+  private paragraphsToText(paragraphs: Paragraph[]): string {
+    return paragraphs.map(p => this.paragraphToText(p) + '\n').join('')
+  }
+
+  private isDuplicateParagraph(existingContent: DocumentContent['content'], newParagraph: DocumentContent['content'][0]): boolean {
+    return existingContent.some((existing: DocumentContent['content'][0]) => 
+      JSON.stringify(existing) === JSON.stringify(newParagraph)
+    )
   }
 
   async saveLocalDocument(doc: Partial<DocumentData>): Promise<DocumentData> {
@@ -56,20 +223,29 @@ class SyncService {
       // First save remotely to get an ID and establish the document
       const remoteDoc = await this.uploadDocument(doc as DocumentData)
       
-      // Transform content to string if it's an object
-      const contentString = typeof doc.content === 'string' ? 
-        doc.content : 
-        JSON.stringify(doc.content)
+      // Initialize YJS document
+      const ydoc = this.getYDoc(remoteDoc._id)
+      const ytext = this.getYText(ydoc)
       
-      // Then save locally with YJS content structure
+      // Set initial content
+      const content = this.parseContent(doc.content)
+      ytext.delete(0, ytext.length)
+      ytext.insert(0, content)
+      
+      // Get the state vector and updates
+      const state = Y.encodeStateVector(ydoc)
+      const update = Y.encodeStateAsUpdate(ydoc)
+      
+      // Save locally with YJS content structure
       const localDoc = await documentStorage.create(this.DOCUMENTS_COLLECTION, {
         ...doc,
         _id: remoteDoc._id,
         lastUpdated: Date.now(),
         content: {
           type: 'yjs',
-          content: contentString,
-          state: []
+          content: content,
+          state: Array.from(update),
+          stateVector: Array.from(state)
         },
         updatedBy: 'local'
       } as any)
@@ -77,10 +253,9 @@ class SyncService {
       const mappedDoc = this.mapToDocumentData(localDoc)
       if (!mappedDoc) throw new Error('Failed to create document')
       
-      // Return the document with the original content format
       return {
         ...mappedDoc,
-        content: doc.content || ''  // Preserve original content format but handle undefined
+        content: doc.content || ''
       }
     } catch (error) {
       console.error('Error saving document:', error)
@@ -105,36 +280,28 @@ class SyncService {
           content = JSON.parse(content)
           console.log('Parsed string content:', content)
           
-          // If it's a YJS wrapper, extract the actual content
-          if (content.type === 'yjs') {
+          if (isYjsContent(content)) {
             console.log('Found YJS wrapper, extracting content')
-            content = content.content
-            // If the content is still a string, try to parse it
-            if (typeof content === 'string') {
-              try {
-                content = JSON.parse(content)
-                console.log('Parsed YJS content:', content)
-              } catch (e) {
-                console.log('Failed to parse YJS content string, using as is')
-              }
+            // Initialize YJS document if needed
+            const ydoc = this.getYDoc(doc._id)
+            const ytext = this.getYText(ydoc)
+            
+            // Apply stored state if it exists
+            if (content.state) {
+              Y.applyUpdate(ydoc, new Uint8Array(content.state))
             }
-          }
-        } catch (e) {
-          console.log('Failed to parse string content, using as is')
-        }
-      } else if (typeof content === 'object') {
-        if (content.type === 'yjs') {
-          console.log('Found YJS content object:', content)
-          content = content.content
-          // If the content is a string, try to parse it
-          if (typeof content === 'string') {
+            
+            // Get the content
+            content = ytext.toString()
             try {
               content = JSON.parse(content)
               console.log('Parsed YJS content:', content)
             } catch (e) {
-              console.log('Failed to parse YJS content string, using as is')
+              console.log('Content is not JSON, using as is')
             }
           }
+        } catch (e) {
+          console.log('Failed to parse string content, using as is')
         }
       }
 
@@ -241,7 +408,116 @@ class SyncService {
     }
   }
 
-  async syncRemoteToLocal(): Promise<void> {
+  private async createLocalDocument(doc: DocumentData) {
+    console.log('\n=== Creating new document ===')
+    console.log('Document ID:', doc._id)
+    console.log('Document title:', doc.title)
+    console.log('Content type:', typeof doc.content)
+    
+    // Initialize YJS document
+    const ydoc = this.getYDoc(doc._id)
+    const ytext = this.getYText(ydoc)
+    
+    // Set initial content
+    const content = this.parseContent(doc.content)
+    ytext.delete(0, ytext.length)
+    ytext.insert(0, content)
+    
+    // Get the state vector and updates
+    const state = Y.encodeStateVector(ydoc)
+    const update = Y.encodeStateAsUpdate(ydoc)
+    
+    await documentStorage.create(this.DOCUMENTS_COLLECTION, {
+      ...doc,
+      content: {
+        type: 'yjs',
+        content: content,
+        state: Array.from(update),
+        stateVector: Array.from(state)
+      },
+      updatedBy: 'remote'
+    } as any)
+  }
+
+  private async parseDocumentContent(content: any): Promise<any> {
+    if (typeof content === 'string') {
+      try {
+        content = JSON.parse(content)
+        if (isYjsContent(content)) {
+          content = JSON.parse(content.content)
+        }
+      } catch (e) {
+        console.log('Failed to parse content:', e)
+      }
+    }
+    return content
+  }
+
+  private async updateLocalDocument(remoteDoc: DocumentData, localDoc: DocumentData) {
+    console.log('\n=== Checking document for updates ===')
+    console.log('Document ID:', remoteDoc._id)
+    console.log('Document title:', remoteDoc.title)
+    console.log('Local lastUpdated:', localDoc.lastUpdated)
+    console.log('Remote lastUpdated:', remoteDoc.lastUpdated)
+    console.log('Local updatedBy:', (localDoc as any).updatedBy)
+
+    // Get local and remote content
+    const localContent = await this.parseDocumentContent(localDoc.content)
+    const remoteContent = await this.parseDocumentContent(remoteDoc.content)
+
+    console.log('Local content:', JSON.stringify(localContent, null, 2))
+    console.log('Remote content:', JSON.stringify(remoteContent, null, 2))
+
+    // Check if we need to merge changes
+    const localUpdatedBy = (localDoc as any).updatedBy
+    const hasLocalChanges = localUpdatedBy === 'local'
+    const hasNewerRemoteChanges = remoteDoc.lastUpdated > localDoc.lastUpdated
+
+    // Merge changes if either:
+    // 1. We have local changes (regardless of timestamps)
+    // 2. We have newer remote changes
+    if (hasLocalChanges || hasNewerRemoteChanges) {
+      console.log('Merging changes - Local changes:', hasLocalChanges, 'Remote changes:', hasNewerRemoteChanges)
+      await this.mergeAndUpdateDocument(remoteDoc, localDoc, localContent, remoteContent)
+    } else {
+      console.log('No changes needed')
+    }
+  }
+
+  private async mergeAndUpdateDocument(remoteDoc: DocumentData, localDoc: DocumentData, localContent: any, remoteContent: any) {
+    console.log('Merging local and remote changes')
+    const finalContent = this.mergeContent(localContent, remoteContent)
+
+    // Initialize YJS document
+    const ydoc = this.getYDoc(remoteDoc._id)
+    const ytext = this.getYText(ydoc)
+    
+    // Set merged content
+    const contentStr = this.parseContent(finalContent)
+    ytext.delete(0, ytext.length)
+    ytext.insert(0, contentStr)
+    
+    // Get the state vector and updates
+    const state = Y.encodeStateVector(ydoc)
+    const update = Y.encodeStateAsUpdate(ydoc)
+    
+    // Update local document with merged content
+    await documentStorage.update(this.DOCUMENTS_COLLECTION, remoteDoc._id, {
+      ...remoteDoc,
+      content: {
+        type: 'yjs',
+        content: contentStr,
+        state: Array.from(update),
+        stateVector: Array.from(state)
+      },
+      lastUpdated: Math.max(localDoc.lastUpdated, remoteDoc.lastUpdated),
+      updatedBy: 'local'  // Keep it as local since we have merged changes
+    } as any)
+    
+    console.log('Document updated with merged content')
+  }
+
+  async syncRemoteToLocal() {
     try {
       console.log('\n=== Starting remote to local sync ===')
       
@@ -265,52 +541,23 @@ class SyncService {
 
       // Create missing documents locally
       for (const doc of docsToCreate) {
-        console.log('\n=== Creating new document ===')
-        console.log('Document ID:', doc._id)
-        console.log('Document title:', doc.title)
-        console.log('Content type:', typeof doc.content)
-        
-        await documentStorage.create(this.DOCUMENTS_COLLECTION, {
-          ...doc,
-          content: doc.content,
-          updatedBy: 'remote'
-        } as any)
+        await this.createLocalDocument(doc)
       }
 
       // Update existing documents if needed
       for (const remoteDoc of docsToUpdate) {
         const localDoc = localDocsMap.get(remoteDoc._id)
-        if (!localDoc) continue // TypeScript safety check
-
-        console.log('\n=== Checking document for updates ===')
-        console.log('Document ID:', remoteDoc._id)
-        console.log('Document title:', remoteDoc.title)
-        console.log('Local lastUpdated:', localDoc.lastUpdated)
-        console.log('Remote lastUpdated:', remoteDoc.lastUpdated)
-        console.log('Local updatedBy:', (localDoc as any).updatedBy)
-
-        // Update if:
-        // 1. Remote is newer OR
-        // 2. Local was last updated by remote (meaning it's safe to update)
-        if (remoteDoc.lastUpdated > localDoc.lastUpdated || 
-            (localDoc as any).updatedBy === 'remote') {
-          console.log('Updating local document with remote changes')
-          await documentStorage.update(this.DOCUMENTS_COLLECTION, remoteDoc._id, {
-            ...remoteDoc,
-            content: remoteDoc.content,
-            updatedBy: 'remote'
-          } as any)
-        } else {
-          console.log('Local document is newer or was updated locally, skipping update')
-        }
+        if (!localDoc) continue
+        await this.updateLocalDocument(remoteDoc, localDoc)
       }
 
       console.log('Remote to local sync completed')
     } catch (error) {
-      console.error('Error during remote to local sync:', error)
+      console.error('Error syncing remote to local:', error)
       throw error
     }
   }
 }
 
 export default SyncService.getInstance()
+

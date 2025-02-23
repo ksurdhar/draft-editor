@@ -6,6 +6,11 @@ import * as fs from 'fs-extra'
 import * as path from 'path'
 import apiService from '../electron/api-service'
 
+// Add the extended interface for test documents
+interface TestDocumentData extends DocumentData {
+  updatedBy?: 'local' | 'remote';
+}
+
 describe('SyncService Integration Tests', () => {
   const TEST_STORAGE_PATH = path.join(process.cwd(), 'test-data')
   
@@ -100,6 +105,50 @@ describe('SyncService Integration Tests', () => {
     it('should handle non-existent document gracefully', async () => {
       const doc = await SyncService.getLocalDocument('non-existent-id')
       expect(doc).toBeNull()
+    })
+
+    it('should save and preserve the updatedBy flag', async () => {
+      const testDoc: Partial<DocumentData> = {
+        title: 'Test Document',
+        content: JSON.stringify({
+          type: 'doc',
+          content: [{
+            type: 'paragraph',
+            content: [{
+              type: 'text',
+              text: 'Hello, World!'
+            }]
+          }]
+        }),
+        comments: [],
+        lastUpdated: Date.now(),
+        userId: 'test-user',
+        folderIndex: 0
+      }
+
+      // Save document with updatedBy flag
+      const savedDoc = await documentStorage.create('documents', {
+        ...testDoc,
+        updatedBy: 'local'
+      } as any)
+      expect(savedDoc).toBeDefined()
+      expect(savedDoc.updatedBy).toBe('local')
+
+      // Retrieve document and verify flag is preserved
+      const retrievedDoc = await documentStorage.findById('documents', savedDoc._id)
+      expect(retrievedDoc).toBeDefined()
+      expect(retrievedDoc?.updatedBy).toBe('local')
+
+      // Update document with new flag
+      await documentStorage.update('documents', savedDoc._id, {
+        updatedBy: 'remote',
+        content: retrievedDoc?.content // Preserve the existing content
+      } as any)
+
+      // Verify flag was updated
+      const updatedDoc = await documentStorage.findById('documents', savedDoc._id)
+      expect(updatedDoc).toBeDefined()
+      expect(updatedDoc?.updatedBy).toBe('remote')
     })
   })
 
@@ -438,6 +487,139 @@ describe('SyncService Integration Tests', () => {
           content: [{
             type: 'text',
             text: 'Updated content 2'
+          }]
+        }]
+      })
+    })
+
+    it('should preserve concurrent edits when syncing', async () => {
+      console.log('Starting concurrent edits test...')
+      
+      // Create initial document
+      const doc = await SyncService.uploadDocument({
+        title: 'Merge Test Doc',
+        content: JSON.stringify({
+          type: 'doc',
+          content: [{
+            type: 'paragraph',
+            content: [{
+              type: 'text',
+              text: 'Initial content'
+            }]
+          }]
+        }),
+        userId: 'test-user'
+      } as DocumentData)
+      console.log('Initial document created:', doc._id)
+      console.log('Initial content:', doc.content)
+
+      // Initial sync to create local copy
+      console.log('Performing initial sync...')
+      await SyncService.syncRemoteToLocal()
+      const afterInitialSync = await SyncService.getLocalDocument(doc._id) as TestDocumentData
+      console.log('Document after initial sync:', {
+        id: afterInitialSync?._id,
+        content: afterInitialSync?.content,
+        updatedBy: afterInitialSync?.updatedBy
+      })
+
+      // Make local change
+      const localUpdateTime = Date.now() + 1000
+      console.log('Making local change at time:', localUpdateTime)
+      await documentStorage.update('documents', doc._id, {
+        content: JSON.stringify({
+          type: 'doc',
+          content: [{
+            type: 'paragraph',
+            content: [{
+              type: 'text',
+              text: 'Initial content'
+            }]
+          }, {
+            type: 'paragraph',
+            content: [{
+              type: 'text',
+              text: 'Local addition'
+            }]
+          }]
+        }),
+        updatedBy: 'local',
+        lastUpdated: localUpdateTime
+      } as any)
+      
+      const afterLocalChange = await SyncService.getLocalDocument(doc._id) as TestDocumentData
+      console.log('Document after local change:', {
+        id: afterLocalChange?._id,
+        content: afterLocalChange?.content,
+        updatedBy: afterLocalChange?.updatedBy,
+        lastUpdated: afterLocalChange?.lastUpdated
+      })
+
+      // Make remote change with different content
+      const remoteUpdateTime = Date.now() + 2000
+      console.log('Making remote change at time:', remoteUpdateTime)
+      const updatedRemoteDoc = await SyncService.uploadDocument({
+        ...doc,
+        content: JSON.stringify({
+          type: 'doc',
+          content: [{
+            type: 'paragraph',
+            content: [{
+              type: 'text',
+              text: 'Initial content'
+            }]
+          }, {
+            type: 'paragraph',
+            content: [{
+              type: 'text',
+              text: 'Remote addition'
+            }]
+          }]
+        }),
+        lastUpdated: remoteUpdateTime
+      } as DocumentData)
+      console.log('Remote document after update:', {
+        id: updatedRemoteDoc._id,
+        content: updatedRemoteDoc.content,
+        lastUpdated: updatedRemoteDoc.lastUpdated
+      })
+
+      // Run sync
+      console.log('Running final sync...')
+      await SyncService.syncRemoteToLocal()
+
+      // Verify final state
+      const finalDoc = await SyncService.getLocalDocument(doc._id) as TestDocumentData
+      console.log('Final document state:', {
+        id: finalDoc?._id,
+        content: finalDoc?.content,
+        updatedBy: finalDoc?.updatedBy,
+        lastUpdated: finalDoc?.lastUpdated
+      })
+
+      const content = typeof finalDoc?.content === 'string' ? 
+        JSON.parse(finalDoc.content) : 
+        finalDoc?.content
+
+      expect(content).toEqual({
+        type: 'doc',
+        content: [{
+          type: 'paragraph',
+          content: [{
+            type: 'text',
+            text: 'Initial content'
+          }]
+        }, {
+          type: 'paragraph',
+          content: [{
+            type: 'text',
+            text: 'Local addition'
+          }]
+        }, {
+          type: 'paragraph',
+          content: [{
+            type: 'text',
+            text: 'Remote addition'
           }]
         }]
       })
