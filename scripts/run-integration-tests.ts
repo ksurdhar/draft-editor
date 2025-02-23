@@ -17,9 +17,13 @@ const envConfig = {
 }
 
 // Get test pattern from command line arguments
-const testPattern = process.argv.slice(2).join(' ') || '**/*.integration.test.ts'
+const testPattern = process.argv.slice(2).join(' ')
+const testGlob = testPattern 
+  ? `**/*${testPattern}*.integration.test.ts`
+  : '**/*.integration.test.ts'
+
 console.log('\n=== Running Integration Tests ===')
-console.log('Test pattern:', testPattern)
+console.log('Test pattern:', testGlob)
 
 async function killProcessOnPort(port: number): Promise<void> {
   try {
@@ -106,7 +110,7 @@ async function runTests(): Promise<number> {
 
   return new Promise((resolve, reject) => {
     console.log('Running integration tests...')
-    const jest = spawn('jest', ['--runInBand', '--testMatch', testPattern], {
+    const jest = spawn('jest', ['--runInBand', '--testMatch', testGlob], {
       env,
       stdio: 'inherit'
     })

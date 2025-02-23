@@ -186,4 +186,65 @@ describe('SyncService Integration Tests', () => {
       console.log('List documents test passed')
     })
   })
+
+  describe('Synchronized Document Operations', () => {
+    it('should save document both locally and remotely', async () => {
+      const testDoc: Partial<DocumentData> = {
+        title: 'Sync Test Document',
+        content: 'Hello, synchronized world!',
+        comments: [],
+        lastUpdated: Date.now(),
+        userId: 'test-user',
+        folderIndex: 0
+      }
+
+      // Save document
+      const savedDoc = await SyncService.saveDocument(testDoc)
+      expect(savedDoc).toBeDefined()
+      expect(savedDoc._id).toBeDefined()
+      expect(savedDoc.title).toBe(testDoc.title)
+
+      // Verify document exists locally
+      const localDoc = await SyncService.getLocalDocument(savedDoc._id)
+      expect(localDoc).toBeDefined()
+      expect(localDoc?.title).toBe(testDoc.title)
+      expect(localDoc?.content).toBe(testDoc.content)
+
+      // Verify document exists remotely
+      const remoteDoc = await SyncService.getRemoteDocument(savedDoc._id)
+      expect(remoteDoc).toBeDefined()
+      expect(remoteDoc?.title).toBe(testDoc.title)
+      expect(remoteDoc?.content).toBe(testDoc.content)
+    })
+
+    it('should properly handle YJS content and maintain sync state', async () => {
+      const testDoc: Partial<DocumentData> = {
+        title: 'YJS Test Document',
+        content: 'Initial content',
+        comments: [],
+        lastUpdated: Date.now(),
+        userId: 'test-user',
+        folderIndex: 0
+      }
+
+      // Save document
+      const savedDoc = await SyncService.saveDocument(testDoc)
+      expect(savedDoc).toBeDefined()
+      expect(savedDoc._id).toBeDefined()
+      expect(savedDoc.title).toBe(testDoc.title)
+
+      // Verify local document has YJS content
+      const localDoc = await documentStorage.findById('documents', savedDoc._id)
+      expect(localDoc).toBeDefined()
+      const content = JSON.parse(localDoc?.content as string)
+      expect(content).toHaveProperty('type', 'yjs')
+      expect(content).toHaveProperty('state')
+      expect(localDoc?.updatedBy).toBe('local')
+
+      // Verify the content is readable when fetched through the service
+      const retrievedDoc = await SyncService.getLocalDocument(savedDoc._id)
+      expect(retrievedDoc).toBeDefined()
+      expect(retrievedDoc?.content).toBe(testDoc.content)
+    })
+  })
 })

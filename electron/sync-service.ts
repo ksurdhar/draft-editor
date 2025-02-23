@@ -51,10 +51,62 @@ class SyncService {
     }
   }
 
+  async saveDocument(doc: Partial<DocumentData>): Promise<DocumentData> {
+    try {
+      // First save remotely to get an ID and establish the document
+      const remoteDoc = await this.uploadDocument(doc as DocumentData)
+      
+      // Then save locally with YJS content
+      const localDoc = await documentStorage.create(this.DOCUMENTS_COLLECTION, {
+        ...doc,
+        _id: remoteDoc._id,
+        lastUpdated: Date.now(),
+        content: {
+          type: 'yjs',
+          content: doc.content || '', // Original content for YJS initialization
+          state: [] // Initial empty state, YJS adapter will handle serialization
+        },
+        updatedBy: 'local' // Mark as locally updated
+      } as any)
+
+      const mappedDoc = this.mapToDocumentData(localDoc)
+      if (!mappedDoc) throw new Error('Failed to create document')
+      
+      // Return the document with readable content
+      return {
+        ...mappedDoc,
+        content: typeof localDoc.content === 'string' ? localDoc.content : 
+                typeof localDoc.content === 'object' && localDoc.content.content ? 
+                localDoc.content.content : JSON.stringify(localDoc.content)
+      }
+    } catch (error) {
+      console.error('Error saving document:', error)
+      throw error
+    }
+  }
+
   async getLocalDocument(id: string): Promise<DocumentData | null> {
     try {
       const doc = await documentStorage.findById(this.DOCUMENTS_COLLECTION, id)
-      return this.mapToDocumentData(doc)
+      if (!doc) return null
+
+      // Handle YJS content
+      let content: any = doc.content
+      if (typeof content === 'string') {
+        try {
+          const parsedContent = JSON.parse(content)
+          if (parsedContent.type === 'yjs') {
+            content = parsedContent.content
+          }
+        } catch (e) {
+          // If parsing fails, use the content as is
+        }
+      }
+
+      return {
+        ...this.mapToDocumentData(doc)!,
+        content: typeof content === 'string' ? content : JSON.stringify(content)
+      }
     } catch (error) {
       console.error('Error getting local document:', error)
       throw error
@@ -89,7 +141,25 @@ class SyncService {
   async getRemoteDocument(id: string): Promise<DocumentData | null> {
     try {
       const response = await apiService.get(`/documents/${id}`)
-      return this.mapToDocumentData(response)
+      if (!response) return null
+
+      // Handle YJS content
+      let content: any = response.content
+      if (typeof content === 'string') {
+        try {
+          const parsedContent = JSON.parse(content)
+          if (parsedContent.type === 'yjs') {
+            content = parsedContent.content
+          }
+        } catch (e) {
+          // If parsing fails, use the content as is
+        }
+      }
+
+      return {
+        ...this.mapToDocumentData(response)!,
+        content: typeof content === 'string' ? content : JSON.stringify(content)
+      }
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 404) {
         return null
