@@ -310,7 +310,7 @@ describe('SyncService Integration Tests', () => {
           type: 'paragraph',
           content: [{
             type: 'text',
-            text: ''
+            text: 'Remote content 1'
           }]
         }]
       }))
@@ -323,7 +323,7 @@ describe('SyncService Integration Tests', () => {
           type: 'paragraph',
           content: [{
             type: 'text',
-            text: ''
+            text: 'Remote content 2'
           }]
         }]
       }))

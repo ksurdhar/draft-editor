@@ -56,6 +56,11 @@ class SyncService {
       // First save remotely to get an ID and establish the document
       const remoteDoc = await this.uploadDocument(doc as DocumentData)
       
+      // Transform content to string if it's an object
+      const contentString = typeof doc.content === 'string' ? 
+        doc.content : 
+        JSON.stringify(doc.content)
+      
       // Then save locally with YJS content
       const localDoc = await documentStorage.create(this.DOCUMENTS_COLLECTION, {
         ...doc,
@@ -63,7 +68,7 @@ class SyncService {
         lastUpdated: Date.now(),
         content: {
           type: 'yjs',
-          content: doc.content || '', // Original content for YJS initialization
+          content: contentString, // Now always a string
           state: [] // Initial empty state, YJS adapter will handle serialization
         },
         updatedBy: 'local' // Mark as locally updated
@@ -72,12 +77,10 @@ class SyncService {
       const mappedDoc = this.mapToDocumentData(localDoc)
       if (!mappedDoc) throw new Error('Failed to create document')
       
-      // Return the document with readable content
+      // Return the document with the original content format
       return {
         ...mappedDoc,
-        content: typeof localDoc.content === 'string' ? localDoc.content : 
-                typeof localDoc.content === 'object' && localDoc.content.content ? 
-                localDoc.content.content : JSON.stringify(localDoc.content)
+        content: doc.content || ''  // Preserve original content format but handle undefined
       }
     } catch (error) {
       console.error('Error saving document:', error)
@@ -222,12 +225,11 @@ class SyncService {
       // Create missing documents locally
       for (const doc of docsToSync) {
         console.log(`Syncing document: ${doc._id}`)
-        const content = typeof doc.content === 'string' ? doc.content : JSON.stringify(doc.content)
         await documentStorage.create(this.DOCUMENTS_COLLECTION, {
           ...doc,
           content: {
             type: 'yjs',
-            content: content,
+            content: doc.content, // Pass the content directly without stringifying
             state: []
           },
           updatedBy: 'remote'

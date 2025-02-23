@@ -11,6 +11,7 @@
     "lint": "next lint",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:unit": "jest \".*\\.unit\\.test\\.ts$\"",
     "edev": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
