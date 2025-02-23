@@ -20,7 +20,7 @@ export type DocumentData = {
       marks?: Array<{ type: string }>
     }>
   }
-  comments: CommentData[]
+  comments?: CommentData[]
   lastUpdated: number
   userId: string
   canEdit?: boolean

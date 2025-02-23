@@ -4,6 +4,7 @@ import { documentStorage } from '../electron/storage-adapter'
 import { startTestServer, stopTestServer } from './test-utils/server'
 import * as fs from 'fs-extra'
 import * as path from 'path'
+import apiService from '../electron/api-service'
 
 describe('SyncService Integration Tests', () => {
   const TEST_STORAGE_PATH = path.join(process.cwd(), 'test-data')
@@ -245,6 +246,87 @@ describe('SyncService Integration Tests', () => {
       const retrievedDoc = await SyncService.getLocalDocument(savedDoc._id)
       expect(retrievedDoc).toBeDefined()
       expect(retrievedDoc?.content).toBe(testDoc.content)
+    })
+
+    it('should sync remote documents to local storage on startup', async () => {
+      // Clear both local and remote documents
+      await documentStorage.delete('documents', {})
+
+      // Get all remote documents and delete them
+      const remoteDocs = await SyncService.getRemoteDocuments()
+      await Promise.all(remoteDocs.map(doc => apiService.deleteDocument(doc._id)))
+
+      // Verify local storage is empty
+      const localDocsBefore = await SyncService.getAllLocalDocuments()
+      expect(localDocsBefore).toHaveLength(0)
+
+      // Create some documents directly on the remote server
+      const remoteDoc1 = await SyncService.uploadDocument({
+        title: 'Remote Doc 1',
+        content: {
+          type: 'doc',
+          content: [{
+            type: 'paragraph',
+            content: [{
+              type: 'text',
+              text: 'Remote content 1'
+            }]
+          }]
+        },
+        userId: 'test-user'
+      } as DocumentData)
+
+      const remoteDoc2 = await SyncService.uploadDocument({
+        title: 'Remote Doc 2',
+        content: {
+          type: 'doc',
+          content: [{
+            type: 'paragraph',
+            content: [{
+              type: 'text',
+              text: 'Remote content 2'
+            }]
+          }]
+        },
+        userId: 'test-user'
+      } as DocumentData)
+
+      // Run startup sync
+      await SyncService.syncRemoteToLocal()
+
+      // Verify documents were synced to local storage
+      const localDocsAfter = await SyncService.getAllLocalDocuments()
+      expect(localDocsAfter).toHaveLength(2)
+
+      // Verify content matches
+      const localDoc1 = await SyncService.getLocalDocument(remoteDoc1._id)
+      const localDoc2 = await SyncService.getLocalDocument(remoteDoc2._id)
+
+      expect(localDoc1).toBeDefined()
+      expect(localDoc1?.title).toBe('Remote Doc 1')
+      expect(localDoc1?.content).toBe(JSON.stringify({
+        type: 'doc',
+        content: [{
+          type: 'paragraph',
+          content: [{
+            type: 'text',
+            text: ''
+          }]
+        }]
+      }))
+
+      expect(localDoc2).toBeDefined()
+      expect(localDoc2?.title).toBe('Remote Doc 2')
+      expect(localDoc2?.content).toBe(JSON.stringify({
+        type: 'doc',
+        content: [{
+          type: 'paragraph',
+          content: [{
+            type: 'text',
+            text: ''
+          }]
+        }]
+      }))
     })
   })
 })

@@ -201,6 +201,45 @@ class SyncService {
       throw error
     }
   }
+
+  async syncRemoteToLocal(): Promise<void> {
+    try {
+      console.log('Starting remote to local sync...')
+      
+      // Get all remote documents
+      const remoteDocs = await this.getRemoteDocuments()
+      console.log(`Found ${remoteDocs.length} remote documents`)
+
+      // Get all local documents
+      const localDocs = await this.getAllLocalDocuments()
+      const localDocIds = new Set(localDocs.map(doc => doc._id))
+      console.log(`Found ${localDocs.length} local documents`)
+
+      // Find documents that exist remotely but not locally
+      const docsToSync = remoteDocs.filter(doc => !localDocIds.has(doc._id))
+      console.log(`Found ${docsToSync.length} documents to sync`)
+
+      // Create missing documents locally
+      for (const doc of docsToSync) {
+        console.log(`Syncing document: ${doc._id}`)
+        const content = typeof doc.content === 'string' ? doc.content : JSON.stringify(doc.content)
+        await documentStorage.create(this.DOCUMENTS_COLLECTION, {
+          ...doc,
+          content: {
+            type: 'yjs',
+            content: content,
+            state: []
+          },
+          updatedBy: 'remote'
+        } as any)
+      }
+
+      console.log('Remote to local sync completed')
+    } catch (error) {
+      console.error('Error during remote to local sync:', error)
+      throw error
+    }
+  }
 }
 
 export default SyncService.getInstance() 
