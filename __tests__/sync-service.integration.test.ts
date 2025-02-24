@@ -153,7 +153,7 @@ describe('SyncService Integration Tests', () => {
               content: [
                 {
                   type: 'text',
-                  text: ''
+                  text: 'hi mongo db'
                 }
               ]
             }
@@ -303,7 +303,7 @@ describe('SyncService Integration Tests', () => {
               content: [
                 {
                   type: 'text',
-                  text: ' '
+                  text: 'hello wizard'
                 }
               ]
             }
@@ -345,7 +345,7 @@ describe('SyncService Integration Tests', () => {
               content: [
                 {
                   type: 'text',
-                  text: ' '
+                  text: 'foobarbaz'
                 }
               ]
             }

@@ -102,9 +102,9 @@ export class YjsStorageAdapter implements StorageAdapter {
       return DEFAULT_DOCUMENT
     }
 
-    // If it's YJS content, return the default document since we'll handle YJS content separately
-    if (content.type === 'yjs') {
-      return DEFAULT_DOCUMENT
+    // If it's YJS content, return it as is
+    if (content.type === 'yjs' && Array.isArray(content.content)) {
+      return content
     }
 
     if (content.type !== 'doc' || !Array.isArray(content.content)) {
@@ -159,6 +159,20 @@ export class YjsStorageAdapter implements StorageAdapter {
       _id: new ObjectId().toString(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
+    }
+
+    // If content is already in YJS format, use it directly
+    if (data.content && typeof data.content === 'object' && 
+        'type' in data.content && 
+        (data.content as any).type === 'yjs' && 
+        'content' in data.content && 
+        Array.isArray((data.content as any).content)) {
+      const filePath = this.getDocumentPath(collection, newDoc._id)
+      await fs.ensureDir(path.dirname(filePath))
+      await fs.writeFile(filePath, JSON.stringify(newDoc, null, 2))
+      
+      console.log('Created new document:', newDoc._id)
+      return newDoc
     }
 
     // Create YDoc for content
