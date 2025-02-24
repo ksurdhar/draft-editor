@@ -1,5 +1,5 @@
 import SyncService from '../electron/sync-service'
-import { DocumentData } from '@typez/globals'
+import { DocumentData, DocContent } from '@typez/globals'
 import { documentStorage } from '../electron/storage-adapter'
 import { startTestServer, stopTestServer } from './test-utils/server'
 import * as fs from 'fs-extra'
@@ -375,6 +375,118 @@ describe('SyncService Integration Tests', () => {
       const retrievedDoc = await SyncService.getLocalDocument(savedDoc._id)
       expect(retrievedDoc).toBeDefined()
       expect(retrievedDoc?.content).toEqual(testDoc.content)
+    })
+
+    it('should sync multiple document changes correctly', async () => {
+      const testDoc: Partial<DocumentData> = {
+        title: 'Sync Changes Test',
+        content: {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text: 'Initial content'
+                }
+              ]
+            }
+          ]
+        },
+        comments: [],
+        lastUpdated: Date.now(),
+        userId: 'test-user',
+        folderIndex: 0
+      }
+
+      // Save initial document
+      const savedDoc = await SyncService.saveDocument(testDoc)
+      expect(savedDoc).toBeDefined()
+      expect(savedDoc._id).toBeDefined()
+
+      // Define changes from multiple users
+      const userAChanges: DocContent = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Initial content - modified by A'
+              }
+            ]
+          },
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'A\'s new paragraph'
+              }
+            ]
+          }
+        ]
+      }
+
+      const userBChanges: DocContent = {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'Initial content (B\'s edit)'
+              }
+            ]
+          },
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'B\'s new paragraph'
+              }
+            ]
+          }
+        ]
+      }
+
+      // Apply both changes
+      const finalDoc = await SyncService.syncDocumentChanges(savedDoc._id, [userAChanges, userBChanges])
+      expect(finalDoc).toBeDefined()
+      expect(finalDoc.content).toBeDefined()
+
+      // Verify the content structure
+      const content = finalDoc.content as DocContent
+      expect(content.type).toBe('doc')
+      expect(content.content.length).toBeGreaterThan(1)
+
+      // Get all text content
+      const allTexts = content.content
+        .map((p: { content?: Array<{ text: string }> }) => 
+          p.content?.map((n: { text: string }) => n.text).join('') || ''
+        )
+
+      // Verify both users' changes are preserved
+      const hasUserAContent = allTexts.some((text: string) => 
+        text.includes('modified by A') || text.includes('A\'s new paragraph')
+      )
+      const hasUserBContent = allTexts.some((text: string) => 
+        text.includes('B\'s edit') || text.includes('B\'s new paragraph')
+      )
+
+      expect(hasUserAContent).toBe(true)
+      expect(hasUserBContent).toBe(true)
+
+      // Verify local storage has YJS content
+      const localDoc = await documentStorage.findById('documents', savedDoc._id)
+      expect(localDoc).toBeDefined()
+      expect(localDoc?.content).toHaveProperty('type', 'yjs')
+      expect(localDoc?.content).toHaveProperty('content')
+      expect(Array.isArray((localDoc?.content as any).content)).toBe(true)
     })
   })
 })

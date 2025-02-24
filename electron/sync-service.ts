@@ -1,11 +1,15 @@
-import { DocumentData, DocContent, SerializedContent, DeserializedContent } from '../types/globals'
+import { DocumentData, DocContent, SerializedContent } from '../types/globals'
 import { documentStorage } from './storage-adapter'
 import apiService from './api-service'
 import axios from 'axios'
 import * as Y from 'yjs'
 import { Schema } from 'prosemirror-model'
-import { yDocToProsemirror, prosemirrorToYDoc } from 'y-prosemirror'
-import { applyTiptapChangesToSerializedYDoc } from '../tests/utils/y-doc-helpers'
+import { yDocToProsemirror } from 'y-prosemirror'
+import { 
+  applyTiptapChangesToSerializedYDoc,
+  syncDocs,
+  createYDocFromBinary
+} from '../tests/utils/y-doc-helpers'
 
 // Define schema for Tiptap/ProseMirror operations
 const schema = new Schema({
@@ -284,6 +288,68 @@ class SyncService {
       return response.map(doc => this.mapToDocumentData(doc)).filter((doc): doc is DocumentData => doc !== null)
     } catch (error) {
       console.error('Error bulk fetching remote documents:', error)
+      throw error
+    }
+  }
+
+  async syncDocumentChanges(docId: string, changes: DocContent[]): Promise<DocumentData> {
+    try {
+      // Get the current document
+      const doc = await this.getLocalDocument(docId)
+      if (!doc) {
+        throw new Error(`Document not found: ${docId}`)
+      }
+
+      // Create initial Y.doc from current content
+      const initialYDoc = new Y.Doc()
+      const initialContent = typeof doc.content === 'string' ? 
+        { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: doc.content }] }] } :
+        (doc.content as DocContent)
+
+      // Apply initial content to Y.doc
+      const initialState = applyTiptapChangesToSerializedYDoc(
+        Y.encodeStateAsUpdate(initialYDoc),
+        initialContent,
+        schema
+      )
+
+      // Apply each change sequentially
+      let currentState = initialState
+      for (const change of changes) {
+        currentState = applyTiptapChangesToSerializedYDoc(
+          currentState,
+          change,
+          schema
+        )
+      }
+
+      // Create final Y.doc with all changes
+      const finalYDoc = createYDocFromBinary(currentState)
+
+      // Convert to serialized content for storage
+      const serializedContent: SerializedContent = {
+        type: 'yjs',
+        content: Array.from(Y.encodeStateAsUpdate(finalYDoc))
+      }
+
+      // Save the updated document
+      const updatedDoc = await documentStorage.create(this.DOCUMENTS_COLLECTION, {
+        ...doc,
+        content: serializedContent,
+        lastUpdated: Date.now(),
+        updatedBy: 'local'
+      } as any)
+
+      // Convert back to Prosemirror format for return
+      const prosemirrorDoc = yDocToProsemirror(schema, finalYDoc)
+      const docContent: DocContent = prosemirrorDoc.toJSON()
+
+      return {
+        ...this.mapToDocumentData(updatedDoc)!,
+        content: docContent
+      }
+    } catch (error) {
+      console.error('Error syncing document changes:', error)
       throw error
     }
   }
