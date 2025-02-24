@@ -102,6 +102,11 @@ export class YjsStorageAdapter implements StorageAdapter {
       return DEFAULT_DOCUMENT
     }
 
+    // If it's YJS content, return the default document since we'll handle YJS content separately
+    if (content.type === 'yjs') {
+      return DEFAULT_DOCUMENT
+    }
+
     if (content.type !== 'doc' || !Array.isArray(content.content)) {
       return DEFAULT_DOCUMENT
     }
@@ -111,7 +116,7 @@ export class YjsStorageAdapter implements StorageAdapter {
       if (node.type !== 'paragraph') {
         return {
           type: 'paragraph',
-          content: [{ type: 'text', text: '' }]
+          content: [{ type: 'text', text: node.text || '' }]
         }
       }
 
@@ -119,14 +124,14 @@ export class YjsStorageAdapter implements StorageAdapter {
       if (!node.content || !Array.isArray(node.content) || node.content.length === 0) {
         return {
           ...node,
-          content: [{ type: 'text', text: '' }]
+          content: [{ type: 'text', text: node.text || '' }]
         }
       }
 
       // Process each content node to ensure it's valid
       const validContent = node.content.map((contentNode: ProsemirrorNode) => {
         if (contentNode.type !== 'text' || typeof contentNode.text !== 'string') {
-          return { type: 'text', text: '' }
+          return { type: 'text', text: contentNode.text || '' }
         }
         return contentNode
       })
@@ -146,7 +151,7 @@ export class YjsStorageAdapter implements StorageAdapter {
   async create(collection: string, data: Omit<Document, '_id'>): Promise<JsonDocument> {
     console.log('\n=== YjsStorageAdapter.create ===')
     console.log('Collection:', collection)
-    console.log('Input data:', data)
+    console.log('Input data:', JSON.stringify(data, null, 2))
 
     // Create document metadata
     const newDoc: JsonDocument = {
@@ -175,7 +180,7 @@ export class YjsStorageAdapter implements StorageAdapter {
       ...newDoc,
       content: {
         type: 'yjs',
-        state: Array.from(this.serializeYDoc(ydoc))
+        content: Array.from(this.serializeYDoc(ydoc))
       }
     }
 
@@ -187,7 +192,10 @@ export class YjsStorageAdapter implements StorageAdapter {
     console.log('Created new document:', newDoc._id)
     return {
       ...newDoc,
-      content: contentToApply
+      content: {
+        type: 'yjs',
+        content: Array.from(this.serializeYDoc(ydoc))
+      }
     }
   }
 
