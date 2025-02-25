@@ -459,6 +459,8 @@ describe('SyncService Integration Tests', () => {
       expect(finalDoc).toBeDefined()
       expect(finalDoc.content).toBeDefined()
 
+      console.log('Final doc content:', JSON.stringify(finalDoc.content, null, 2))
+
       // Verify the content structure
       const content = finalDoc.content as DocContent
       expect(content.type).toBe('doc')
@@ -469,6 +471,7 @@ describe('SyncService Integration Tests', () => {
         .map((p: { content?: Array<{ text: string }> }) => 
           p.content?.map((n: { text: string }) => n.text).join('') || ''
         )
+      console.log('All texts:', allTexts)
 
       // Verify both users' changes are preserved
       const hasUserAContent = allTexts.some((text: string) => 

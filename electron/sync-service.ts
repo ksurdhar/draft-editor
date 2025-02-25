@@ -4,11 +4,9 @@ import apiService from './api-service'
 import axios from 'axios'
 import * as Y from 'yjs'
 import { Schema } from 'prosemirror-model'
-import { yDocToProsemirror } from 'y-prosemirror'
+import { prosemirrorToYDoc, yDocToProsemirror } from 'y-prosemirror'
 import { 
   applyTiptapChangesToSerializedYDoc,
-  syncDocs,
-  createYDocFromBinary
 } from '../tests/utils/y-doc-helpers'
 
 // Define schema for Tiptap/ProseMirror operations
@@ -299,39 +297,63 @@ class SyncService {
       if (!doc) {
         throw new Error(`Document not found: ${docId}`)
       }
-
-      // Create initial Y.doc from current content
-      const initialYDoc = new Y.Doc()
+  
+      // Create a base Y.doc from current content
+      const baseYDoc = new Y.Doc()
       const initialContent = typeof doc.content === 'string' ? 
         { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: doc.content }] }] } :
         (doc.content as DocContent)
-
-      // Apply initial content to Y.doc
-      const initialState = applyTiptapChangesToSerializedYDoc(
-        Y.encodeStateAsUpdate(initialYDoc),
-        initialContent,
-        schema
-      )
-
-      // Apply each change sequentially
-      let currentState = initialState
-      for (const change of changes) {
-        currentState = applyTiptapChangesToSerializedYDoc(
-          currentState,
-          change,
-          schema
-        )
+  
+      // Apply initial content to base Y.doc
+      const pmDoc = schema.nodeFromJSON(initialContent)
+      const yBaseDoc = prosemirrorToYDoc(pmDoc)
+      
+      // Create a Y.doc for each change and apply the change to it
+      const changeDocs = changes.map(change => {
+        // Create a new Y.doc with the base state
+        const changeDoc = new Y.Doc()
+        Y.applyUpdate(changeDoc, Y.encodeStateAsUpdate(yBaseDoc))
+        
+        // Apply the specific change
+        const pmChangeDoc = schema.nodeFromJSON(change)
+        const yChangeDoc = prosemirrorToYDoc(pmChangeDoc)
+        
+        // Replace the content of changeDoc with the content from yChangeDoc
+        const xmlFragment = changeDoc.getXmlFragment('prosemirror')
+        xmlFragment.delete(0, xmlFragment.length)
+        const sourceFragment = yChangeDoc.getXmlFragment('prosemirror')
+        
+        // Clone the content from sourceFragment to xmlFragment
+        changeDoc.transact(() => {
+          for (let i = 0; i < sourceFragment.length; i++) {
+            const item = sourceFragment.get(i)
+            if (item) {
+              xmlFragment.insert(xmlFragment.length, [item.clone()])
+            }
+          }
+        })
+        
+        return changeDoc
+      })
+      
+      // Merge all changes together using Y.js's CRDT capabilities
+      const finalYDoc = new Y.Doc()
+      Y.applyUpdate(finalYDoc, Y.encodeStateAsUpdate(yBaseDoc))
+      
+      // Apply each change doc's updates to the final doc
+      for (const changeDoc of changeDocs) {
+        // Use syncDocs helper to properly merge the documents
+        // This uses Y.js's CRDT algorithm to intelligently merge changes
+        const update = Y.encodeStateAsUpdate(changeDoc)
+        Y.applyUpdate(finalYDoc, update)
       }
-
-      // Create final Y.doc with all changes
-      const finalYDoc = createYDocFromBinary(currentState)
-
+  
       // Convert to serialized content for storage
-      const serializedContent: SerializedContent = {
+      const serializedContent = {
         type: 'yjs',
         content: Array.from(Y.encodeStateAsUpdate(finalYDoc))
       }
-
+  
       // Save the updated document
       const updatedDoc = await documentStorage.create(this.DOCUMENTS_COLLECTION, {
         ...doc,
@@ -339,11 +361,11 @@ class SyncService {
         lastUpdated: Date.now(),
         updatedBy: 'local'
       } as any)
-
+  
       // Convert back to Prosemirror format for return
-      const prosemirrorDoc = yDocToProsemirror(schema, finalYDoc)
-      const docContent: DocContent = prosemirrorDoc.toJSON()
-
+      const finalProsemirrorDoc = yDocToProsemirror(schema, finalYDoc)
+      const docContent = finalProsemirrorDoc.toJSON()
+  
       return {
         ...this.mapToDocumentData(updatedDoc)!,
         content: docContent
