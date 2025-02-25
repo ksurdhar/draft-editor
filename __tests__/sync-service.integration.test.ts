@@ -492,4 +492,281 @@ describe('SyncService Integration Tests', () => {
       expect(Array.isArray((localDoc?.content as any).content)).toBe(true)
     })
   })
+
+  describe('Document Synchronization Scenarios', () => {
+    // Helper function to create a test document
+    const createTestDocument = async (title: string, initialContent: string): Promise<DocumentData> => {
+      const testDoc: Partial<DocumentData> = {
+        title,
+        content: {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text: initialContent
+                }
+              ]
+            }
+          ]
+        },
+        comments: [],
+        lastUpdated: Date.now(),
+        userId: 'test-user',
+        folderIndex: 0
+      }
+      
+      return await SyncService.saveDocument(testDoc)
+    }
+    
+    // Helper to create document content
+    const createDocContent = (paragraphs: string[]): DocContent => ({
+      type: 'doc',
+      content: paragraphs.map(text => ({
+        type: 'paragraph',
+        content: [{ type: 'text', text }]
+      }))
+    })
+    
+    // Helper to extract text from document content
+    const extractTexts = (content: DocContent): string[] => {
+      return content.content.map(p => 
+        p.content?.[0]?.text || ''
+      )
+    }
+    
+    it('should handle basic edits to the same paragraph', async () => {
+      // Create initial document
+      const initialDoc = await createTestDocument('Basic Edits Test', 'This is the original text')
+      
+      // Define user changes
+      const userAChanges = createDocContent(['This is the original text with A\'s additions'])
+      const userBChanges = createDocContent(['This is the original text with B\'s modifications'])
+      
+      // Apply changes
+      const result = await SyncService.syncDocumentChanges(initialDoc._id, [userAChanges, userBChanges])
+      
+      // Verify result
+      const texts = extractTexts(result.content as DocContent)
+      console.log('Basic edits result:', texts)
+      
+      // We expect a merged paragraph containing elements from both edits
+      expect(texts.length).toBe(1)
+      expect(texts[0]).toContain('A\'s additions')
+      expect(texts[0]).toContain('B\'s modifications')
+    })
+    
+    it('should handle adding paragraphs in different positions', async () => {
+      // Create initial document with multiple paragraphs
+      const initialContent = createDocContent([
+        'First paragraph',
+        'Second paragraph',
+        'Third paragraph'
+      ])
+      
+      const testDoc: Partial<DocumentData> = {
+        title: 'Adding Paragraphs Test',
+        content: initialContent,
+        comments: [],
+        lastUpdated: Date.now(),
+        userId: 'test-user',
+        folderIndex: 0
+      }
+      
+      const initialDoc = await SyncService.saveDocument(testDoc)
+      
+      // User A adds a paragraph between first and second
+      const userAChanges = createDocContent([
+        'First paragraph',
+        'A\'s new paragraph',
+        'Second paragraph',
+        'Third paragraph'
+      ])
+      
+      // User B adds a paragraph between second and third
+      const userBChanges = createDocContent([
+        'First paragraph',
+        'Second paragraph',
+        'B\'s new paragraph',
+        'Third paragraph'
+      ])
+      
+      // Apply changes
+      const result = await SyncService.syncDocumentChanges(initialDoc._id, [userAChanges, userBChanges])
+      
+      // Verify result
+      const texts = extractTexts(result.content as DocContent)
+      console.log('Adding paragraphs result:', texts)
+      
+      // We expect both new paragraphs to be present in their relative positions
+      expect(texts.length).toBe(5)
+      expect(texts[1]).toBe('A\'s new paragraph')
+      expect(texts[2]).toBe('B\'s new paragraph')
+    })
+    
+    it('should handle local version behind cloud version', async () => {
+      // Create initial document
+      const initialDoc = await createTestDocument('Local Behind Test', 'Initial shared content')
+      
+      // Cloud version has more changes
+      const cloudChanges = createDocContent([
+        'Initial shared content with cloud updates',
+        'Additional cloud paragraph'
+      ])
+      
+      // Local version has minor changes
+      const localChanges = createDocContent(['Initial shared content with minor local edit'])
+      
+      // Apply changes (cloud first, then local)
+      const result = await SyncService.syncDocumentChanges(initialDoc._id, [cloudChanges, localChanges])
+      
+      // Verify result
+      const texts = extractTexts(result.content as DocContent)
+      console.log('Local behind cloud result:', texts)
+      
+      // We expect merged content of the first paragraph and the additional cloud paragraph
+      expect(texts.length).toBe(2)
+      expect(texts[0]).toContain('cloud updates')
+      expect(texts[0]).toContain('local edit')
+      expect(texts[1]).toBe('Additional cloud paragraph')
+    })
+    
+    it('should handle cloud version behind local version', async () => {
+      // Create initial document
+      const initialDoc = await createTestDocument('Cloud Behind Test', 'Initial shared content')
+      
+      // Local version has more changes
+      const localChanges = createDocContent([
+        'Initial shared content with extensive local updates',
+        'New local paragraph with important info'
+      ])
+      
+      // Cloud version has minor changes
+      const cloudChanges = createDocContent(['Initial shared content with small cloud edit'])
+      
+      // Apply changes (local first, then cloud)
+      const result = await SyncService.syncDocumentChanges(initialDoc._id, [localChanges, cloudChanges])
+      
+      // Verify result
+      const texts = extractTexts(result.content as DocContent)
+      console.log('Cloud behind local result:', texts)
+      
+      // We expect merged content of the first paragraph and the additional local paragraph
+      expect(texts.length).toBe(2)
+      expect(texts[0]).toContain('extensive local updates')
+      expect(texts[0]).toContain('small cloud edit')
+      expect(texts[1]).toBe('New local paragraph with important info')
+    })
+    
+    it('should handle significant divergence between versions', async () => {
+      // Create initial document
+      const initialDoc = await createTestDocument('Divergent Versions Test', 'Base shared content')
+      
+      // Local version has completely different content
+      const localChanges = createDocContent([
+        'Completely rewritten local introduction',
+        'New local body paragraph',
+        'Local conclusion'
+      ])
+      
+      // Cloud version also has completely different content
+      const cloudChanges = createDocContent([
+        'Cloud version introduction',
+        'Cloud body paragraph 1',
+        'Cloud body paragraph 2',
+        'Cloud conclusion'
+      ])
+      
+      // Apply changes
+      const result = await SyncService.syncDocumentChanges(initialDoc._id, [localChanges, cloudChanges])
+      
+      // Verify result
+      const texts = extractTexts(result.content as DocContent)
+      console.log('Divergent versions result:', texts)
+      
+      // In a significant divergence, we expect the system to preserve both versions
+      // with some attempt at merging the first paragraph
+      expect(texts.length).toBeGreaterThan(3)
+      expect(texts.some(t => t.includes('local'))).toBeTruthy()
+      expect(texts.some(t => t.includes('Cloud'))).toBeTruthy()
+    })
+    
+    it('should handle one version deleting content the other modified', async () => {
+      // Create initial document with multiple paragraphs
+      const initialContent = createDocContent([
+        'Introduction paragraph',
+        'Second paragraph to be deleted by one user',
+        'Third paragraph to stay unchanged'
+      ])
+      
+      const testDoc: Partial<DocumentData> = {
+        title: 'Deletion vs Modification Test',
+        content: initialContent,
+        comments: [],
+        lastUpdated: Date.now(),
+        userId: 'test-user',
+        folderIndex: 0
+      }
+      
+      const initialDoc = await SyncService.saveDocument(testDoc)
+      
+      // User A deletes the second paragraph
+      const userAChanges = createDocContent([
+        'Introduction paragraph', 
+        'Third paragraph to stay unchanged'
+      ])
+      
+      // User B modifies the second paragraph
+      const userBChanges = createDocContent([
+        'Introduction paragraph',
+        'Second paragraph MODIFIED by user B',
+        'Third paragraph to stay unchanged'
+      ])
+      
+      // Apply changes
+      const result = await SyncService.syncDocumentChanges(initialDoc._id, [userAChanges, userBChanges])
+      
+      // Verify result
+      const texts = extractTexts(result.content as DocContent)
+      console.log('Deletion vs modification result:', texts)
+      
+      // In conflict between deletion and modification, our algorithm should
+      // prefer keeping the modified content
+      expect(texts.length).toBe(3)
+      expect(texts[1]).toContain('MODIFIED')
+    })
+    
+    it('should handle concurrent complex edits to the same paragraph', async () => {
+      // Create initial document
+      const initialDoc = await createTestDocument('Complex Edits Test', 
+        'The quick brown fox jumps over the lazy dog')
+      
+      // User A modifies the beginning and end
+      const userAChanges = createDocContent([
+        'The fast brown fox leaps over the lazy dog and runs away'
+      ])
+      
+      // User B modifies the middle
+      const userBChanges = createDocContent([
+        'The quick brown fox quickly jumps over the sleepy dog'
+      ])
+      
+      // Apply changes
+      const result = await SyncService.syncDocumentChanges(initialDoc._id, [userAChanges, userBChanges])
+      
+      // Verify result
+      const texts = extractTexts(result.content as DocContent)
+      console.log('Complex edits result:', texts)
+      
+      // We expect a sophisticated merge that captures all changes
+      expect(texts.length).toBe(1)
+      expect(texts[0]).toContain('fast')  // from A
+      expect(texts[0]).toContain('leaps') // from A
+      expect(texts[0]).toContain('runs away') // from A
+      expect(texts[0]).toContain('quickly') // from B
+      expect(texts[0]).toContain('sleepy') // from B
+    })
+  })
 })
