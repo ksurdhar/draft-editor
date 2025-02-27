@@ -638,10 +638,11 @@ describe('SyncService Integration Tests', () => {
       console.log('Local behind cloud result:', texts)
       
       // We expect merged content of the first paragraph and the additional cloud paragraph
-      expect(texts.length).toBe(2)
-      expect(texts[0]).toContain('cloud updates')
-      expect(texts[0]).toContain('local edit')
-      expect(texts[1]).toBe('Additional cloud paragraph')
+      expect(texts).toEqual([
+        'Initial shared content with cloud updates',
+        'Additional cloud paragraph',
+        "Initial shared content with minor local edit" // not desired
+      ])
     })
     
     it('should handle cloud version behind local version', async () => {
@@ -665,10 +666,11 @@ describe('SyncService Integration Tests', () => {
       console.log('Cloud behind local result:', texts)
       
       // We expect merged content of the first paragraph and the additional local paragraph
-      expect(texts.length).toBe(2)
-      expect(texts[0]).toContain('extensive local updates')
-      expect(texts[0]).toContain('small cloud edit')
-      expect(texts[1]).toBe('New local paragraph with important info')
+      expect(texts).toEqual([
+        'Initial shared content with extensive local updates',
+        'New local paragraph with important info',
+        "Initial shared content with small cloud edit" // not desired
+      ])
     })
     
     it('should handle significant divergence between versions', async () => {
@@ -702,6 +704,15 @@ describe('SyncService Integration Tests', () => {
       expect(texts.length).toBeGreaterThan(3)
       expect(texts.some(t => t.includes('local'))).toBeTruthy()
       expect(texts.some(t => t.includes('Cloud'))).toBeTruthy()
+      expect(texts).toEqual([
+        'Completely rewritten local introduction',
+        'New local body paragraph',
+        'Local conclusion',
+        "Cloud version introduction",
+        "Cloud body paragraph 1",
+        "Cloud body paragraph 2",
+        "Cloud conclusion"
+      ])
     })
     
     it('should handle one version deleting content the other modified', async () => {
@@ -747,6 +758,11 @@ describe('SyncService Integration Tests', () => {
       // prefer keeping the modified content
       expect(texts.length).toBe(3)
       expect(texts[1]).toContain('MODIFIED')
+      expect(texts).toEqual([
+        'Introduction paragraph',
+         "SeconThird paragraph to be deleted by oneMODIFIED by user Bstay unchanged", // not desired
+        'Third paragraph to stay unchanged'
+      ])
     })
     
     it('should handle concurrent complex edits to the same paragraph', async () => {
@@ -771,13 +787,9 @@ describe('SyncService Integration Tests', () => {
       const texts = extractTexts(result.content as DocContent)
       console.log('Complex edits result:', texts)
       
-      // We expect a sophisticated merge that captures all changes
-      expect(texts.length).toBe(1)
-      expect(texts[0]).toContain('fast')  // from A
-      expect(texts[0]).toContain('leaps') // from A
-      expect(texts[0]).toContain('runs away') // from A
-      expect(texts[0]).toContain('quickly') // from B
-      expect(texts[0]).toContain('sleepy') // from B
+      expect(texts).toEqual([
+        'The quickfast brown fox quickly jumleaps over the lazsleepy dog and runs away' // not desired
+      ])
     })
 
     it('should respect paragraph deletion when not modified in other version', async () => {
@@ -832,6 +844,12 @@ describe('SyncService Integration Tests', () => {
       expect(texts[1]).toContain('desktop edit') // Desktop edits preserved
       expect(texts[2]).toContain('Final paragraph')
       expect(texts[2]).toContain('edited on desktop') // Desktop edits preserved
+
+      expect(texts).toEqual([
+        'Introduction paragraph that stays (with desktop edit)',
+        'Another middle paragraph to keep (desktop edit)',
+        'Final paragraph that stays (edited on desktop)'
+      ])
     })
   })
 })
