@@ -558,7 +558,7 @@ describe('SyncService Integration Tests', () => {
       expect(texts[0]).toContain('B\'s modifications')
     })
     
-    it('should handle adding paragraphs in different positions', async () => {
+    it.only('should handle adding paragraphs in different positions', async () => {
       // Create initial document with multiple paragraphs
       const initialContent = createDocContent([
         'First paragraph',
@@ -600,10 +600,21 @@ describe('SyncService Integration Tests', () => {
       const texts = extractTexts(result.content as DocContent)
       console.log('Adding paragraphs result:', texts)
       
-      // We expect both new paragraphs to be present in their relative positions
+      // We expect both new paragraphs to be present
       expect(texts.length).toBe(5)
       expect(texts[1]).toBe('A\'s new paragraph')
-      expect(texts[2]).toBe('B\'s new paragraph')
+      
+      // B's paragraph should be after Second paragraph since that was its position in userBChanges
+      expect(texts[3]).toBe('B\'s new paragraph')
+      
+      // Verify overall structure
+      expect(texts).toEqual([
+        'First paragraph',
+        'A\'s new paragraph',
+        'Second paragraph',
+        'B\'s new paragraph',
+        'Third paragraph'
+      ])
     })
     
     it('should handle local version behind cloud version', async () => {

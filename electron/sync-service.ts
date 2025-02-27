@@ -443,6 +443,7 @@ class SyncService {
   ): string[] {
     const result = [...mergedParagraphs]
     
+    // Process each version in the order they were provided
     for (let versionIdx = 0; versionIdx < changes.length; versionIdx++) {
       const paragraphs = allVersionsParagraphs[versionIdx]
       const versionParagraphs = changes[versionIdx].content.map((p: any) => p.content?.[0]?.text || '')
@@ -450,7 +451,10 @@ class SyncService {
       // Create position mapping for this version
       const positionMapping = this.createPositionMapping(mergedParagraphs, versionParagraphs)
       
-      // Process unprocessed paragraphs
+      // Keep track of unprocessed paragraphs with their original positions
+      const unprocessedWithPositions: {paraIdx: number, para: string}[] = []
+      
+      // First collect all unprocessed paragraphs with their original positions
       for (let paraIdx = 0; paraIdx < paragraphs.length; paraIdx++) {
         const key = `${versionIdx}-${paraIdx}`
         if (processed.has(key)) continue
@@ -458,6 +462,15 @@ class SyncService {
         const para = paragraphs[paraIdx]
         if (!para) continue
         
+        unprocessedWithPositions.push({paraIdx, para})
+      }
+      
+      // Sort unprocessed paragraphs by their original index
+      // This ensures we maintain relative paragraph order from each version
+      unprocessedWithPositions.sort((a, b) => a.paraIdx - b.paraIdx)
+      
+      // Now insert each paragraph in order
+      for (const {paraIdx, para} of unprocessedWithPositions) {
         // Determine insertion position
         const insertAt = this.determineInsertPosition(
           paraIdx,
@@ -468,7 +481,7 @@ class SyncService {
         
         // Insert the paragraph and mark as processed
         result.splice(insertAt, 0, para)
-        processed.add(key)
+        processed.add(`${versionIdx}-${paraIdx}`)
         
         // Update position mappings after this insertion
         this.updatePositionMappings(positionMapping, insertAt)
@@ -664,6 +677,9 @@ class SyncService {
       const result: string[] = []
       const processed = new Set<string>() // Track which paragraphs we've processed
       
+      // Create a mapping of original paragraphs to their position in the result array
+      const originalParaMapping = new Map<string, number>()
+      
       // First pass: Process original paragraphs
       for (let origIdx = 0; origIdx < originalParagraphs.length; origIdx++) {
         if (deletedParagraphs.has(origIdx)) {
@@ -700,6 +716,9 @@ class SyncService {
             versions.push(matchedPara)
             processed.add(paraKey)
             console.log(`  Added match from version ${versionIdx}, paragraph ${bestMatchIdx} (similarity: ${bestMatchScore.toFixed(2)})`)
+            
+            // Store the mapping for this version's paragraph to its original index
+            originalParaMapping.set(paraKey, result.length)
           }
         }
         
@@ -709,9 +728,17 @@ class SyncService {
         console.log(`  → Added merged paragraph: "${mergedPara.substring(0, 30)}..."`)
       }
       
-      // Second pass: Add any paragraphs from changes that weren't matched
+      // Second pass: Add new paragraphs from each version in context
       for (let versionIdx = 0; versionIdx < changedParagraphs.length; versionIdx++) {
         const versionParagraphs = changedParagraphs[versionIdx]
+        
+        // Find all unprocessed paragraphs in this version with their position context
+        const newParagraphs: Array<{
+          paraIdx: number,
+          text: string,
+          prevMatchedIdx: number | null,
+          nextMatchedIdx: number | null
+        }> = []
         
         for (let paraIdx = 0; paraIdx < versionParagraphs.length; paraIdx++) {
           const paraKey = `${versionIdx}-${paraIdx}`
@@ -723,27 +750,83 @@ class SyncService {
           }
           
           const para = versionParagraphs[paraIdx]
-          console.log(`Adding unmatched paragraph from version ${versionIdx}, index ${paraIdx}: "${para.substring(0, 30)}..."`)
           
-          // Determine insertion position based on surrounding paragraphs
-          let insertPos = result.length // Default to end
+          // Find the nearest processed paragraphs before and after this one
+          let prevMatchedIdx = null
+          let nextMatchedIdx = null
           
-          // Look for context (paragraphs before and after this one)
-          if (paraIdx > 0) {
-            const prevPara = versionParagraphs[paraIdx - 1]
-            
-            // Find where previous paragraph ended up in result
-            for (let i = 0; i < result.length; i++) {
-              if (this.calculateSimilarity(prevPara, result[i]) > 0.5) {
-                insertPos = i + 1 // Insert after this paragraph
-                break
-              }
+          // Look for previous processed paragraph
+          for (let i = paraIdx - 1; i >= 0; i--) {
+            const prevKey = `${versionIdx}-${i}`
+            if (processed.has(prevKey)) {
+              prevMatchedIdx = originalParaMapping.get(prevKey) ?? null
+              break
             }
           }
           
-          // Insert the paragraph
-          result.splice(insertPos, 0, para)
-          processed.add(paraKey)
+          // Look for next processed paragraph
+          for (let i = paraIdx + 1; i < versionParagraphs.length; i++) {
+            const nextKey = `${versionIdx}-${i}`
+            if (processed.has(nextKey)) {
+              nextMatchedIdx = originalParaMapping.get(nextKey) ?? null
+              break
+            }
+          }
+          
+          newParagraphs.push({
+            paraIdx,
+            text: para,
+            prevMatchedIdx,
+            nextMatchedIdx
+          })
+        }
+        
+        // Sort by the index of the preceding paragraph match
+        // This ensures that paragraphs are inserted in the right order relative to the original document
+        newParagraphs.sort((a, b) => {
+          // If both have same prev index, sort by their original order
+          if (a.prevMatchedIdx === b.prevMatchedIdx) {
+            return a.paraIdx - b.paraIdx;
+          }
+          
+          // If one has no prev, put it at the beginning if next match exists
+          if (a.prevMatchedIdx === null) return a.nextMatchedIdx !== null ? -1 : 1;
+          if (b.prevMatchedIdx === null) return b.nextMatchedIdx !== null ? 1 : -1;
+          
+          // Otherwise sort by prev match index
+          return a.prevMatchedIdx - b.prevMatchedIdx;
+        });
+        
+        // Now insert each paragraph
+        for (const { paraIdx, text, prevMatchedIdx, nextMatchedIdx } of newParagraphs) {
+          let insertPos;
+          
+          if (prevMatchedIdx !== null && nextMatchedIdx !== null) {
+            // If we have both prev and next, insert between them
+            insertPos = prevMatchedIdx + 1;
+          } else if (prevMatchedIdx !== null) {
+            // If we only have prev, insert after it
+            insertPos = prevMatchedIdx + 1;
+          } else if (nextMatchedIdx !== null) {
+            // If we only have next, insert before it
+            insertPos = nextMatchedIdx;
+          } else {
+            // If we have neither, append to the end
+            insertPos = result.length;
+          }
+          
+          console.log(`Adding unmatched paragraph from version ${versionIdx}: "${text.substring(0, 30)}..." at position ${insertPos}`);
+          
+          // Insert and update positions of all subsequent paragraphs
+          result.splice(insertPos, 0, text);
+          processed.add(`${versionIdx}-${paraIdx}`);
+          
+          // Update mapping for paragraphs after this insertion
+          for (const [key, pos] of originalParaMapping.entries()) {
+            if (pos >= insertPos) {
+              originalParaMapping.set(key, pos + 1);
+            }
+          }
         }
       }
       
