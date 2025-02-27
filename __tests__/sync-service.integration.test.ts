@@ -768,5 +768,59 @@ describe('SyncService Integration Tests', () => {
       expect(texts[0]).toContain('quickly') // from B
       expect(texts[0]).toContain('sleepy') // from B
     })
+
+    it.only('should respect paragraph deletion when not modified in other version', async () => {
+      // Create initial document with multiple paragraphs
+      const initialContent = createDocContent([
+        'Introduction paragraph that stays',
+        'Middle paragraph to be deleted',
+        'Another middle paragraph to keep',
+        'Final paragraph that stays'
+      ])
+      
+      const testDoc: Partial<DocumentData> = {
+        title: 'Deletion Test',
+        content: initialContent,
+        comments: [],
+        lastUpdated: Date.now(),
+        userId: 'test-user',
+        folderIndex: 0
+      }
+      
+      const initialDoc = await SyncService.saveDocument(testDoc)
+      
+      // Web app version - user deletes the second paragraph
+      const webAppChanges = createDocContent([
+        'Introduction paragraph that stays',
+        'Another middle paragraph to keep',
+        'Final paragraph that stays'
+      ])
+      
+      // Desktop app version - user doesn't modify the deleted paragraph
+      // but makes changes to other paragraphs
+      const desktopAppChanges = createDocContent([
+        'Introduction paragraph that stays (with desktop edit)',
+        'Middle paragraph to be deleted',
+        'Another middle paragraph to keep (desktop edit)',
+        'Final paragraph that stays (edited on desktop)'
+      ])
+      
+      // Apply changes
+      const result = await SyncService.syncDocumentChanges(initialDoc._id, [webAppChanges, desktopAppChanges])
+      
+      // Verify result
+      const texts = extractTexts(result.content as DocContent)
+      console.log('Deletion respect result:', texts)
+      
+      // We expect the deleted paragraph to be gone while other edits are preserved
+      expect(texts.length).toBe(3) // Should be 3 paragraphs, not 4
+      expect(texts[0]).toContain('Introduction')
+      expect(texts[0]).toContain('desktop edit') // Desktop edits preserved
+      expect(texts.some(t => t === 'Middle paragraph to be deleted')).toBe(false) // Deleted paragraph should be gone
+      expect(texts[1]).toContain('Another middle paragraph')
+      expect(texts[1]).toContain('desktop edit') // Desktop edits preserved
+      expect(texts[2]).toContain('Final paragraph')
+      expect(texts[2]).toContain('edited on desktop') // Desktop edits preserved
+    })
   })
 })
