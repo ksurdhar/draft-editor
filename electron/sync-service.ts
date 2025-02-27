@@ -114,7 +114,7 @@ class SyncService {
 
       // Convert to serialized content structure for storage
       const serializedContent: SerializedContent = {
-        type: 'yjs',
+        type: 'yjs' as const,
         content: Array.from(Y.encodeStateAsUpdate(ydoc))
       }
 
@@ -299,568 +299,606 @@ class SyncService {
   }
   
   /**
-   * Find matching paragraphs between original document and a changed version
-   * Returns a map of original paragraph index -> indices in the changed version
+   * Retrieves the document and extracts its content
    */
-  private findMatchingParagraphs(
-    originalParagraphs: string[], 
-    changedParagraphs: string[], 
-    versionIdx: number,
-    similarityThreshold = 0.3
-  ): [number, number][] {
-    const matches: [number, number][] = []
+  private async retrieveDocumentAndContent(docId: string): Promise<{
+    doc: DocumentData,
+    initialContent: DocContent,
+    originalParagraphs: string[]
+  }> {
+    const doc = await this.getLocalDocument(docId)
+    if (!doc) {
+      throw new Error(`Document not found: ${docId}`)
+    }
+
+    // Extract initial content
+    const initialContent = typeof doc.content === 'string' ? 
+      { type: 'doc' as const, content: [{ type: 'paragraph', content: [{ type: 'text', text: doc.content }] }] } :
+      (doc.content as DocContent)
+    
+    // Extract paragraphs from original content
+    const originalParagraphs = this.extractParagraphTexts(initialContent)
+    console.log('Original paragraphs:', originalParagraphs)
+    
+    return { doc, initialContent, originalParagraphs }
+  }
+
+  /**
+   * Detects paragraphs that were intentionally deleted
+   */
+  private detectDeletedParagraphs(
+    originalParagraphs: string[],
+    changedParagraphs: string[][]
+  ): { 
+    deletedParagraphs: Set<number>,
+    deletedVersionParas: Map<string, boolean>
+  } {
+    const deletedParagraphs = new Set<number>()
+    const deletedVersionParas = new Map<string, boolean>()
+    
+    // First version paragraphs (e.g., mobile version that deleted a paragraph)
+    const version0 = changedParagraphs[0]
+    
+    // For each original paragraph
+    for (let origIdx = 0; origIdx < originalParagraphs.length; origIdx++) {
+      this.checkIfParagraphWasDeleted(
+        origIdx,
+        originalParagraphs[origIdx],
+        version0,
+        changedParagraphs,
+        deletedParagraphs,
+        deletedVersionParas
+      )
+    }
+    
+    console.log('\nDeleted paragraphs:', Array.from(deletedParagraphs))
+    console.log('Paragraphs in versions that match deleted originals:', Array.from(deletedVersionParas.entries()))
+    
+    return { deletedParagraphs, deletedVersionParas }
+  }
+
+  /**
+   * Checks if a specific paragraph was deleted
+   */
+  private checkIfParagraphWasDeleted(
+    origIdx: number,
+    origPara: string,
+    version0: string[],
+    changedParagraphs: string[][],
+    deletedParagraphs: Set<number>,
+    deletedVersionParas: Map<string, boolean>
+  ): void {
+    console.log(`\nChecking if paragraph ${origIdx} was deleted: "${origPara.substring(0, 30)}..."`)
+    
+    // Check if this paragraph exists in version 0
+    const { foundInVersion, bestMatchScore } = this.findParagraphInVersion(origPara, version0, 0.7)
+    
+    // If paragraph doesn't exist in version 0, check if it was modified in other versions
+    if (!foundInVersion) {
+      console.log(`  Not found in version 0. Best match score: ${bestMatchScore.toFixed(2)}`)
+      this.checkIfDeletedButModifiedElsewhere(
+        origIdx,
+        origPara,
+        changedParagraphs,
+        deletedParagraphs,
+        deletedVersionParas
+      )
+    }
+  }
+
+  /**
+   * Finds a paragraph in a specific version
+   */
+  private findParagraphInVersion(
+    origPara: string,
+    versionParagraphs: string[],
+    similarityThreshold: number
+  ): { foundInVersion: boolean, bestMatchScore: number, bestMatchIdx: number } {
+    let foundInVersion = false
+    let bestMatchScore = 0
+    let bestMatchIdx = -1
+    
+    for (let paraIdx = 0; paraIdx < versionParagraphs.length; paraIdx++) {
+      const versionPara = versionParagraphs[paraIdx]
+      const similarity = this.calculateSimilarity(origPara, versionPara)
+      
+      if (similarity > bestMatchScore) {
+        bestMatchScore = similarity
+        bestMatchIdx = paraIdx
+      }
+      
+      if (similarity > similarityThreshold) {
+        foundInVersion = true
+        console.log(`  Found in version with similarity ${similarity.toFixed(2)}`)
+        break
+      }
+    }
+    
+    return { foundInVersion, bestMatchScore, bestMatchIdx }
+  }
+
+  /**
+   * Checks if a paragraph was deleted in one version but modified in others
+   */
+  private checkIfDeletedButModifiedElsewhere(
+    origIdx: number,
+    origPara: string,
+    changedParagraphs: string[][],
+    deletedParagraphs: Set<number>,
+    deletedVersionParas: Map<string, boolean>
+  ): void {
+    let significantlyModified = false
+    
+    // Check other versions (e.g., desktop version)
+    for (let versionIdx = 1; versionIdx < changedParagraphs.length; versionIdx++) {
+      const versionParagraphs = changedParagraphs[versionIdx]
+      
+      let bestMatchParaIdx = -1
+      let bestMatchScore = 0
+      
+      for (let paraIdx = 0; paraIdx < versionParagraphs.length; paraIdx++) {
+        const versionPara = versionParagraphs[paraIdx]
+        const similarity = this.calculateSimilarity(origPara, versionPara)
+        console.log(`  Checking version ${versionIdx}, para ${paraIdx}: similarity ${similarity.toFixed(2)} with "${versionPara.substring(0, 30)}..."`)
+        
+        if (similarity > bestMatchScore) {
+          bestMatchScore = similarity
+          bestMatchParaIdx = paraIdx
+        }
+        
+        // If paragraph exists in this version with high similarity, it wasn't modified
+        if (similarity > 0.9) {
+          console.log(`  Found almost identical in version ${versionIdx}, paragraph ${paraIdx}`)
+          // Mark this paragraph in this version as corresponding to a deleted paragraph
+          deletedVersionParas.set(`${versionIdx}-${paraIdx}`, true)
+          console.log(`  Marked version ${versionIdx}, paragraph ${paraIdx} as matching a deleted paragraph`)
+          // It exists unchanged in another version, but was deleted in version 0
+          // This is a true deletion
+          console.log(`  ✓ MARKING FOR DELETION - identical in other version but missing in version 0`)
+          deletedParagraphs.add(origIdx)
+          break
+        }
+        // If paragraph exists but was significantly modified
+        else if (similarity > 0.5) {
+          console.log(`  Found modified in version ${versionIdx}, paragraph ${paraIdx}`)
+          significantlyModified = true
+          break
+        }
+      }
+      
+      if (bestMatchParaIdx !== -1 && !significantlyModified && bestMatchScore > 0.9) {
+        deletedVersionParas.set(`${versionIdx}-${bestMatchParaIdx}`, true)
+        console.log(`  Marked best match: version ${versionIdx}, paragraph ${bestMatchParaIdx} as matching a deleted paragraph`)
+      }
+      
+      if (significantlyModified) {
+        break
+      }
+    }
+    
+    // If not significantly modified in any version, mark as deleted
+    if (!significantlyModified && !deletedParagraphs.has(origIdx)) {
+      console.log(`  ✓ MARKING FOR DELETION - not found in version 0 and not modified elsewhere`)
+      deletedParagraphs.add(origIdx)
+    }
+  }
+
+  /**
+   * Processes original paragraphs and merges with versions
+   */
+  private processOriginalParagraphs(
+    originalParagraphs: string[],
+    changedParagraphs: string[][],
+    deletedParagraphs: Set<number>
+  ): {
+    result: string[],
+    processed: Set<string>,
+    originalParaMapping: Map<string, number>
+  } {
+    const result: string[] = []
+    const processed = new Set<string>()
+    const originalParaMapping = new Map<string, number>()
     
     for (let origIdx = 0; origIdx < originalParagraphs.length; origIdx++) {
-      const origPara = originalParagraphs[origIdx]
+      if (deletedParagraphs.has(origIdx)) {
+        console.log(`Skipping deleted paragraph ${origIdx}: "${originalParagraphs[origIdx].substring(0, 30)}..."`)
+        continue
+      }
+      
+      const { mergedPara, processedKeys, mappings } = this.mergeParagraphVersions(
+        origIdx,
+        originalParagraphs[origIdx],
+        changedParagraphs,
+        result.length
+      )
+      
+      result.push(mergedPara)
+      
+      // Add all processed keys
+      for (const key of processedKeys) {
+        processed.add(key)
+      }
+      
+      // Add all mappings
+      for (const [key, pos] of mappings) {
+        originalParaMapping.set(key, pos)
+      }
+    }
+    
+    return { result, processed, originalParaMapping }
+  }
+
+  /**
+   * Merges all versions of a single paragraph
+   */
+  private mergeParagraphVersions(
+    origIdx: number,
+    origPara: string,
+    changedParagraphs: string[][],
+    resultIndex: number
+  ): {
+    mergedPara: string,
+    processedKeys: Set<string>,
+    mappings: Map<string, number>
+  } {
+    console.log(`Processing original paragraph ${origIdx}: "${origPara.substring(0, 30)}..."`)
+    
+    // Find all versions of this paragraph
+    const versions = [origPara]
+    const processedKeys = new Set<string>()
+    const mappings = new Map<string, number>()
+    
+    for (let versionIdx = 0; versionIdx < changedParagraphs.length; versionIdx++) {
+      const versionParagraphs = changedParagraphs[versionIdx]
       
       // Find best match in this version
       let bestMatchIdx = -1
-      let bestMatchScore = 0
+      let bestMatchScore = 0.1 // Minimum similarity threshold
       
-      for (let paraIdx = 0; paraIdx < changedParagraphs.length; paraIdx++) {
-        const para = changedParagraphs[paraIdx]
-        if (!para) continue
+      for (let paraIdx = 0; paraIdx < versionParagraphs.length; paraIdx++) {
+        const versionPara = versionParagraphs[paraIdx]
+        const similarity = this.calculateSimilarity(origPara, versionPara)
         
-        const similarity = this.calculateSimilarity(origPara, para)
-        if (similarity > bestMatchScore && similarity > similarityThreshold) {
+        if (similarity > bestMatchScore) {
           bestMatchScore = similarity
           bestMatchIdx = paraIdx
         }
       }
       
       if (bestMatchIdx !== -1) {
-        matches.push([origIdx, bestMatchIdx])
+        const paraKey = `${versionIdx}-${bestMatchIdx}`
+        const matchedPara = versionParagraphs[bestMatchIdx]
+        versions.push(matchedPara)
+        processedKeys.add(paraKey)
+        console.log(`  Added match from version ${versionIdx}, paragraph ${bestMatchIdx} (similarity: ${bestMatchScore.toFixed(2)})`)
+        
+        // Store the mapping for this version's paragraph to its result index
+        mappings.set(paraKey, resultIndex)
       }
     }
     
-    return matches
+    // Merge all versions of this paragraph
+    const mergedPara = this.mergeTextEdits(origPara, versions)
+    console.log(`  → Added merged paragraph: "${mergedPara.substring(0, 30)}..."`)
+    
+    return { mergedPara, processedKeys, mappings }
   }
-  
+
   /**
-   * Merge original paragraphs with their matched versions
-   * Returns merged paragraphs and a set of processed paragraph keys
+   * Processes new paragraphs from all versions
    */
-  private mergeMatchedParagraphs(
-    originalParagraphs: string[],
-    allVersionsParagraphs: string[][],
-    paragraphMatches: Map<number, [number, number][]>,
-    deletedParagraphs: Set<number>
-  ): { mergedParagraphs: string[], processed: Set<string> } {
-    const mergedParagraphs: string[] = []
-    const processed = new Set<string>()
+  private processNewParagraphs(
+    result: string[],
+    processed: Set<string>,
+    changedParagraphs: string[][],
+    originalParaMapping: Map<string, number>,
+    deletedVersionParas: Map<string, boolean>
+  ): string[] {
+    const resultWithNew = [...result]
     
-    console.log('\nIn mergeMatchedParagraphs:')
-    console.log('Deleted paragraphs:', Array.from(deletedParagraphs))
-    
-    for (let origIdx = 0; origIdx < originalParagraphs.length; origIdx++) {
-      // Skip paragraphs that were intentionally deleted
-      if (deletedParagraphs.has(origIdx)) {
-        console.log(`  Skipping deleted paragraph ${origIdx}: "${originalParagraphs[origIdx].substring(0, 30)}..."`)
-        continue;
-      }
-      
-      console.log(`  Processing paragraph ${origIdx}: "${originalParagraphs[origIdx].substring(0, 30)}..."`)
-      const origPara = originalParagraphs[origIdx]
-      const matches = paragraphMatches.get(origIdx) || []
-      
-      // Collect all versions of this paragraph
-      const versions = [origPara]
-      for (const [versionIdx, paraIdx] of matches) {
-        versions.push(allVersionsParagraphs[versionIdx][paraIdx])
-        processed.add(`${versionIdx}-${paraIdx}`)
-        console.log(`    Added version ${versionIdx}, paragraph ${paraIdx}`)
-      }
-      
-      // Merge all versions
-      const mergedPara = this.mergeTextEdits(origPara, versions)
-      mergedParagraphs.push(mergedPara)
-      console.log(`    Final merged paragraph: "${mergedPara.substring(0, 30)}..."`)
+    for (let versionIdx = 0; versionIdx < changedParagraphs.length; versionIdx++) {
+      this.insertNewParagraphsFromVersion(
+        versionIdx,
+        changedParagraphs[versionIdx],
+        resultWithNew,
+        processed,
+        originalParaMapping,
+        deletedVersionParas
+      )
     }
     
-    return { mergedParagraphs, processed }
+    return resultWithNew
   }
-  
+
   /**
-   * Determine the best position to insert a new paragraph
+   * Inserts new paragraphs from a specific version
    */
-  private determineInsertPosition(
+  private insertNewParagraphsFromVersion(
+    versionIdx: number,
+    versionParagraphs: string[],
+    result: string[],
+    processed: Set<string>,
+    originalParaMapping: Map<string, number>,
+    deletedVersionParas: Map<string, boolean>
+  ): void {
+    const newParagraphs = this.findNewParagraphsInVersion(
+      versionIdx,
+      versionParagraphs,
+      processed,
+      originalParaMapping,
+      deletedVersionParas
+    )
+    
+    // Sort by context position
+    this.sortNewParagraphsByContext(newParagraphs)
+    
+    // Insert each paragraph
+    for (const { paraIdx, text, prevMatchedIdx, nextMatchedIdx } of newParagraphs) {
+      const insertPos = this.determineInsertPosition(
+        prevMatchedIdx,
+        nextMatchedIdx,
+        result.length
+      )
+      
+      console.log(`Adding unmatched paragraph from version ${versionIdx}: "${text.substring(0, 30)}..." at position ${insertPos}`)
+      
+      // Insert and update positions
+      result.splice(insertPos, 0, text)
+      processed.add(`${versionIdx}-${paraIdx}`)
+      
+      // Update mapping for paragraphs after this insertion
+      this.updatePositionMappings(originalParaMapping, insertPos)
+    }
+  }
+
+  /**
+   * Finds new paragraphs in a specific version
+   */
+  private findNewParagraphsInVersion(
+    versionIdx: number,
+    versionParagraphs: string[],
+    processed: Set<string>,
+    originalParaMapping: Map<string, number>,
+    deletedVersionParas: Map<string, boolean>
+  ): Array<{
     paraIdx: number,
-    positionMapping: {originalIdx: number, mergedIdx: number}[],
-    totalParagraphs: number,
-    mergedParagraphsLength: number
-  ): number {
-    // Default to end
-    let insertAt = mergedParagraphsLength
+    text: string,
+    prevMatchedIdx: number | null,
+    nextMatchedIdx: number | null
+  }> {
+    const newParagraphs = []
     
-    // Find the nearest mappings before and after this paragraph
-    let prevMapping = null
-    let nextMapping = null
+    for (let paraIdx = 0; paraIdx < versionParagraphs.length; paraIdx++) {
+      const paraKey = `${versionIdx}-${paraIdx}`
+      
+      // Skip if already processed or if it corresponds to a deleted paragraph
+      if (processed.has(paraKey) || deletedVersionParas.get(paraKey)) {
+        console.log(`Skipping paragraph ${paraKey} - already processed or matches a deleted paragraph`)
+        continue
+      }
+      
+      const para = versionParagraphs[paraIdx]
+      
+      // Find context paragraphs
+      const { prevMatchedIdx, nextMatchedIdx } = this.findContextParagraphs(
+        versionIdx,
+        paraIdx,
+        processed,
+        originalParaMapping
+      )
+      
+      newParagraphs.push({
+        paraIdx,
+        text: para,
+        prevMatchedIdx,
+        nextMatchedIdx
+      })
+    }
     
-    for (const mapping of positionMapping) {
-      if (mapping.originalIdx < paraIdx) {
-        prevMapping = mapping
-      } else if (mapping.originalIdx > paraIdx && !nextMapping) {
-        nextMapping = mapping
+    return newParagraphs
+  }
+
+  /**
+   * Finds the context paragraphs (before and after) for a new paragraph
+   */
+  private findContextParagraphs(
+    versionIdx: number,
+    paraIdx: number,
+    processed: Set<string>,
+    originalParaMapping: Map<string, number>
+  ): {
+    prevMatchedIdx: number | null,
+    nextMatchedIdx: number | null
+  } {
+    let prevMatchedIdx = null
+    let nextMatchedIdx = null
+    
+    // Look for previous processed paragraph
+    for (let i = paraIdx - 1; i >= 0; i--) {
+      const prevKey = `${versionIdx}-${i}`
+      if (processed.has(prevKey)) {
+        prevMatchedIdx = originalParaMapping.get(prevKey) ?? null
         break
       }
     }
     
-    if (prevMapping && nextMapping) {
-      // We have mappings both before and after
-      // Insert proportionally between them based on relative position
-      const originalGap = nextMapping.originalIdx - prevMapping.originalIdx
-      const mergedGap = nextMapping.mergedIdx - prevMapping.mergedIdx
+    // Look for next processed paragraph
+    for (let i = paraIdx + 1; i < Infinity; i++) {
+      const nextKey = `${versionIdx}-${i}`
+      if (processed.has(nextKey)) {
+        nextMatchedIdx = originalParaMapping.get(nextKey) ?? null
+        break
+      }
       
-      const relativePos = (paraIdx - prevMapping.originalIdx) / originalGap
-      insertAt = Math.round(prevMapping.mergedIdx + relativePos * mergedGap)
+      // Safety check - if we've looked too far ahead, stop
+      if (i > paraIdx + 100) break
+    }
+    
+    return { prevMatchedIdx, nextMatchedIdx }
+  }
+
+  /**
+   * Sorts new paragraphs by their context to maintain relative ordering
+   */
+  private sortNewParagraphsByContext(newParagraphs: Array<{
+    paraIdx: number,
+    text: string,
+    prevMatchedIdx: number | null,
+    nextMatchedIdx: number | null
+  }>): void {
+    newParagraphs.sort((a, b) => {
+      // If both have same prev index, sort by their original order
+      if (a.prevMatchedIdx === b.prevMatchedIdx) {
+        return a.paraIdx - b.paraIdx
+      }
       
-      // Ensure we don't insert beyond the next mapping (in case of rounding errors)
-      insertAt = Math.min(insertAt, nextMapping.mergedIdx)
-    } else if (prevMapping) {
-      // Only have mapping before - insert after it
-      insertAt = prevMapping.mergedIdx + 1
-    } else if (nextMapping) {
-      // Only have mapping after - insert before it
-      insertAt = nextMapping.mergedIdx
+      // If one has no prev, put it at the beginning if next match exists
+      if (a.prevMatchedIdx === null) return a.nextMatchedIdx !== null ? -1 : 1
+      if (b.prevMatchedIdx === null) return b.nextMatchedIdx !== null ? 1 : -1
+      
+      // Otherwise sort by prev match index
+      return a.prevMatchedIdx - b.prevMatchedIdx
+    })
+  }
+
+  /**
+   * Determines the best position to insert a new paragraph
+   */
+  private determineInsertPosition(
+    prevMatchedIdx: number | null,
+    nextMatchedIdx: number | null,
+    resultLength: number
+  ): number {
+    let insertPos
+    
+    if (prevMatchedIdx !== null && nextMatchedIdx !== null) {
+      // If we have both prev and next, insert between them
+      insertPos = prevMatchedIdx + 1
+    } else if (prevMatchedIdx !== null) {
+      // If we only have prev, insert after it
+      insertPos = prevMatchedIdx + 1
+    } else if (nextMatchedIdx !== null) {
+      // If we only have next, insert before it
+      insertPos = nextMatchedIdx
     } else {
-      // No mappings - use relative position in the document
-      const relativePos = paraIdx / totalParagraphs
-      insertAt = Math.floor(relativePos * mergedParagraphsLength)
+      // If we have neither, append to the end
+      insertPos = resultLength
     }
     
-    // Ensure insertion point is within bounds
-    return Math.max(0, Math.min(insertAt, mergedParagraphsLength))
+    return insertPos
   }
-  
+
   /**
-   * Find positions for new paragraphs and insert them
-   */
-  private insertNewParagraphs(
-    mergedParagraphs: string[],
-    processed: Set<string>,
-    allVersionsParagraphs: string[][],
-    changes: DocContent[]
-  ): string[] {
-    const result = [...mergedParagraphs]
-    
-    // Process each version in the order they were provided
-    for (let versionIdx = 0; versionIdx < changes.length; versionIdx++) {
-      const paragraphs = allVersionsParagraphs[versionIdx]
-      const versionParagraphs = changes[versionIdx].content.map((p: any) => p.content?.[0]?.text || '')
-      
-      // Create position mapping for this version
-      const positionMapping = this.createPositionMapping(mergedParagraphs, versionParagraphs)
-      
-      // Keep track of unprocessed paragraphs with their original positions
-      const unprocessedWithPositions: {paraIdx: number, para: string}[] = []
-      
-      // First collect all unprocessed paragraphs with their original positions
-      for (let paraIdx = 0; paraIdx < paragraphs.length; paraIdx++) {
-        const key = `${versionIdx}-${paraIdx}`
-        if (processed.has(key)) continue
-        
-        const para = paragraphs[paraIdx]
-        if (!para) continue
-        
-        unprocessedWithPositions.push({paraIdx, para})
-      }
-      
-      // Sort unprocessed paragraphs by their original index
-      // This ensures we maintain relative paragraph order from each version
-      unprocessedWithPositions.sort((a, b) => a.paraIdx - b.paraIdx)
-      
-      // Now insert each paragraph in order
-      for (const {paraIdx, para} of unprocessedWithPositions) {
-        // Determine insertion position
-        const insertAt = this.determineInsertPosition(
-          paraIdx,
-          positionMapping,
-          versionParagraphs.length,
-          result.length
-        )
-        
-        // Insert the paragraph and mark as processed
-        result.splice(insertAt, 0, para)
-        processed.add(`${versionIdx}-${paraIdx}`)
-        
-        // Update position mappings after this insertion
-        this.updatePositionMappings(positionMapping, insertAt)
-      }
-    }
-    
-    return result
-  }
-  
-  /**
-   * Create a mapping of paragraph positions between a version and the merged result
-   */
-  private createPositionMapping(
-    mergedParagraphs: string[],
-    versionParagraphs: string[]
-  ): {originalIdx: number, mergedIdx: number}[] {
-    const mapping: {originalIdx: number, mergedIdx: number}[] = []
-    
-    // For each paragraph in the version, find corresponding paragraph in merged result
-    for (let versionParaIdx = 0; versionParaIdx < versionParagraphs.length; versionParaIdx++) {
-      const versionPara = versionParagraphs[versionParaIdx]
-      
-      // Find best match in merged paragraphs
-      let bestMatchIdx = -1
-      let bestMatchScore = 0
-      
-      for (let mergedIdx = 0; mergedIdx < mergedParagraphs.length; mergedIdx++) {
-        const mergedPara = mergedParagraphs[mergedIdx]
-        const similarity = this.calculateSimilarity(versionPara, mergedPara)
-        
-        if (similarity > bestMatchScore && similarity > 0.5) {
-          bestMatchScore = similarity
-          bestMatchIdx = mergedIdx
-        }
-      }
-      
-      if (bestMatchIdx !== -1) {
-        mapping.push({
-          originalIdx: versionParaIdx,
-          mergedIdx: bestMatchIdx
-        })
-      }
-    }
-    
-    // Sort by original index
-    return mapping.sort((a, b) => a.originalIdx - b.originalIdx)
-  }
-  
-  /**
-   * Update position mappings after inserting a paragraph
+   * Updates position mappings after inserting a paragraph
    */
   private updatePositionMappings(
-    positionMapping: {originalIdx: number, mergedIdx: number}[],
-    insertAt: number
+    originalParaMapping: Map<string, number>,
+    insertPos: number
   ): void {
-    for (let i = 0; i < positionMapping.length; i++) {
-      if (positionMapping[i].mergedIdx >= insertAt) {
-        positionMapping[i].mergedIdx++
+    for (const [key, pos] of originalParaMapping.entries()) {
+      if (pos >= insertPos) {
+        originalParaMapping.set(key, pos + 1)
       }
     }
   }
-  
+
   /**
-   * Create the final document content from merged paragraphs
+   * Creates final document content from paragraph text array
    */
-  private createFinalContent(mergedParagraphs: string[]): DocContent {
+  private createFinalDocumentContent(
+    mergedParagraphs: string[]  ): {
+    finalContent: DocContent,
+    serializedContent: SerializedContent
+  } {
+    console.log('Final result:', mergedParagraphs)
+    
+    // Construct the final document
+    const finalContent = this.createFinalContent(mergedParagraphs)
+    
+    // Convert to YJS format for storage
+    const ydoc = new Y.Doc()
+    const state = applyTiptapChangesToSerializedYDoc(
+      Y.encodeStateAsUpdate(ydoc),
+      finalContent,
+      schema
+    )
+    
+    // Serialize for storage
+    const serializedContent: SerializedContent = {
+      type: 'yjs' as const,
+      content: Array.from(state)
+    }
+    
+    return { finalContent, serializedContent }
+  }
+
+  /**
+   * Saves the document with updated content
+   */
+  private async saveUpdatedDocument(
+    doc: DocumentData,
+    serializedContent: SerializedContent,
+    finalContent: DocContent
+  ): Promise<DocumentData> {
+    // Save the updated document
+    const updatedDoc = await documentStorage.create(this.DOCUMENTS_COLLECTION, {
+      ...doc,
+      content: serializedContent,
+      lastUpdated: Date.now(),
+      updatedBy: 'local'
+    } as any)
+    
     return {
-      type: 'doc',
-      content: mergedParagraphs.map(text => ({
-        type: 'paragraph',
-        content: [{ type: 'text', text }]
-      }))
+      ...this.mapToDocumentData(updatedDoc)!,
+      content: finalContent
     }
   }
 
+  /**
+   * Main method to sync document changes
+   */
   async syncDocumentChanges(docId: string, changes: DocContent[]): Promise<DocumentData> {
     try {
-      // Get the current document
-      const doc = await this.getLocalDocument(docId)
-      if (!doc) {
-        throw new Error(`Document not found: ${docId}`)
-      }
-
-      // Extract initial content
-      const initialContent = typeof doc.content === 'string' ? 
-        { type: 'doc' as const, content: [{ type: 'paragraph', content: [{ type: 'text', text: doc.content }] }] } :
-        (doc.content as DocContent)
+      // Step 1: Get the document and extract content
+      const { doc, originalParagraphs } = await this.retrieveDocumentAndContent(docId)
       
-      // Extract paragraphs from all versions
-      const originalParagraphs = this.extractParagraphTexts(initialContent)
-      console.log('Original paragraphs:', originalParagraphs)
-      
+      // Step 2: Extract paragraphs from the changed versions
       const changedParagraphs = changes.map(change => this.extractParagraphTexts(change))
       console.log('Changed paragraphs:')
       changedParagraphs.forEach((version, idx) => {
         console.log(`Version ${idx}:`, version)
       })
       
-      // First, detect deleted paragraphs
-      const deletedParagraphs = new Set<number>()
-      // Track which paragraphs from each version correspond to deleted originals
-      const deletedVersionParas = new Map<string, boolean>() // Maps "versionIdx-paraIdx" to boolean
-      
-      // First version paragraphs (e.g., mobile version that deleted a paragraph)
-      const version0 = changedParagraphs[0]
-      
-      // For each original paragraph
-      for (let origIdx = 0; origIdx < originalParagraphs.length; origIdx++) {
-        const origPara = originalParagraphs[origIdx]
-        console.log(`\nChecking if paragraph ${origIdx} was deleted: "${origPara.substring(0, 30)}..."`)
-        
-        // Check if this paragraph exists in version 0
-        let foundInVersion0 = false
-        let bestMatchScore0 = 0
-        
-        for (const versionPara of version0) {
-          const similarity = this.calculateSimilarity(origPara, versionPara)
-          if (similarity > bestMatchScore0) {
-            bestMatchScore0 = similarity
-          }
-          if (similarity > 0.7) {
-            foundInVersion0 = true
-            console.log(`  Found in version 0 with similarity ${similarity.toFixed(2)}`)
-            break
-          }
-        }
-        
-        // If paragraph doesn't exist in version 0, check if it was modified in other versions
-        if (!foundInVersion0) {
-          console.log(`  Not found in version 0. Best match score: ${bestMatchScore0.toFixed(2)}`)
-          
-          let significantlyModified = false
-          
-          // Check other versions (e.g., desktop version)
-          for (let versionIdx = 1; versionIdx < changedParagraphs.length; versionIdx++) {
-            const versionParagraphs = changedParagraphs[versionIdx]
-            
-            let bestMatchParaIdx = -1
-            let bestMatchScore = 0
-            
-            for (let paraIdx = 0; paraIdx < versionParagraphs.length; paraIdx++) {
-              const versionPara = versionParagraphs[paraIdx]
-              const similarity = this.calculateSimilarity(origPara, versionPara)
-              console.log(`  Checking version ${versionIdx}, para ${paraIdx}: similarity ${similarity.toFixed(2)} with "${versionPara.substring(0, 30)}..."`)
-              
-              if (similarity > bestMatchScore) {
-                bestMatchScore = similarity
-                bestMatchParaIdx = paraIdx
-              }
-              
-              // If paragraph exists in this version with high similarity, it wasn't modified
-              if (similarity > 0.9) {
-                console.log(`  Found almost identical in version ${versionIdx}, paragraph ${paraIdx}`)
-                // Mark this paragraph in this version as corresponding to a deleted paragraph
-                deletedVersionParas.set(`${versionIdx}-${paraIdx}`, true)
-                console.log(`  Marked version ${versionIdx}, paragraph ${paraIdx} as matching a deleted paragraph`)
-                // It exists unchanged in another version, but was deleted in version 0
-                // This is a true deletion
-                console.log(`  ✓ MARKING FOR DELETION - identical in other version but missing in version 0`)
-                deletedParagraphs.add(origIdx)
-                break
-              }
-              // If paragraph exists but was significantly modified
-              else if (similarity > 0.5) {
-                console.log(`  Found modified in version ${versionIdx}, paragraph ${paraIdx}`)
-                significantlyModified = true
-                break
-              }
-            }
-            
-            if (bestMatchParaIdx !== -1 && !significantlyModified && bestMatchScore > 0.9) {
-              deletedVersionParas.set(`${versionIdx}-${bestMatchParaIdx}`, true)
-              console.log(`  Marked best match: version ${versionIdx}, paragraph ${bestMatchParaIdx} as matching a deleted paragraph`)
-            }
-            
-            if (significantlyModified) {
-              break
-            }
-          }
-          
-          // If not significantly modified in any version, mark as deleted
-          if (!significantlyModified && !deletedParagraphs.has(origIdx)) {
-            console.log(`  ✓ MARKING FOR DELETION - not found in version 0 and not modified elsewhere`)
-            deletedParagraphs.add(origIdx)
-          }
-        }
-      }
-      
-      console.log('\nDeleted paragraphs:', Array.from(deletedParagraphs))
-      console.log('Paragraphs in versions that match deleted originals:', Array.from(deletedVersionParas.entries()))
-      
-      // Now build our result by processing each original paragraph
-      const result: string[] = []
-      const processed = new Set<string>() // Track which paragraphs we've processed
-      
-      // Create a mapping of original paragraphs to their position in the result array
-      const originalParaMapping = new Map<string, number>()
-      
-      // First pass: Process original paragraphs
-      for (let origIdx = 0; origIdx < originalParagraphs.length; origIdx++) {
-        if (deletedParagraphs.has(origIdx)) {
-          console.log(`Skipping deleted paragraph ${origIdx}: "${originalParagraphs[origIdx].substring(0, 30)}..."`)
-          continue
-        }
-        
-        console.log(`Processing original paragraph ${origIdx}: "${originalParagraphs[origIdx].substring(0, 30)}..."`)
-        const origPara = originalParagraphs[origIdx]
-        
-        // Find all versions of this paragraph
-        const versions = [origPara]
-        
-        for (let versionIdx = 0; versionIdx < changedParagraphs.length; versionIdx++) {
-          const versionParagraphs = changedParagraphs[versionIdx]
-          
-          // Find best match in this version
-          let bestMatchIdx = -1
-          let bestMatchScore = 0.1 // Minimum similarity threshold
-          
-          for (let paraIdx = 0; paraIdx < versionParagraphs.length; paraIdx++) {
-            const versionPara = versionParagraphs[paraIdx]
-            const similarity = this.calculateSimilarity(origPara, versionPara)
-            
-            if (similarity > bestMatchScore) {
-              bestMatchScore = similarity
-              bestMatchIdx = paraIdx
-            }
-          }
-          
-          if (bestMatchIdx !== -1) {
-            const paraKey = `${versionIdx}-${bestMatchIdx}`
-            const matchedPara = versionParagraphs[bestMatchIdx]
-            versions.push(matchedPara)
-            processed.add(paraKey)
-            console.log(`  Added match from version ${versionIdx}, paragraph ${bestMatchIdx} (similarity: ${bestMatchScore.toFixed(2)})`)
-            
-            // Store the mapping for this version's paragraph to its original index
-            originalParaMapping.set(paraKey, result.length)
-          }
-        }
-        
-        // Merge all versions of this paragraph
-        const mergedPara = this.mergeTextEdits(origPara, versions)
-        result.push(mergedPara)
-        console.log(`  → Added merged paragraph: "${mergedPara.substring(0, 30)}..."`)
-      }
-      
-      // Second pass: Add new paragraphs from each version in context
-      for (let versionIdx = 0; versionIdx < changedParagraphs.length; versionIdx++) {
-        const versionParagraphs = changedParagraphs[versionIdx]
-        
-        // Find all unprocessed paragraphs in this version with their position context
-        const newParagraphs: Array<{
-          paraIdx: number,
-          text: string,
-          prevMatchedIdx: number | null,
-          nextMatchedIdx: number | null
-        }> = []
-        
-        for (let paraIdx = 0; paraIdx < versionParagraphs.length; paraIdx++) {
-          const paraKey = `${versionIdx}-${paraIdx}`
-          
-          // Skip if already processed or if it corresponds to a deleted paragraph
-          if (processed.has(paraKey) || deletedVersionParas.get(paraKey)) {
-            console.log(`Skipping paragraph ${paraKey} - already processed or matches a deleted paragraph`)
-            continue
-          }
-          
-          const para = versionParagraphs[paraIdx]
-          
-          // Find the nearest processed paragraphs before and after this one
-          let prevMatchedIdx = null
-          let nextMatchedIdx = null
-          
-          // Look for previous processed paragraph
-          for (let i = paraIdx - 1; i >= 0; i--) {
-            const prevKey = `${versionIdx}-${i}`
-            if (processed.has(prevKey)) {
-              prevMatchedIdx = originalParaMapping.get(prevKey) ?? null
-              break
-            }
-          }
-          
-          // Look for next processed paragraph
-          for (let i = paraIdx + 1; i < versionParagraphs.length; i++) {
-            const nextKey = `${versionIdx}-${i}`
-            if (processed.has(nextKey)) {
-              nextMatchedIdx = originalParaMapping.get(nextKey) ?? null
-              break
-            }
-          }
-          
-          newParagraphs.push({
-            paraIdx,
-            text: para,
-            prevMatchedIdx,
-            nextMatchedIdx
-          })
-        }
-        
-        // Sort by the index of the preceding paragraph match
-        // This ensures that paragraphs are inserted in the right order relative to the original document
-        newParagraphs.sort((a, b) => {
-          // If both have same prev index, sort by their original order
-          if (a.prevMatchedIdx === b.prevMatchedIdx) {
-            return a.paraIdx - b.paraIdx;
-          }
-          
-          // If one has no prev, put it at the beginning if next match exists
-          if (a.prevMatchedIdx === null) return a.nextMatchedIdx !== null ? -1 : 1;
-          if (b.prevMatchedIdx === null) return b.nextMatchedIdx !== null ? 1 : -1;
-          
-          // Otherwise sort by prev match index
-          return a.prevMatchedIdx - b.prevMatchedIdx;
-        });
-        
-        // Now insert each paragraph
-        for (const { paraIdx, text, prevMatchedIdx, nextMatchedIdx } of newParagraphs) {
-          let insertPos;
-          
-          if (prevMatchedIdx !== null && nextMatchedIdx !== null) {
-            // If we have both prev and next, insert between them
-            insertPos = prevMatchedIdx + 1;
-          } else if (prevMatchedIdx !== null) {
-            // If we only have prev, insert after it
-            insertPos = prevMatchedIdx + 1;
-          } else if (nextMatchedIdx !== null) {
-            // If we only have next, insert before it
-            insertPos = nextMatchedIdx;
-          } else {
-            // If we have neither, append to the end
-            insertPos = result.length;
-          }
-          
-          console.log(`Adding unmatched paragraph from version ${versionIdx}: "${text.substring(0, 30)}..." at position ${insertPos}`);
-          
-          // Insert and update positions of all subsequent paragraphs
-          result.splice(insertPos, 0, text);
-          processed.add(`${versionIdx}-${paraIdx}`);
-          
-          // Update mapping for paragraphs after this insertion
-          for (const [key, pos] of originalParaMapping.entries()) {
-            if (pos >= insertPos) {
-              originalParaMapping.set(key, pos + 1);
-            }
-          }
-        }
-      }
-      
-      console.log('Final result:', result)
-      
-      // Construct the final document
-      const finalContent = this.createFinalContent(result)
-      
-      // Convert to YJS format for storage
-      const ydoc = new Y.Doc()
-      const state = applyTiptapChangesToSerializedYDoc(
-        Y.encodeStateAsUpdate(ydoc),
-        finalContent,
-        schema
+      // Step 3: Detect deleted paragraphs
+      const { deletedParagraphs, deletedVersionParas } = this.detectDeletedParagraphs(
+        originalParagraphs,
+        changedParagraphs
       )
       
-      // Serialize for storage
-      const serializedContent = {
-        type: 'yjs',
-        content: Array.from(state)
-      }
+      // Step 4: Process original paragraphs
+      const { result, processed, originalParaMapping } = this.processOriginalParagraphs(
+        originalParagraphs,
+        changedParagraphs,
+        deletedParagraphs
+      )
       
-      // Save the updated document
-      const updatedDoc = await documentStorage.create(this.DOCUMENTS_COLLECTION, {
-        ...doc,
-        content: serializedContent,
-        lastUpdated: Date.now(),
-        updatedBy: 'local'
-      } as any)
+      // Step 5: Process new paragraphs
+      const mergedParagraphs = this.processNewParagraphs(
+        result,
+        processed,
+        changedParagraphs,
+        originalParaMapping,
+        deletedVersionParas
+      )
       
-      return {
-        ...this.mapToDocumentData(updatedDoc)!,
-        content: finalContent
-      }
+      // Step 6: Create final document content
+      const { finalContent, serializedContent } = this.createFinalDocumentContent(
+        mergedParagraphs,
+      )
+      
+      // Step 7: Save the updated document
+      return await this.saveUpdatedDocument(doc, serializedContent, finalContent)
+      
     } catch (error) {
       console.error('Error syncing document changes:', error)
       throw error
@@ -955,6 +993,19 @@ class SyncService {
     }
     
     return result
+  }
+
+  /**
+   * Create the final document content from merged paragraphs
+   */
+  private createFinalContent(mergedParagraphs: string[]): DocContent {
+    return {
+      type: 'doc',
+      content: mergedParagraphs.map(text => ({
+        type: 'paragraph',
+        content: [{ type: 'text', text }]
+      }))
+    }
   }
 }
 

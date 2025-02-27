@@ -558,7 +558,7 @@ describe('SyncService Integration Tests', () => {
       expect(texts[0]).toContain('B\'s modifications')
     })
     
-    it.only('should handle adding paragraphs in different positions', async () => {
+    it('should handle adding paragraphs in different positions', async () => {
       // Create initial document with multiple paragraphs
       const initialContent = createDocContent([
         'First paragraph',
