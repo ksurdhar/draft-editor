@@ -769,7 +769,7 @@ describe('SyncService Integration Tests', () => {
       expect(texts[0]).toContain('sleepy') // from B
     })
 
-    it.only('should respect paragraph deletion when not modified in other version', async () => {
+    it('should respect paragraph deletion when not modified in other version', async () => {
       // Create initial document with multiple paragraphs
       const initialContent = createDocContent([
         'Introduction paragraph that stays',

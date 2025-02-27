@@ -151,7 +151,7 @@ export class YjsStorageAdapter implements StorageAdapter {
   async create(collection: string, data: Omit<Document, '_id'>): Promise<JsonDocument> {
     console.log('\n=== YjsStorageAdapter.create ===')
     console.log('Collection:', collection)
-    console.log('Input data:', JSON.stringify(data, null, 2))
+    // console.log('Input data:', JSON.stringify(data, null, 2))
 
     // Create document metadata
     const newDoc: JsonDocument = {
