@@ -851,5 +851,59 @@ describe('SyncService Integration Tests', () => {
         'Final paragraph that stays (edited on desktop)'
       ])
     })
+
+    it.only('should respect complicated differing edits', async () => {
+      // Create initial document with multiple paragraphs
+      const initialContent = createDocContent([
+        'the world was a complicated place',
+        'ezra took a deep breath and walked after the magician',
+        'he knew in his gut that magic wasnt real',
+        'the wind blew through his hair and he wasnt sure of anything'
+      ])
+      
+      const testDoc: Partial<DocumentData> = {
+        title: 'Deletion Test',
+        content: initialContent,
+        comments: [],
+        lastUpdated: Date.now(),
+        userId: 'test-user',
+        folderIndex: 0
+      }
+      
+      const initialDoc = await SyncService.saveDocument(testDoc)
+      
+      // Web app version - user deletes the second paragraph
+      const webAppChanges = createDocContent([
+        'the world was a complicated place',
+        'ezra took a deep breath and walked after the magician, Lautreque',
+        'the man wore the strangest clothing',
+        'he knew in his gut that magic wasnt real',
+        'the wind blew through his black hair and he wasnt sure of anything'
+      ])
+      
+      // Desktop app version - user doesn't modify the deleted paragraph
+      // but makes changes to other paragraphs
+      const desktopAppChanges = createDocContent([
+        'the world was a complicated place',
+        'Ezra took a deep breath and walked after the magician',
+        'he knew in his stomach that magic wasnt real',
+        'the wind blew through his hair and he wasnt sure of much of anything'
+      ])
+      
+      // Apply changes
+      const result = await SyncService.syncDocumentChanges(initialDoc._id, [webAppChanges, desktopAppChanges])
+      
+      // Verify result
+      const texts = extractTexts(result.content as DocContent)
+      console.log('Deletion respect result:', texts)
+
+      expect(texts).toEqual([
+        'the world was a complicated place',
+        'Ezra took a deep breath and walked after the magician, Lautreque',
+        'the man wore the strangest clothing',
+        'he knew in his stomach that magic wasnt real',
+        'the wind blew through his black hair and he wasnt sure of much of anything'
+      ])
+    })
   })
 })
