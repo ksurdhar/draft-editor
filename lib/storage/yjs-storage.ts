@@ -3,6 +3,53 @@ import path from 'path'
 import { ObjectId } from 'mongodb'
 import * as Y from 'yjs'
 import { StorageAdapter, Document, JsonDocument } from './types'
+import { Schema } from 'prosemirror-model'
+import { yDocToProsemirror } from 'y-prosemirror'
+import { 
+  serializeDocument, 
+  applyTiptapChangesToSerializedYDoc
+} from '../../tests/utils/y-doc-helpers'
+
+// Define schema for Tiptap/ProseMirror operations
+const schema = new Schema({
+  nodes: {
+    doc: {
+      content: 'paragraph+'
+    },
+    paragraph: {
+      content: 'text*',  // Allow zero or more text nodes
+      toDOM() { return ['p', 0] },
+      parseDOM: [{ tag: 'p' }]
+    },
+    text: {
+      group: 'inline',
+      inline: true
+    }
+  }
+})
+
+interface ProsemirrorNode {
+  type: string;
+  content?: ProsemirrorNode[];
+  text?: string;
+}
+
+interface ProsemirrorDoc {
+  type: 'doc';
+  content: ProsemirrorNode[];
+}
+
+// Default empty document structure
+const DEFAULT_DOCUMENT: ProsemirrorDoc = {
+  type: 'doc',
+  content: [{
+    type: 'paragraph',
+    content: [{
+      type: 'text',
+      text: ''
+    }]
+  }]
+}
 
 export class YjsStorageAdapter implements StorageAdapter {
   private docs: Map<string, Y.Doc>
@@ -42,17 +89,69 @@ export class YjsStorageAdapter implements StorageAdapter {
   }
 
   private serializeYDoc(ydoc: Y.Doc): Uint8Array {
-    return Y.encodeStateAsUpdate(ydoc)
+    return serializeDocument(ydoc)
   }
 
   private deserializeYDoc(ydoc: Y.Doc, state: Uint8Array) {
     Y.applyUpdate(ydoc, state)
   }
 
+  private ensureValidProsemirrorDoc(content: any): ProsemirrorDoc {
+    // If it's not a proper document structure, wrap it in one
+    if (!content || typeof content !== 'object') {
+      return DEFAULT_DOCUMENT
+    }
+
+    // If it's YJS content, return it as is
+    if (content.type === 'yjs' && Array.isArray(content.content)) {
+      return content
+    }
+
+    if (content.type !== 'doc' || !Array.isArray(content.content)) {
+      return DEFAULT_DOCUMENT
+    }
+
+    // Process each paragraph to ensure it has valid content
+    const processedContent = content.content.map((node: ProsemirrorNode) => {
+      if (node.type !== 'paragraph') {
+        return {
+          type: 'paragraph',
+          content: [{ type: 'text', text: node.text || '' }]
+        }
+      }
+
+      // Ensure paragraph has content array with at least one text node
+      if (!node.content || !Array.isArray(node.content) || node.content.length === 0) {
+        return {
+          ...node,
+          content: [{ type: 'text', text: node.text || '' }]
+        }
+      }
+
+      // Process each content node to ensure it's valid
+      const validContent = node.content.map((contentNode: ProsemirrorNode) => {
+        if (contentNode.type !== 'text' || typeof contentNode.text !== 'string') {
+          return { type: 'text', text: contentNode.text || '' }
+        }
+        return contentNode
+      })
+
+      return {
+        ...node,
+        content: validContent
+      }
+    })
+
+    return {
+      type: 'doc',
+      content: processedContent
+    }
+  }
+
   async create(collection: string, data: Omit<Document, '_id'>): Promise<JsonDocument> {
     console.log('\n=== YjsStorageAdapter.create ===')
     console.log('Collection:', collection)
-    console.log('Input data:', data)
+    // console.log('Input data:', JSON.stringify(data, null, 2))
 
     // Create document metadata
     const newDoc: JsonDocument = {
@@ -62,23 +161,40 @@ export class YjsStorageAdapter implements StorageAdapter {
       updatedAt: new Date().toISOString()
     }
 
+    // If content is already in YJS format, use it directly
+    if (data.content && typeof data.content === 'object' && 
+        'type' in data.content && 
+        (data.content as any).type === 'yjs' && 
+        'content' in data.content && 
+        Array.isArray((data.content as any).content)) {
+      const filePath = this.getDocumentPath(collection, newDoc._id)
+      await fs.ensureDir(path.dirname(filePath))
+      await fs.writeFile(filePath, JSON.stringify(newDoc, null, 2))
+      
+      console.log('Created new document:', newDoc._id)
+      return newDoc
+    }
+
     // Create YDoc for content
     const ydoc = this.getYDoc(newDoc._id)
-    const ytext = ydoc.getText('content')
     
-    // If there's content, set it in the YDoc
-    if (typeof data.content === 'string') {
-      ytext.insert(0, data.content)
-    } else if (data.content) {
-      ytext.insert(0, JSON.stringify(data.content))
-    }
+    // Ensure content is valid before applying
+    const contentToApply = this.ensureValidProsemirrorDoc(data.content)
+    
+    // Apply content as Tiptap changes
+    const state = applyTiptapChangesToSerializedYDoc(
+      this.serializeYDoc(ydoc),
+      contentToApply,
+      schema
+    )
+    this.deserializeYDoc(ydoc, state)
 
     // Serialize the complete document
     const documentToSave = {
       ...newDoc,
       content: {
         type: 'yjs',
-        state: Array.from(this.serializeYDoc(ydoc)) // Convert to regular array for JSON storage
+        content: Array.from(this.serializeYDoc(ydoc))
       }
     }
 
@@ -88,7 +204,13 @@ export class YjsStorageAdapter implements StorageAdapter {
     await fs.writeFile(filePath, JSON.stringify(documentToSave, null, 2))
     
     console.log('Created new document:', newDoc._id)
-    return newDoc
+    return {
+      ...newDoc,
+      content: {
+        type: 'yjs',
+        content: Array.from(this.serializeYDoc(ydoc))
+      }
+    }
   }
 
   async findById(collection: string, id: string): Promise<JsonDocument | null> {
@@ -110,11 +232,12 @@ export class YjsStorageAdapter implements StorageAdapter {
       if (doc.content?.type === 'yjs' && Array.isArray(doc.content.state)) {
         const ydoc = this.getYDoc(id)
         this.deserializeYDoc(ydoc, new Uint8Array(doc.content.state))
-        const ytext = ydoc.getText('content')
-        doc.content = ytext.toString()
+        
+        // Convert YDoc content to ProseMirror JSON
+        const pmDoc = yDocToProsemirror(schema, ydoc)
+        doc.content = pmDoc.toJSON()
       }
 
-      // console.log('Found document:', doc._id)
       return this.ensureStringDates(doc)
     } catch (error) {
       console.error('Error reading document:', error)
@@ -158,16 +281,22 @@ export class YjsStorageAdapter implements StorageAdapter {
     }
 
     const ydoc = this.getYDoc(id)
-    const ytext = ydoc.getText('content')
 
     // Update content if provided
     if (data.content) {
-      ytext.delete(0, ytext.length)
-      if (typeof data.content === 'string') {
-        ytext.insert(0, data.content)
-      } else {
-        ytext.insert(0, JSON.stringify(data.content))
-      }
+      // Clear existing content
+      const fragment = ydoc.getXmlFragment('prosemirror')
+      ydoc.transact(() => {
+        fragment.delete(0, fragment.length)
+      })
+
+      // Apply new content
+      const state = applyTiptapChangesToSerializedYDoc(
+        this.serializeYDoc(ydoc),
+        data.content,
+        schema
+      )
+      this.deserializeYDoc(ydoc, state)
     }
 
     const updatedDoc = this.ensureStringDates({
@@ -184,10 +313,10 @@ export class YjsStorageAdapter implements StorageAdapter {
     const filePath = this.getDocumentPath(collection, id)
     await fs.writeFile(filePath, JSON.stringify(updatedDoc, null, 2))
 
-    // Return the document with readable content
+    // Return the document with the updated content
     return {
       ...updatedDoc,
-      content: ytext.toString()
+      content: data.content || existingDoc.content
     }
   }
 

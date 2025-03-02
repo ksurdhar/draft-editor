@@ -7,26 +7,40 @@ declare global {
 
 export {}
 
+export type DocumentContent = {
+  type: string
+  content?: any[]
+  text?: string
+  marks?: Array<{ type: string }>
+}
+
+export type DocContent = {
+  type: 'doc'
+  content: DocumentContent[]
+}
+
+// The content structure when document is loaded in the app
+export type DeserializedContent = DocContent
+
+// The content structure when document is stored
+export type SerializedContent = {
+  type: 'yjs'
+  content: number[] // Serialized YDoc as Uint8Array
+}
+
 export type DocumentData = {
   _id: string
   id: string // Added for compatibility with frontend
   title: string
-  content: string | { 
-    type: 'doc',
-    content: Array<{
-      type: string
-      content?: any[]
-      text?: string
-      marks?: Array<{ type: string }>
-    }>
-  }
-  comments: CommentData[]
+  content: string | DeserializedContent | SerializedContent
+  comments?: CommentData[]
   lastUpdated: number
   userId: string
   canEdit?: boolean
   canComment?: boolean
   parentId?: string | 'root' // ID of the parent folder, 'root' means root level
   folderIndex: number // Position within the parent folder, lower numbers appear first
+  updatedBy?: 'local' | 'remote' // Added to track sync state
 }
 
 export type CommentData = {

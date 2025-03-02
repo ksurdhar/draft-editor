@@ -16,6 +16,15 @@ const envConfig = {
   NEXT_PUBLIC_STORAGE_TYPE: 'mongo'
 }
 
+// Get test pattern from command line arguments
+const testPattern = process.argv.slice(2).join(' ')
+const testGlob = testPattern 
+  ? `**/*${testPattern}*.integration.test.ts`
+  : '**/*.integration.test.ts'
+
+console.log('\n=== Running Integration Tests ===')
+console.log('Test pattern:', testGlob)
+
 async function killProcessOnPort(port: number): Promise<void> {
   try {
     if (process.platform === 'win32') {
@@ -81,7 +90,7 @@ async function startServer(): Promise<boolean> {
 
     server = spawn('npm', ['run', 'dev'], {
       env,
-      stdio: process.platform === 'win32' ? 'pipe' : ['ignore', 'ignore', 'ignore']
+      stdio: 'inherit'
     })
 
     // Wait for server to be ready
@@ -98,9 +107,10 @@ async function runTests(): Promise<number> {
     ...envConfig,
     LOCAL_DB: 'false'
   } as NodeJS.ProcessEnv
+
   return new Promise((resolve, reject) => {
     console.log('Running integration tests...')
-    const jest = spawn('jest', ['--runInBand', '--testMatch', '**/*.integration.test.ts'], {
+    const jest = spawn('jest', ['--runInBand', '--testMatch', testGlob], {
       env,
       stdio: 'inherit'
     })
@@ -131,7 +141,10 @@ function stopServer() {
 
 async function main() {
   try {
-    await startServer()
+    const serverStarted = await startServer()
+    if (!serverStarted) {
+      throw new Error('Failed to start test server')
+    }
     const testResult = await runTests()
     stopServer()
     process.exit(testResult)

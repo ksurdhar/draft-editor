@@ -11,6 +11,7 @@
     "lint": "next lint",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:unit": "jest \".*\\.unit\\.test\\.ts$\"",
     "edev": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
@@ -76,6 +77,8 @@
     "utf-8-validate": "^6.0.5",
     "uuid": "^9.0.1",
     "wouter": "^2.12.1",
+    "y-prosemirror": "^1.2.2",
+    "y-protocols": "^1.0.6",
     "yjs": "^13.6.23"
   },
   "devDependencies": {
@@ -94,6 +97,7 @@
     "@types/jsonwebtoken": "^9.0.4",
     "@types/lowdb": "^1.0.15",
     "@types/node": "18.0.0",
+    "@types/node-fetch": "^2.6.12",
     "@types/react": "^18.2.31",
     "@types/react-dom": "^18.2.14",
     "@types/uuid": "^9.0.7",

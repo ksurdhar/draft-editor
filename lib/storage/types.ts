@@ -15,6 +15,13 @@ export interface MongoDocument {
   [key: string]: unknown
 }
 
+// Interface for YJS content structure
+export interface YjsContent {
+  type: 'yjs'
+  content: string | Record<string, any>
+  state?: number[]  // For serialized YJS state
+}
+
 // Interface for documents as they are stored in JSON files
 export interface JsonDocument {
   _id: string
