@@ -79,13 +79,18 @@ async function startServer(): Promise<boolean> {
       PORT: '3000'
     } as NodeJS.ProcessEnv
 
+    console.log('Starting Next.js server...')
     server = spawn('npm', ['run', 'dev'], {
       env,
       stdio: process.platform === 'win32' ? 'pipe' : ['ignore', 'ignore', 'ignore']
     })
 
     // Wait for server to be ready
-    return await waitForServer()
+    const serverReady = await waitForServer()
+    if (serverReady) {
+      console.log('Next.js server is ready')
+    }
+    return serverReady
   } catch (error) {
     console.error('Failed to start server:', error)
     return false
@@ -96,8 +101,10 @@ async function runTests(): Promise<number> {
   const env = {
     ...process.env,
     ...envConfig,
-    LOCAL_DB: 'false'
+    LOCAL_DB: 'false',
+    SHARED_SERVER: 'true' // Add flag to indicate tests should use shared server
   } as NodeJS.ProcessEnv
+  
   return new Promise((resolve, reject) => {
     console.log('Running integration tests...')
     const jest = spawn('jest', ['--runInBand', '--testMatch', '**/*.integration.test.ts'], {
@@ -131,8 +138,17 @@ function stopServer() {
 
 async function main() {
   try {
-    await startServer()
+    // Start server once at the beginning
+    const serverStarted = await startServer()
+    if (!serverStarted) {
+      console.error('Failed to start server, aborting tests')
+      process.exit(1)
+    }
+    
+    // Run all tests with the server already running
     const testResult = await runTests()
+    
+    // Stop server after all tests are done
     stopServer()
     process.exit(testResult)
   } catch (error) {

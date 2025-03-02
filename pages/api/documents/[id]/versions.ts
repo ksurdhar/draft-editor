@@ -1,7 +1,6 @@
 import withHybridAuth, { ExtendedApiRequest } from '@lib/with-hybrid-auth'
 import type { NextApiResponse } from 'next'
 import { createVersion, getVersionsForDoc, getDocument, deleteVersion } from '@lib/mongo-utils'
-import * as Y from 'yjs'
 
 export default withHybridAuth(async function versionsHandler(req: ExtendedApiRequest, res: NextApiResponse) {
   const { query, method, user } = req
@@ -33,33 +32,32 @@ export default withHybridAuth(async function versionsHandler(req: ExtendedApiReq
         const versions = await getVersionsForDoc(documentId)
         console.log('Found versions:', versions.length)
 
-        // Convert YJS state to readable content for each version
-        const versionsWithContent = versions.map(version => {
+        // Parse stringified JSON content for each version
+        const versionsWithParsedContent = versions.map(version => {
           console.log('\nProcessing version:', version.id)
           console.log('Version content type:', typeof version.content)
-          console.log('Is YJS content?', version.content?.type === 'yjs')
           
-          if (version.content?.type === 'yjs' && Array.isArray(version.content.state)) {
-            console.log('YJS state array length:', version.content.state.length)
-            const ydoc = new Y.Doc()
-            const state = new Uint8Array(version.content.state)
-            Y.applyUpdate(ydoc, state)
-            const ytext = ydoc.getText('content')
-            const content = ytext.toString()
-            console.log('Deserialized content length:', content.length)
-            console.log('Content preview:', content.substring(0, 100))
-            
-            return {
-              ...version,
-              content
+          if (typeof version.content === 'string') {
+            try {
+              // Try to parse the content as JSON
+              const parsedContent = JSON.parse(version.content)
+              console.log('Successfully parsed content as JSON')
+              
+              return {
+                ...version,
+                content: parsedContent
+              }
+            } catch (e) {
+              console.log('Warning: Could not parse version content as JSON, returning as-is')
+              return version
             }
           } else {
-            console.log('Non-YJS content, returning as-is')
+            console.log('Non-string content, returning as-is')
             return version
           }
         })
-
-        res.status(200).json(versionsWithContent)
+        
+        res.status(200).json(versionsWithParsedContent)
       } catch (error) {
         console.error('Error fetching versions:', error)
         res.status(500).json({ error: 'Failed to fetch versions' })
@@ -81,56 +79,59 @@ export default withHybridAuth(async function versionsHandler(req: ExtendedApiReq
         console.log('\n=== Creating Version ===')
         console.log('Document ID:', documentId)
         console.log('Input content type:', typeof req.body.content)
-        console.log('Input content length:', typeof req.body.content === 'string' ? req.body.content.length : 'non-string')
-        console.log('Input content preview:', typeof req.body.content === 'string' ? 
-          req.body.content.substring(0, 100) : 
-          JSON.stringify(req.body.content).substring(0, 100))
-
-        // Create YJS document and insert content
-        const ydoc = new Y.Doc()
-        const ytext = ydoc.getText('content')
         
-        if (typeof req.body.content === 'string') {
-          ytext.insert(0, req.body.content)
-        } else {
-          ytext.insert(0, JSON.stringify(req.body.content))
+        // Prepare content as stringified JSON
+        let contentToStore = req.body.content
+        
+        if (typeof contentToStore === 'object') {
+          // If content is an object, stringify it
+          console.log('Stringifying object content')
+          contentToStore = JSON.stringify(contentToStore)
+        } else if (typeof contentToStore === 'string') {
+          // If it's already a string, make sure it's valid JSON
+          try {
+            // Try to parse it to validate, but keep it as a string
+            JSON.parse(contentToStore)
+            console.log('Content is already a valid JSON string')
+          } catch (e) {
+            // If it's not valid JSON, wrap it as a string value in JSON
+            console.log('Content is not valid JSON, wrapping as string value')
+            contentToStore = JSON.stringify(contentToStore)
+          }
         }
 
-        console.log('YJS text content after insert:', ytext.toString().substring(0, 100))
-        console.log('YJS text length:', ytext.toString().length)
+        // Calculate word count from the content
+        const wordCount = typeof req.body.content === 'string' ? 
+          req.body.content.split(/\s+/).length : 
+          JSON.stringify(req.body.content).split(/\s+/).length
 
-        // Get YJS state
-        const state = Y.encodeStateAsUpdate(ydoc)
-        console.log('YJS state array length:', state.length)
-
-        // Verify state can be decoded
-        const verifyDoc = new Y.Doc()
-        Y.applyUpdate(verifyDoc, state)
-        const verifyText = verifyDoc.getText('content').toString()
-        console.log('Verification - decoded content length:', verifyText.length)
-        console.log('Verification - decoded content preview:', verifyText.substring(0, 100))
-
+        // Create the version with stringified content
         const newVersion = await createVersion({
           documentId,
           ownerId: user.sub,
-          content: {
-            type: 'yjs',
-            state: Array.from(state)
-          },
+          content: contentToStore,
           createdAt: req.body.createdAt || Date.now(),
           name: req.body.name || '',
-          wordCount: typeof req.body.content === 'string' ? 
-            req.body.content.split(/\s+/).length : 
-            JSON.stringify(req.body.content).split(/\s+/).length
+          wordCount
         })
         
         console.log('Version created successfully:', newVersion.id)
-        console.log('Stored state array length:', (newVersion.content as any).state.length)
+
+        // Parse the content for the response
+        let responseContent = newVersion.content
+        if (typeof responseContent === 'string') {
+          try {
+            responseContent = JSON.parse(responseContent)
+          } catch (e) {
+            console.log('Warning: Could not parse version content for response')
+            // Keep as string if parsing fails
+          }
+        }
         
-        // Return the readable content in the response
+        // Return the parsed content in the response
         res.status(200).json({
           ...newVersion,
-          content: ytext.toString()
+          content: responseContent
         })
       } catch (error) {
         console.error('Error creating version:', error)
