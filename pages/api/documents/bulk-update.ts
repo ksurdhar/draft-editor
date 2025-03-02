@@ -25,17 +25,52 @@ const handlers = {
         })
       )
 
-      // Perform updates
+      // Perform updates with stringified content
       const results = await Promise.all(
-        updates.map(update => 
-          storage.update('documents', update.documentId, {
-            content: update.content,
+        updates.map(update => {
+          // Prepare content as stringified JSON
+          let content = update.content
+          
+          if (typeof content === 'object') {
+            // If content is an object, stringify it
+            content = JSON.stringify(content)
+          } else if (typeof content === 'string') {
+            // If it's already a string, make sure it's valid JSON
+            try {
+              // Try to parse it to validate, but keep it as a string
+              JSON.parse(content)
+              // It's already a valid JSON string, no need to modify
+            } catch (e) {
+              // If it's not valid JSON, wrap it as a string value in JSON
+              content = JSON.stringify(content)
+            }
+          }
+          
+          return storage.update('documents', update.documentId, {
+            content,
             lastUpdated: Date.now()
           })
-        )
+        })
       )
 
-      res.status(200).json({ success: true, results })
+      // Parse content in results for the response
+      const parsedResults = results.map(result => {
+        if (result && typeof result.content === 'string') {
+          try {
+            const parsedContent = JSON.parse(result.content)
+            return {
+              ...result,
+              content: parsedContent
+            }
+          } catch (e) {
+            // If parsing fails, return as is
+            return result
+          }
+        }
+        return result
+      })
+
+      res.status(200).json({ success: true, results: parsedResults })
     } catch (error) {
       console.error('Error in bulk update:', error)
       res.status(500).json({ error: 'Failed to update documents' })
