@@ -1,7 +1,6 @@
 import axios from 'axios'
 import { Doc, Folder } from '@lib/mongo-models'
 import { mockUser } from '../lib/mock-auth'
-import mongoose from 'mongoose'
 
 const API_URL = 'http://localhost:3000/api'
 
