@@ -3,7 +3,6 @@ import { DocumentData } from '@typez/globals'
 import type { NextApiResponse } from 'next'
 import { storage } from '@lib/storage'
 import { ObjectId } from 'mongodb'
-import * as Y from 'yjs'
 
 async function bulkFetchHandler(req: ExtendedApiRequest, res: NextApiResponse) {
   const { method, user, body } = req
@@ -58,28 +57,31 @@ async function bulkFetchHandler(req: ExtendedApiRequest, res: NextApiResponse) {
   const documents = await storage.find('documents', query)
   console.log('Found documents:', documents.length)
 
-  // Convert YJS state to readable content for each document
+  // Process documents and parse stringified JSON content
   const docsWithPermissions = await Promise.all(documents.map(async doc => {
-    let content = ''
+    let parsedContent = undefined
     
-    // Only load content if metadataOnly is not set to true
-    if (metadataOnly !== true) {
-      const docContent = doc.content as { type?: string; state?: number[] } | string | undefined
-      
-      if (docContent && typeof docContent === 'object' && 
-          docContent.type === 'yjs' && Array.isArray(docContent.state)) {
-        const ydoc = new Y.Doc()
-        Y.applyUpdate(ydoc, new Uint8Array(docContent.state))
-        content = ydoc.getText('content').toString()
+    // Only include content if metadataOnly is not set to true
+    if (metadataOnly !== true && doc.content) {
+      // Parse stringified JSON content
+      if (typeof doc.content === 'string') {
+        try {
+          parsedContent = JSON.parse(doc.content)
+        } catch (e) {
+          console.log(`Warning: Could not parse content for document ${doc._id}`)
+          // Keep as string if parsing fails
+          parsedContent = doc.content
+        }
       } else {
-        content = typeof docContent === 'string' ? docContent : JSON.stringify(docContent)
+        // If content is already an object (shouldn't happen with our new approach)
+        parsedContent = doc.content
       }
     }
 
     return {
       ...doc,
       id: doc._id,
-      content: metadataOnly === true ? undefined : content,
+      content: parsedContent,
       canEdit: true,
       canComment: true,
       lastUpdated: doc.lastUpdated || Date.now()

@@ -19,7 +19,9 @@
     "migrate-storage": "ts-node scripts/migrate-to-files.ts",
     "migrate-to-yjs": "ts-node scripts/migrate-to-yjs.ts",
     "test:integration": "ts-node scripts/run-integration-tests.ts",
-    "test:integration:debug": "DEBUG=true ts-node scripts/run-integration-tests.ts"
+    "test:integration:debug": "DEBUG=true ts-node scripts/run-integration-tests.ts",
+    "rollback-from-yjs": "ts-node scripts/rollback-from-yjs.ts",
+    "stringify-content": "ts-node scripts/stringify-content.ts"
   },
   "engines": {
     "node": "^20.0.0"

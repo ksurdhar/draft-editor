@@ -84,79 +84,123 @@ module.exports = {
   },
 
   async down(db) {
-    console.log('\n=== Rolling Back YJS Migration ===')
-    
-    // This is a best-effort rollback - it will convert YJS content back to string
-    // but won't restore the exact original format
+    console.log('\n=== Rolling Back YJS Migration to TipTap JSON ===')
     
     // Rollback documents
-    const documents = await db.collection('documents').find({
-      'content.type': 'yjs'
-    }).toArray()
-    console.log(`Found ${documents.length} documents to rollback`)
+    const documentsQuery = { 'content.type': 'yjs' }
+    const documentCount = await db.collection('documents').countDocuments(documentsQuery)
+    console.log(`Found ${documentCount} documents to rollback to TipTap JSON format`)
 
-    for (const doc of documents) {
-      console.log(`\nRolling back document: ${doc._id}`)
+    const documentCursor = db.collection('documents').find(documentsQuery)
+    let processedDocs = 0
+    let successDocs = 0
+    let failedDocs = 0
+
+    while (await documentCursor.hasNext()) {
+      const doc = await documentCursor.next()
+      processedDocs++
+      console.log(`\nRolling back document ${processedDocs}/${documentCount}: ${doc._id}`)
       
       try {
-        // Create YDoc and apply state
+        if (!doc.content || !Array.isArray(doc.content.state)) {
+          console.log('Invalid YJS state format, skipping...')
+          failedDocs++
+          continue
+        }
+
+        // Convert YJS state back to content
         const ydoc = new Y.Doc()
         Y.applyUpdate(ydoc, new Uint8Array(doc.content.state))
         const ytext = ydoc.getText('content')
+        const contentStr = ytext.toString()
         
-        // Try to parse the content as JSON, fallback to string if not valid
+        // Try to parse content as JSON first (TipTap structure)
         let content
         try {
-          content = JSON.parse(ytext.toString())
-        } catch {
-          content = ytext.toString()
+          content = JSON.parse(contentStr)
+          // Validate that this looks like a TipTap document
+          if (!content.type && !content.content) {
+            // If it doesn't have typical TipTap structure, keep as string
+            console.log('Content parsed as JSON but doesn\'t look like TipTap structure - storing as parsed JSON anyway')
+          }
+        } catch (e) {
+          // If not valid JSON, store as string
+          console.log('Content is not valid JSON, storing as string')
+          content = contentStr
         }
 
-        // Update document with original content
+        // Update document with original content format
         await db.collection('documents').updateOne(
           { _id: doc._id },
           { $set: { content } }
         )
         console.log('Document rolled back successfully')
+        successDocs++
       } catch (error) {
         console.error('Error rolling back document:', error)
+        failedDocs++
       }
     }
 
     // Rollback versions
-    const versions = await db.collection('versions').find({
-      'content.type': 'yjs'
-    }).toArray()
-    console.log(`\nFound ${versions.length} versions to rollback`)
+    const versionsQuery = { 'content.type': 'yjs' }
+    const versionCount = await db.collection('versions').countDocuments(versionsQuery)
+    console.log(`\nFound ${versionCount} versions to rollback`)
 
-    for (const version of versions) {
-      console.log(`\nRolling back version: ${version._id}`)
+    const versionCursor = db.collection('versions').find(versionsQuery)
+    let processedVersions = 0
+    let successVersions = 0
+    let failedVersions = 0
+
+    while (await versionCursor.hasNext()) {
+      const version = await versionCursor.next()
+      processedVersions++
+      console.log(`\nRolling back version ${processedVersions}/${versionCount}: ${version._id}`)
       
       try {
-        // Create YDoc and apply state
+        if (!version.content || !Array.isArray(version.content.state)) {
+          console.log('Invalid YJS state format, skipping...')
+          failedVersions++
+          continue
+        }
+
+        // Convert YJS state back to content
         const ydoc = new Y.Doc()
         Y.applyUpdate(ydoc, new Uint8Array(version.content.state))
         const ytext = ydoc.getText('content')
+        const contentStr = ytext.toString()
         
-        // Try to parse the content as JSON, fallback to string if not valid
+        // Try to parse content as JSON first (TipTap structure)
         let content
         try {
-          content = JSON.parse(ytext.toString())
-        } catch {
-          content = ytext.toString()
+          content = JSON.parse(contentStr)
+          // Validate that this looks like a TipTap document
+          if (!content.type && !content.content) {
+            // If it doesn't have typical TipTap structure, keep as string
+            console.log('Content parsed as JSON but doesn\'t look like TipTap structure - storing as parsed JSON anyway')
+          }
+        } catch (e) {
+          // If not valid JSON, store as string
+          console.log('Content is not valid JSON, storing as string')
+          content = contentStr
         }
 
-        // Update version with original content
+        // Update version with original content format
         await db.collection('versions').updateOne(
           { _id: version._id },
           { $set: { content } }
         )
         console.log('Version rolled back successfully')
+        successVersions++
       } catch (error) {
         console.error('Error rolling back version:', error)
+        failedVersions++
       }
     }
 
+    console.log('\n=== Rollback Summary ===')
+    console.log(`Documents: ${successDocs} succeeded, ${failedDocs} failed out of ${documentCount}`)
+    console.log(`Versions: ${successVersions} succeeded, ${failedVersions} failed out of ${versionCount}`)
     console.log('\n=== Rollback Complete ===')
   }
 } 

@@ -1,7 +1,6 @@
 import withHybridAuth, { ExtendedApiRequest } from '@lib/with-hybrid-auth'
 import type { NextApiResponse } from 'next'
 import { storage } from '@lib/storage'
-import * as Y from 'yjs'
 
 export default withHybridAuth(async function documentHandler(req: ExtendedApiRequest, res: NextApiResponse) {
   const { query, method, user } = req
@@ -24,25 +23,21 @@ export default withHybridAuth(async function documentHandler(req: ExtendedApiReq
         return res.status(404).json({ error: 'Document not found' })
       }
 
-      // Convert YJS state to readable content
-      let content = ''
-      const docContent = document.content as { type?: string; state?: number[] } | string | undefined
-      
-      if (docContent && typeof docContent === 'object' && 
-          docContent.type === 'yjs' && Array.isArray(docContent.state)) {
-        console.log('Converting YJS state to readable content')
-        const ydoc = new Y.Doc()
-        Y.applyUpdate(ydoc, new Uint8Array(docContent.state))
-        content = ydoc.getText('content').toString()
-        console.log('Content length:', content.length)
-      } else {
-        content = typeof docContent === 'string' ? docContent : JSON.stringify(docContent)
+      // Parse stringified JSON content
+      let parsedContent = document.content
+      if (typeof document.content === 'string') {
+        try {
+          parsedContent = JSON.parse(document.content)
+        } catch (e) {
+          console.log('Warning: Could not parse document content')
+          // Keep as string if parsing fails
+        }
       }
 
       // For local storage, everyone has full permissions
       const documentWithPermissions = {
         ...document,
-        content,
+        content: parsedContent,
         canEdit: true,
         canComment: true,
         lastUpdated: document.lastUpdated || Date.now()
@@ -60,37 +55,27 @@ export default withHybridAuth(async function documentHandler(req: ExtendedApiReq
         return res.status(404).json({ error: 'Document not found' })
       }
 
-      // Only process content if it's being updated
-      let content = req.body.content
-      if (content !== undefined) {
-        console.log('Converting content to YJS state')
-        const ydoc = new Y.Doc()
-        const ytext = ydoc.getText('content')
-        
-        if (typeof content === 'string') {
-          ytext.insert(0, content)
-        } else {
-          ytext.insert(0, JSON.stringify(content))
-        }
-
-        const state = Y.encodeStateAsUpdate(ydoc)
-        console.log('YJS state length:', state.length)
-        
-        content = {
-          type: 'yjs',
-          state: Array.from(state)
-        }
-      }
-
+      // Stringify content if it's provided
       const updateData = {
         ...req.body,
         updatedAt: new Date().toISOString(),
         lastUpdated: Date.now()
       }
 
-      // Only include content in update if it was provided
-      if (content !== undefined) {
-        updateData.content = content
+      // If content is provided, ensure it's stringified
+      if (req.body.content !== undefined) {
+        if (typeof req.body.content === 'object') {
+          updateData.content = JSON.stringify(req.body.content)
+        } else if (typeof req.body.content === 'string') {
+          // Validate that it's proper JSON
+          try {
+            JSON.parse(req.body.content)
+            updateData.content = req.body.content
+          } catch (e) {
+            // If not valid JSON, stringify it as a string value
+            updateData.content = JSON.stringify(req.body.content)
+          }
+        }
       }
 
       const updatedDocument = await storage.update('documents', documentId, updateData)
@@ -99,17 +84,20 @@ export default withHybridAuth(async function documentHandler(req: ExtendedApiReq
         return res.status(500).json({ error: 'Failed to update document' })
       }
 
-      // Convert YJS state back to readable content for response
-      let responseContent = updatedDocument.content
-      if (responseContent && typeof responseContent === 'object' && responseContent.type === 'yjs') {
-        const ydoc = new Y.Doc()
-        Y.applyUpdate(ydoc, new Uint8Array(responseContent.state))
-        responseContent = ydoc.getText('content').toString()
+      // Parse the content for the response
+      let parsedContent = updatedDocument.content
+      if (typeof updatedDocument.content === 'string') {
+        try {
+          parsedContent = JSON.parse(updatedDocument.content)
+        } catch (e) {
+          console.log('Warning: Could not parse updated document content')
+          // Keep as string if parsing fails
+        }
       }
 
       res.status(200).json({
         ...updatedDocument,
-        content: responseContent
+        content: parsedContent
       })
       break
     }

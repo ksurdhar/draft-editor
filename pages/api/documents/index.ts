@@ -4,41 +4,41 @@ import type { NextApiResponse } from 'next'
 import { storage } from '@lib/storage'
 import { DEFAULT_DOCUMENT_CONTENT, DEFAULT_DOCUMENT_TITLE } from '@lib/constants'
 import { createPermission } from '@lib/mongo-utils'
-import * as Y from 'yjs'
 
 const handlers = {
   async POST(req: ExtendedApiRequest, res: NextApiResponse) {
     console.log('\n=== Creating New Document ===')
     
-    // Create YJS document with default or provided content
-    const ydoc = new Y.Doc()
-    const ytext = ydoc.getText('content')
+    // Prepare content as stringified JSON
+    let content = req.body.content
     
-    if (req.body.content) {
-      console.log('Using provided content')
-      if (typeof req.body.content === 'string') {
-        ytext.insert(0, req.body.content)
-      } else {
-        ytext.insert(0, JSON.stringify(req.body.content))
-      }
-    } else {
+    if (!content) {
       console.log('Using default content')
-      ytext.insert(0, JSON.stringify(DEFAULT_DOCUMENT_CONTENT))
+      // Stringify the default content
+      content = JSON.stringify(DEFAULT_DOCUMENT_CONTENT)
+    } else if (typeof content === 'object') {
+      // If content is an object, stringify it
+      console.log('Stringifying object content')
+      content = JSON.stringify(content)
+    } else if (typeof content === 'string') {
+      // If it's already a string, make sure it's valid JSON
+      try {
+        // Try to parse it to validate, but keep it as a string
+        JSON.parse(content)
+        console.log('Content is already a valid JSON string')
+      } catch (e) {
+        // If it's not valid JSON, wrap it as a string value in JSON
+        console.log('Content is not valid JSON, wrapping as string value')
+        content = JSON.stringify(content)
+      }
     }
-
-    // Get YJS state
-    const state = Y.encodeStateAsUpdate(ydoc)
-    console.log('YJS state length:', state.length)
 
     const now = Date.now()
     const newDocument = await storage.create('documents', {
       ...req.body,
       userId: req.user!.sub,
       title: req.body.title || DEFAULT_DOCUMENT_TITLE,
-      content: {
-        type: 'yjs',
-        state: Array.from(state)
-      },
+      content,
       comments: [],
       lastUpdated: now
     })
@@ -58,10 +58,19 @@ const handlers = {
       // Don't fail the request if permission creation fails
     }
 
-    // Return document with readable content
+    // For the response, parse the stringified content back to an object
+    let responseContent
+    try {
+      responseContent = JSON.parse(content)
+    } catch (e) {
+      // If parsing fails, use the string as is
+      responseContent = content
+    }
+
+    // Return document with parsed content for the response
     res.status(200).json({
       ...newDocument,
-      content: ytext.toString()
+      content: responseContent
     })
   },
 
@@ -75,28 +84,27 @@ const handlers = {
     const documents = await storage.find('documents', { userId: req.user!.sub })
     console.log('Found documents:', documents.length)
 
-    // Convert YJS state to readable content for each document
+    // Process documents and parse stringified JSON
     const docsWithPermissions = await Promise.all(documents.map(async doc => {
-      let content = ''
+      let content = doc.content
       
-      // Only load content if metadataOnly is not set to true
-      if (metadataOnly !== 'true') {
-        const docContent = doc.content as { type?: string; state?: number[] } | string | undefined
-        
-        if (docContent && typeof docContent === 'object' && 
-            docContent.type === 'yjs' && Array.isArray(docContent.state)) {
-          const ydoc = new Y.Doc()
-          Y.applyUpdate(ydoc, new Uint8Array(docContent.state))
-          content = ydoc.getText('content').toString()
-        } else {
-          content = typeof docContent === 'string' ? docContent : JSON.stringify(docContent)
+      // Only include content if metadataOnly is not set to true
+      if (metadataOnly === 'true') {
+        content = undefined
+      } else if (typeof content === 'string') {
+        // Try to parse stringified JSON
+        try {
+          content = JSON.parse(content)
+        } catch (e) {
+          console.log(`Warning: Could not parse content for document ${doc._id}`)
+          // Keep as string if parsing fails
         }
       }
 
       return {
         ...doc,
         id: doc._id,
-        content: metadataOnly === 'true' ? undefined : content,
+        content,
         canEdit: true,
         canComment: true,
         lastUpdated: doc.lastUpdated || Date.now()
