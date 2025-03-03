@@ -1,0 +1,301 @@
+import fs from 'fs-extra'
+import path from 'path'
+import apiService from '../electron/api-service'
+import { DocumentData, FolderData } from '@typez/globals'
+
+// Mock the env-electron.json to use local DB
+jest.mock('fs', () => {
+  const originalFs = jest.requireActual('fs')
+  return {
+    ...originalFs,
+    readFileSync: (filePath: string, encoding: string) => {
+      if (filePath.includes('env-electron.json')) {
+        return JSON.stringify({
+          LOCAL_DB: true,
+          APP_STORAGE: false
+        })
+      }
+      return originalFs.readFileSync(filePath, encoding)
+    }
+  }
+})
+
+// Mock auth service to bypass authentication
+jest.mock('../electron/auth-service', () => ({
+  getAccessToken: jest.fn().mockReturnValue('mock-token'),
+  isTokenExpired: jest.fn().mockReturnValue(false),
+  refreshTokens: jest.fn().mockResolvedValue(undefined)
+}))
+
+describe('Electron API Service - Local Storage Integration Tests', () => {
+  const testDataDir = path.resolve(process.cwd(), 'data')
+  const documentsDir = path.join(testDataDir, 'documents')
+  const foldersDir = path.join(testDataDir, 'folders')
+  const versionsDir = path.join(testDataDir, 'versions')
+
+  // Clean up test data before and after tests
+  beforeAll(async () => {
+    // Ensure test directories exist
+    await fs.ensureDir(documentsDir)
+    await fs.ensureDir(foldersDir)
+    await fs.ensureDir(versionsDir)
+    
+    // Clean up any existing test data
+    const docFiles = await fs.readdir(documentsDir)
+    for (const file of docFiles) {
+      if (file.endsWith('.json')) {
+        await fs.remove(path.join(documentsDir, file))
+      }
+    }
+    
+    const folderFiles = await fs.readdir(foldersDir)
+    for (const file of folderFiles) {
+      if (file.endsWith('.json')) {
+        await fs.remove(path.join(foldersDir, file))
+      }
+    }
+    
+    const versionFiles = await fs.readdir(versionsDir)
+    for (const file of versionFiles) {
+      if (file.endsWith('.json')) {
+        await fs.remove(path.join(versionsDir, file))
+      }
+    }
+  }, 10000)
+
+  afterAll(async () => {
+    // Clean up test data
+    await fs.emptyDir(documentsDir)
+    await fs.emptyDir(foldersDir)
+    await fs.emptyDir(versionsDir)
+  }, 10000)
+
+  describe('Document Operations', () => {
+    it('should create a new document locally', async () => {
+      // Create a new document
+      const newDocData: Partial<DocumentData> = {
+        title: 'Test Document',
+        userId: 'test-user-id',
+        folderIndex: 0
+      }
+      
+      const result = await apiService.post('documents', newDocData)
+      
+      // Verify the document was created
+      expect(result).toBeDefined()
+      expect(result._id).toBeDefined()
+      expect(result.title).toBe('Test Document')
+      expect(result.userId).toBe('test-user-id')
+      expect(result.folderIndex).toBe(0)
+      
+      // Verify the document file exists
+      const docPath = path.join(documentsDir, `${result._id}.json`)
+      expect(fs.existsSync(docPath)).toBe(true)
+      
+      // Verify file contents
+      const fileContent = await fs.readFile(docPath, 'utf-8')
+      const savedDoc = JSON.parse(fileContent)
+      expect(savedDoc._id).toBe(result._id)
+      expect(savedDoc.title).toBe('Test Document')
+      expect(savedDoc.content).toBeDefined()
+      expect(savedDoc.content.type).toBe('yjs')
+      expect(Array.isArray(savedDoc.content.state)).toBe(true)
+      
+      return result
+    }, 10000)
+    
+    it('should retrieve all documents', async () => {
+      // Create a second document to ensure we have multiple
+      const secondDocData: Partial<DocumentData> = {
+        title: 'Second Test Document',
+        userId: 'test-user-id',
+        folderIndex: 1
+      }
+      
+      await apiService.post('documents', secondDocData)
+      
+      // Get all documents
+      const documents = await apiService.getDocuments()
+      
+      // Verify we got both documents
+      expect(Array.isArray(documents)).toBe(true)
+      expect(documents.length).toBeGreaterThanOrEqual(2)
+      
+      // Verify document properties
+      const testDoc = documents.find((doc: DocumentData) => doc.title === 'Test Document')
+      const secondDoc = documents.find((doc: DocumentData) => doc.title === 'Second Test Document')
+      
+      expect(testDoc).toBeDefined()
+      expect(secondDoc).toBeDefined()
+      
+      expect(testDoc?.userId).toBe('test-user-id')
+      expect(secondDoc?.userId).toBe('test-user-id')
+      
+      // Verify content is parsed from YJS format
+      expect(typeof testDoc?.content).toBe('string')
+      expect(typeof secondDoc?.content).toBe('string')
+    }, 10000)
+    
+    it('should retrieve a document by ID', async () => {
+      // Get all documents to find an ID
+      const documents = await apiService.getDocuments()
+      const testDoc = documents.find((doc: DocumentData) => doc.title === 'Test Document')
+      
+      expect(testDoc).toBeDefined()
+      expect(testDoc?._id).toBeDefined()
+      
+      // Get the document by ID
+      const document = await apiService.get(`documents/${testDoc?._id}`)
+      
+      // Verify document properties
+      expect(document).toBeDefined()
+      expect(document._id).toBe(testDoc?._id)
+      expect(document.title).toBe('Test Document')
+      expect(document.userId).toBe('test-user-id')
+      
+      // Verify content is parsed from YJS format
+      expect(typeof document.content).toBe('string')
+    }, 10000)
+    
+    it('should update a document', async () => {
+      // Get all documents to find an ID
+      const documents = await apiService.getDocuments()
+      const testDoc = documents.find((doc: DocumentData) => doc.title === 'Test Document')
+      
+      expect(testDoc).toBeDefined()
+      expect(testDoc?._id).toBeDefined()
+      
+      // Update the document
+      const updateData: Partial<DocumentData> = {
+        title: 'Updated Test Document',
+        content: JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Updated content' }] }] })
+      }
+      
+      const updatedDoc = await apiService.updateDocument(testDoc?._id as string, updateData)
+      
+      // Verify document was updated
+      expect(updatedDoc).toBeDefined()
+      expect(updatedDoc._id).toBe(testDoc?._id)
+      expect(updatedDoc.title).toBe('Updated Test Document')
+      
+      // Verify content was updated and is parsed from YJS format
+      expect(typeof updatedDoc.content).toBe('string')
+      expect(updatedDoc.content).toContain('Updated content')
+      
+      // Verify file was updated
+      const docPath = path.join(documentsDir, `${testDoc?._id}.json`)
+      const fileContent = await fs.readFile(docPath, 'utf-8')
+      const savedDoc = JSON.parse(fileContent)
+      
+      expect(savedDoc.title).toBe('Updated Test Document')
+      expect(savedDoc.content.type).toBe('yjs')
+    }, 10000)
+    
+    it('should delete a document', async () => {
+      // Get all documents to find an ID
+      const documents = await apiService.getDocuments()
+      const secondDoc = documents.find((doc: DocumentData) => doc.title === 'Second Test Document')
+      
+      expect(secondDoc).toBeDefined()
+      expect(secondDoc?._id).toBeDefined()
+      
+      // Delete the document
+      const result = await apiService.deleteDocument(secondDoc?._id as string)
+      
+      // Verify deletion was successful
+      expect(result).toBeDefined()
+      expect(result.success).toBe(true)
+      
+      // Verify file was deleted
+      const docPath = path.join(documentsDir, `${secondDoc?._id}.json`)
+      expect(fs.existsSync(docPath)).toBe(false)
+      
+      // Verify document is no longer in the list
+      const updatedDocuments = await apiService.getDocuments()
+      const deletedDoc = updatedDocuments.find((doc: DocumentData) => doc._id === secondDoc?._id)
+      expect(deletedDoc).toBeUndefined()
+    }, 10000)
+  })
+
+  describe('Folder Operations', () => {
+    it('should create a new folder locally', async () => {
+      // Create a new folder
+      const newFolderData = {
+        title: 'Test Folder',
+        userId: 'test-user-id',
+        parentId: 'root',
+        folderIndex: 0
+      }
+      
+      const result = await apiService.post('folders', newFolderData)
+      
+      // Verify the folder was created
+      expect(result).toBeDefined()
+      expect(result._id).toBeDefined()
+      expect(result.title).toBe('Test Folder')
+      expect(result.userId).toBe('test-user-id')
+      expect(result.parentId).toBe('root')
+      expect(result.folderIndex).toBe(0)
+      
+      // Verify the folder file exists
+      const folderPath = path.join(foldersDir, `${result._id}.json`)
+      expect(fs.existsSync(folderPath)).toBe(true)
+      
+      // Verify file contents
+      const fileContent = await fs.readFile(folderPath, 'utf-8')
+      const savedFolder = JSON.parse(fileContent)
+      expect(savedFolder._id).toBe(result._id)
+      expect(savedFolder.title).toBe('Test Folder')
+      
+      return result
+    }, 10000)
+    
+    it('should retrieve all folders', async () => {
+      // Get all folders
+      const folders = await apiService.getFolders()
+      
+      // Verify we got the folder
+      expect(Array.isArray(folders)).toBe(true)
+      expect(folders.length).toBeGreaterThanOrEqual(1)
+      
+      // Verify folder properties
+      const testFolder = folders.find((folder: FolderData) => folder.title === 'Test Folder')
+      expect(testFolder).toBeDefined()
+      expect(testFolder?.userId).toBe('test-user-id')
+      expect(testFolder?.parentId).toBe('root')
+    }, 10000)
+  })
+
+  describe('Document in Folder', () => {
+    it('should create a document in a folder', async () => {
+      // Get the folder ID
+      const folders = await apiService.getFolders()
+      const testFolder = folders.find((folder: FolderData) => folder.title === 'Test Folder')
+      expect(testFolder).toBeDefined()
+      expect(testFolder?._id).toBeDefined()
+      
+      // Create a document in the folder
+      const newDocData: Partial<DocumentData> = {
+        title: 'Document in Folder',
+        userId: 'test-user-id',
+        parentId: testFolder?._id,
+        folderIndex: 0
+      }
+      
+      const result = await apiService.post('documents', newDocData)
+      
+      // Verify the document was created
+      expect(result).toBeDefined()
+      expect(result._id).toBeDefined()
+      expect(result.title).toBe('Document in Folder')
+      expect(result.userId).toBe('test-user-id')
+      expect(result.parentId).toBe(testFolder?._id)
+      
+      // Get all documents and verify the document is in the folder
+      const documents = await apiService.getDocuments()
+      const docInFolder = documents.find((doc: DocumentData) => doc.title === 'Document in Folder')
+      expect(docInFolder).toBeDefined()
+      expect(docInFolder?.parentId).toBe(testFolder?._id)
+    }, 10000)
+  })
+}) 

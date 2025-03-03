@@ -5,6 +5,12 @@ import { ObjectId } from 'mongodb'
 import * as Y from 'yjs'
 import { VersionData } from '@typez/globals'
 
+// Define an interface for YJS content structure
+interface YjsContent {
+  type: string
+  state: number[]
+}
+
 export class VersionStorage {
   private storagePath = ''
   private useFileStorage: boolean
@@ -46,6 +52,14 @@ export class VersionStorage {
     return versionsPath
   }
 
+  // Helper to check if content is YJS format
+  private isYjsContent(content: any): content is YjsContent {
+    return content && 
+           typeof content === 'object' && 
+           content.type === 'yjs' && 
+           Array.isArray(content.state)
+  }
+
   async getVersions(documentId: string): Promise<VersionData[]> {
     if (!this.useFileStorage) {
       return [] // In mongo mode, versions should be handled by mongo adapter
@@ -63,10 +77,10 @@ export class VersionStorage {
           .map(async file => {
             const filePath = path.join(versionsPath, file)
             const content = await fs.readFile(filePath, 'utf-8')
-            const version = JSON.parse(content) as VersionData
+            const version = JSON.parse(content) as VersionData & { content: any }
 
             // Deserialize YJS content if present
-            if (version.content?.type === 'yjs' && Array.isArray(version.content.state)) {
+            if (this.isYjsContent(version.content)) {
               console.log(`Deserializing YJS content for version: ${version.id}`)
               const ydoc = this.getYDoc(`${documentId}-${version.id}`) // Use unique ID for each version
               const state = new Uint8Array(version.content.state)
@@ -128,17 +142,17 @@ export class VersionStorage {
       }
 
       const content = await fs.readFile(filePath, 'utf-8')
-      const version = JSON.parse(content) as VersionData
+      const version = JSON.parse(content) as VersionData & { content: any }
       console.log('Raw version data:', {
         id: version.id,
         documentId: version.documentId,
         contentType: typeof version.content,
-        hasYjsState: version.content?.type === 'yjs' && Array.isArray(version.content.state),
-        stateLength: version.content?.state?.length
+        hasYjsState: this.isYjsContent(version.content),
+        stateLength: this.isYjsContent(version.content) ? version.content.state.length : undefined
       })
       
       // If the version has YJS content, deserialize it
-      if (version.content?.type === 'yjs' && Array.isArray(version.content.state)) {
+      if (this.isYjsContent(version.content)) {
         console.log('Deserializing YJS state')
         const ydoc = this.getYDoc(documentId)
         const state = new Uint8Array(version.content.state)
@@ -194,26 +208,30 @@ export class VersionStorage {
     const state = Y.encodeStateAsUpdate(ydoc)
     console.log('YJS state array length:', state.length)
 
-    const newVersion: VersionData = {
+    // Create a new version with YJS content
+    // We need to cast this to any because VersionData expects content to be a string
+    // but we need to store the YJS state for persistence
+    const newVersion = {
       ...version,
       id: new ObjectId().toString(),
       content: {
         type: 'yjs',
         state: Array.from(state)
       }
-    }
+    } as any
 
     const versionsPath = this.getVersionsPath(version.documentId)
     const filePath = path.join(versionsPath, `${newVersion.id}.json`)
     
     await fs.writeFile(filePath, JSON.stringify(newVersion, null, 2))
     console.log('Created version:', newVersion.id)
-    console.log('Stored state array length:', (newVersion.content as any).state.length)
+    console.log('Stored state array length:', newVersion.content.state.length)
 
     // Return with readable content
     const readableContent = ytext.toString()
     console.log('Returning content preview:', readableContent.substring(0, 100))
 
+    // Return a proper VersionData object with string content
     return {
       ...newVersion,
       content: readableContent
