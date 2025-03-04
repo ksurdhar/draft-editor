@@ -482,12 +482,12 @@ describe('Electron API Service - Local Storage Integration Tests', () => {
 
       // Verify version was created
       expect(result).toBeDefined()
-      expect(result.id).toBeDefined()
+      expect(result._id).toBeDefined()
       expect(result.documentId).toBe(testDocId)
       expect(result.title).toBe('Version 1')
 
       // Verify version file exists
-      const versionPath = path.join(versionsDir, `${result.id}.json`)
+      const versionPath = path.join(versionsDir, `${result._id}.json`)
       expect(fs.existsSync(versionPath)).toBe(true)
 
       // Verify file contents
@@ -566,19 +566,19 @@ describe('Electron API Service - Local Storage Integration Tests', () => {
       }
 
       const version = await apiService.post(`documents/${testDocId}/versions`, versionData)
-      expect(version.id).toBeDefined()
+      expect(version._id).toBeDefined()
 
       // Delete the version
-      const result = await apiService.destroy(`documents/${testDocId}/versions?versionId=${version.id}`)
+      const result = await apiService.destroy(`documents/${testDocId}/versions?versionId=${version._id}`)
       expect(result.success).toBe(true)
 
       // Verify version file was deleted
-      const versionPath = path.join(versionsDir, `${version.id}.json`)
+      const versionPath = path.join(versionsDir, `${version._id}.json`)
       expect(fs.existsSync(versionPath)).toBe(false)
 
       // Verify version is not in the list
       const versions = await apiService.get(`documents/${testDocId}/versions`)
-      const deletedVersion = versions.find((v: any) => v.id === version.id)
+      const deletedVersion = versions.find((v: any) => v._id === version._id)
       expect(deletedVersion).toBeUndefined()
     }, 10000)
   })

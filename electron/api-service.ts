@@ -199,18 +199,18 @@ const makeRequest = async (
       switch (method) {
         case 'get':
           console.log('Getting versions for document:', documentId)
-          return { data: await versionStorage.getVersions(documentId) }
+          return { data: await versionStorage.find('versions', { documentId }) }
         case 'post':
           if (!data) return { data: null }
           console.log('Creating version:', data)
-          return { data: await versionStorage.createVersion(data as Omit<VersionData, 'id'>) }
+          return { data: await versionStorage.create('versions', data) }
         case 'delete':
           if (!versionId) {
             console.log('No version ID provided for deletion')
             return { data: { success: false, error: 'No version ID provided' } }
           }
           console.log('Deleting version:', { documentId, versionId })
-          const success = await versionStorage.deleteVersion(documentId, versionId)
+          const success = await versionStorage.delete('versions', { _id: versionId })
           return { data: { success } }
       }
     }
@@ -284,17 +284,17 @@ const makeRequest = async (
         const [docId, versionId] = parts
         switch (method) {
           case 'get':
-            return { data: await versionStorage.getVersion(docId, versionId) }
+            return { data: await versionStorage.findById('versions', versionId) }
           case 'delete':
-            return { data: await versionStorage.deleteVersion(docId, versionId) }
+            return { data: await versionStorage.delete('versions', { _id: versionId }) }
         }
       } else if (parts.length === 1) {
         switch (method) {
           case 'get':
-            return { data: await versionStorage.getVersions(parts[0]) }
+            return { data: await versionStorage.find('versions', { documentId: parts[0] }) }
           case 'post':
             if (!data) return { data: null }
-            return { data: await versionStorage.createVersion(data as VersionData) }
+            return { data: await versionStorage.create('versions', data) }
         }
       }
     }
