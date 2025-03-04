@@ -89,6 +89,54 @@ class ElectronFileStorageAdapter extends FileStorageAdapter {
 
     return updatedDoc
   }
+
+  async delete(collection: string, query: Record<string, any>): Promise<boolean> {
+    console.log('\n=== ElectronFileStorageAdapter.delete ===')
+    console.log('Collection:', collection)
+    console.log('Query:', query)
+
+    try {
+      const documents = await this.find(collection, query)
+      
+      if (documents.length === 0) {
+        return false
+      }
+
+      // If we're deleting folders, we need to handle nested content
+      if (collection === 'folders') {
+        for (const folder of documents) {
+          // Delete all documents in this folder
+          await this.find('documents', { parentId: folder._id }).then(docs => {
+            docs.forEach(async doc => {
+              await this.delete('documents', { _id: doc._id })
+            })
+          })
+
+          // Delete all nested folders recursively
+          await this.find('folders', { parentId: folder._id }).then(async subfolders => {
+            for (const subfolder of subfolders) {
+              await this.delete('folders', { _id: subfolder._id })
+            }
+          })
+
+          // Delete the folder file itself
+          const filePath = path.join(process.env.JSON_STORAGE_PATH || './data', collection, `${folder._id}.json`)
+          await fs.remove(filePath)
+        }
+      } else {
+        // For non-folder collections, just delete the files
+        for (const doc of documents) {
+          const filePath = path.join(process.env.JSON_STORAGE_PATH || './data', collection, `${doc._id}.json`)
+          await fs.remove(filePath)
+        }
+      }
+
+      return true
+    } catch (error) {
+      console.error('Error deleting documents:', error)
+      return false
+    }
+  }
 }
 
 // Create a custom version storage adapter that uses generateUUID for IDs

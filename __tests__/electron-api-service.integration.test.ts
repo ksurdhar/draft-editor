@@ -235,8 +235,10 @@ describe('Electron API Service - Local Storage Integration Tests', () => {
   })
 
   describe('Folder Operations', () => {
-    it('should create a new folder locally', async () => {
-      // Create a new folder
+    let testFolderId: string
+
+    beforeEach(async () => {
+      // Create a test folder to work with
       const newFolderData = {
         title: 'Test Folder',
         userId: 'test-user-id',
@@ -245,14 +247,27 @@ describe('Electron API Service - Local Storage Integration Tests', () => {
       }
       
       const result = await apiService.post('folders', newFolderData)
+      testFolderId = result._id
+    })
+
+    it('should create a new folder locally', async () => {
+      // Create a new folder
+      const newFolderData = {
+        title: 'Another Test Folder',
+        userId: 'test-user-id',
+        parentId: 'root',
+        folderIndex: 1
+      }
+      
+      const result = await apiService.post('folders', newFolderData)
       
       // Verify the folder was created
       expect(result).toBeDefined()
       expect(result._id).toBeDefined()
-      expect(result.title).toBe('Test Folder')
+      expect(result.title).toBe('Another Test Folder')
       expect(result.userId).toBe('test-user-id')
       expect(result.parentId).toBe('root')
-      expect(result.folderIndex).toBe(0)
+      expect(result.folderIndex).toBe(1)
       
       // Verify the folder file exists
       const folderPath = path.join(foldersDir, `${result._id}.json`)
@@ -262,25 +277,137 @@ describe('Electron API Service - Local Storage Integration Tests', () => {
       const fileContent = await fs.readFile(folderPath, 'utf-8')
       const savedFolder = JSON.parse(fileContent)
       expect(savedFolder._id).toBe(result._id)
-      expect(savedFolder.title).toBe('Test Folder')
-      
-      return result
-    }, 10000)
+      expect(savedFolder.title).toBe('Another Test Folder')
+    })
     
     it('should retrieve all folders', async () => {
       // Get all folders
       const folders = await apiService.getFolders()
       
-      // Verify we got the folder
+      // Verify we got the folders
       expect(Array.isArray(folders)).toBe(true)
       expect(folders.length).toBeGreaterThanOrEqual(1)
       
       // Verify folder properties
-      const testFolder = folders.find((folder: FolderData) => folder.title === 'Test Folder')
+      const testFolder = folders.find((folder: FolderData) => folder._id === testFolderId)
       expect(testFolder).toBeDefined()
       expect(testFolder?.userId).toBe('test-user-id')
       expect(testFolder?.parentId).toBe('root')
-    }, 10000)
+    })
+
+    it('should retrieve a folder by ID', async () => {
+      // Get the folder by ID
+      const folder = await apiService.get(`folders/${testFolderId}`)
+      
+      // Verify folder properties
+      expect(folder).toBeDefined()
+      expect(folder._id).toBe(testFolderId)
+      expect(folder.title).toBe('Test Folder')
+      expect(folder.userId).toBe('test-user-id')
+      expect(folder.parentId).toBe('root')
+    })
+
+    it('should update a folder', async () => {
+      // Update the folder
+      const updateData = {
+        title: 'Updated Test Folder',
+        folderIndex: 2
+      }
+      
+      const updatedFolder = await apiService.patch(`folders/${testFolderId}`, updateData)
+      
+      // Verify folder was updated
+      expect(updatedFolder).toBeDefined()
+      expect(updatedFolder._id).toBe(testFolderId)
+      expect(updatedFolder.title).toBe('Updated Test Folder')
+      expect(updatedFolder.folderIndex).toBe(2)
+      
+      // Verify file was updated
+      const folderPath = path.join(foldersDir, `${testFolderId}.json`)
+      const fileContent = await fs.readFile(folderPath, 'utf-8')
+      const savedFolder = JSON.parse(fileContent)
+      expect(savedFolder.title).toBe('Updated Test Folder')
+      expect(savedFolder.folderIndex).toBe(2)
+    })
+
+    it('should create nested folders', async () => {
+      // Create a child folder
+      const childFolderData = {
+        title: 'Child Folder',
+        userId: 'test-user-id',
+        parentId: testFolderId,
+        folderIndex: 0
+      }
+      
+      const childFolder = await apiService.post('folders', childFolderData)
+      
+      // Verify child folder was created
+      expect(childFolder).toBeDefined()
+      expect(childFolder._id).toBeDefined()
+      expect(childFolder.title).toBe('Child Folder')
+      expect(childFolder.parentId).toBe(testFolderId)
+      
+      // Get all folders and verify parent-child relationship
+      const folders = await apiService.getFolders()
+      const parent = folders.find((f: FolderData) => f._id === testFolderId)
+      const child = folders.find((f: FolderData) => f._id === childFolder._id)
+      
+      expect(parent).toBeDefined()
+      expect(child).toBeDefined()
+      expect(child?.parentId).toBe(parent?._id)
+    })
+
+    it('should delete a folder', async () => {
+      // Create a folder to delete
+      const folderToDelete = await apiService.post('folders', {
+        title: 'Folder to Delete',
+        userId: 'test-user-id',
+        parentId: 'root',
+        folderIndex: 3
+      })
+      
+      expect(folderToDelete._id).toBeDefined()
+      
+      // Delete the folder
+      const result = await apiService.destroy(`folders/${folderToDelete._id}`)
+      expect(result.success).toBe(true)
+      
+      // Verify file was deleted
+      const folderPath = path.join(foldersDir, `${folderToDelete._id}.json`)
+      expect(fs.existsSync(folderPath)).toBe(false)
+      
+      // Verify folder is no longer in the list
+      const folders = await apiService.getFolders()
+      const deletedFolder = folders.find((f: FolderData) => f._id === folderToDelete._id)
+      expect(deletedFolder).toBeUndefined()
+    })
+
+    it('should delete a folder and its nested folders', async () => {
+      // Create a child folder
+      const childFolder = await apiService.post('folders', {
+        title: 'Nested Folder',
+        userId: 'test-user-id',
+        parentId: testFolderId,
+        folderIndex: 0
+      })
+      
+      // Delete the parent folder
+      const result = await apiService.destroy(`folders/${testFolderId}`)
+      expect(result.success).toBe(true)
+      
+      // Verify both folders' files were deleted
+      const parentPath = path.join(foldersDir, `${testFolderId}.json`)
+      const childPath = path.join(foldersDir, `${childFolder._id}.json`)
+      expect(fs.existsSync(parentPath)).toBe(false)
+      expect(fs.existsSync(childPath)).toBe(false)
+      
+      // Verify neither folder is in the list
+      const folders = await apiService.getFolders()
+      const deletedParent = folders.find((f: FolderData) => f._id === testFolderId)
+      const deletedChild = folders.find((f: FolderData) => f._id === childFolder._id)
+      expect(deletedParent).toBeUndefined()
+      expect(deletedChild).toBeUndefined()
+    })
   })
 
   describe('Document in Folder', () => {

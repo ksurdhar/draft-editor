@@ -265,7 +265,10 @@ const makeRequest = async (
           if (!data) return { data: null }
           return { data: await folderStorage.update(FOLDERS_COLLECTION, id, data as Partial<Document>) }
         case 'delete':
-          return { data: await folderStorage.delete(FOLDERS_COLLECTION, { _id: id }) }
+          console.log('Attempting to delete folder with ID:', id)
+          const deleteResult = await folderStorage.delete(FOLDERS_COLLECTION, { _id: id })
+          console.log('Delete operation result:', deleteResult)
+          return { data: { success: deleteResult } }
         case 'post':
           if (!data) return { data: null }
           return { data: await folderStorage.create(FOLDERS_COLLECTION, data as Omit<Document, '_id'>) }
