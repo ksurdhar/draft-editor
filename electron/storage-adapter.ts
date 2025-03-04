@@ -1,5 +1,6 @@
 import { FileStorageAdapter } from '../lib/storage/file-storage'
 import { VersionStorage } from '../lib/storage/version-storage'
+import { VersionData } from '@typez/globals'
 import * as path from 'path'
 import { ObjectId } from 'mongodb'
 import * as fs from 'fs-extra'
@@ -94,6 +95,67 @@ class ElectronFileStorageAdapter extends FileStorageAdapter {
 class ElectronVersionStorage extends VersionStorage {
   generateId() {
     return generateUUID()
+  }
+
+  async createVersion(version: Omit<VersionData, 'id'>): Promise<VersionData> {
+    const newVersion = {
+      ...version,
+      id: this.generateId(),
+      createdAt: Date.now()
+    }
+
+    // Parse content if it's provided as a string
+    if (typeof newVersion.content === 'string') {
+      try {
+        newVersion.content = JSON.parse(newVersion.content)
+      } catch (e) {
+        console.error('Error parsing content:', e)
+        // Keep content as string if parsing fails
+      }
+    }
+
+    const filePath = path.join(process.env.JSON_STORAGE_PATH || './data', 'versions', `${newVersion.id}.json`)
+    await fs.writeFile(filePath, JSON.stringify(newVersion, null, 2))
+
+    return newVersion
+  }
+
+  async getVersions(documentId: string): Promise<VersionData[]> {
+    const versionsPath = path.join(process.env.JSON_STORAGE_PATH || './data', 'versions')
+    
+    if (!fs.existsSync(versionsPath)) {
+      return []
+    }
+
+    const files = await fs.readdir(versionsPath)
+    const versions = await Promise.all(
+      files
+        .filter(file => file.endsWith('.json'))
+        .map(async file => {
+          const filePath = path.join(versionsPath, file)
+          const content = await fs.readFile(filePath, 'utf-8')
+          const version = JSON.parse(content)
+          return version
+        })
+    )
+
+    // Filter versions for this document and sort by title
+    const documentVersions = versions
+      .filter(version => version.documentId === documentId)
+      .sort((a, b) => a.title.localeCompare(b.title))
+
+    return documentVersions
+  }
+
+  async deleteVersion(documentId: string, versionId: string): Promise<boolean> {
+    const filePath = path.join(process.env.JSON_STORAGE_PATH || './data', 'versions', `${versionId}.json`)
+
+    if (!fs.existsSync(filePath)) {
+      return false
+    }
+
+    await fs.remove(filePath)
+    return true
   }
 }
 

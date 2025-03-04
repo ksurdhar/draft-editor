@@ -315,4 +315,144 @@ describe('Electron API Service - Local Storage Integration Tests', () => {
       expect(docInFolder?.parentId).toBe(testFolder?._id)
     }, 10000)
   })
+
+  describe('Version Operations', () => {
+    let testDocId: string
+
+    beforeEach(async () => {
+      // Create a test document to work with
+      const newDocData: Partial<DocumentData> = {
+        title: 'Version Test Document',
+        userId: 'test-user-id',
+        content: JSON.stringify({
+          type: 'doc',
+          content: [{ 
+            type: 'paragraph', 
+            content: [{ type: 'text', text: 'Initial content' }] 
+          }]
+        })
+      }
+      
+      const doc = await apiService.post('documents', newDocData)
+      testDocId = doc._id
+    })
+
+    it('should create a version of a document', async () => {
+      const versionData = {
+        documentId: testDocId,
+        content: JSON.stringify({
+          type: 'doc',
+          content: [{ 
+            type: 'paragraph', 
+            content: [{ type: 'text', text: 'Version 1 content' }] 
+          }]
+        }),
+        title: 'Version 1',
+        userId: 'test-user-id'
+      }
+
+      const result = await apiService.post(`documents/${testDocId}/versions`, versionData)
+
+      // Verify version was created
+      expect(result).toBeDefined()
+      expect(result.id).toBeDefined()
+      expect(result.documentId).toBe(testDocId)
+      expect(result.title).toBe('Version 1')
+
+      // Verify version file exists
+      const versionPath = path.join(versionsDir, `${result.id}.json`)
+      expect(fs.existsSync(versionPath)).toBe(true)
+
+      // Verify file contents
+      const fileContent = await fs.readFile(versionPath, 'utf-8')
+      const savedVersion = JSON.parse(fileContent)
+      expect(savedVersion.documentId).toBe(testDocId)
+      expect(savedVersion.title).toBe('Version 1')
+      
+      // Parse content and verify
+      const content = typeof savedVersion.content === 'string' 
+        ? JSON.parse(savedVersion.content)
+        : savedVersion.content
+      expect(content.type).toBe('doc')
+      expect(content.content[0].content[0].text).toBe('Version 1 content')
+    })
+
+    it('should retrieve versions of a document', async () => {
+      // Create two versions
+      const version1Data = {
+        documentId: testDocId,
+        content: JSON.stringify({
+          type: 'doc',
+          content: [{ 
+            type: 'paragraph', 
+            content: [{ type: 'text', text: 'Version 1 content' }] 
+          }]
+        }),
+        title: 'Version 1',
+        userId: 'test-user-id'
+      }
+
+      const version2Data = {
+        documentId: testDocId,
+        content: JSON.stringify({
+          type: 'doc',
+          content: [{ 
+            type: 'paragraph', 
+            content: [{ type: 'text', text: 'Version 2 content' }] 
+          }]
+        }),
+        title: 'Version 2',
+        userId: 'test-user-id'
+      }
+
+      await apiService.post(`documents/${testDocId}/versions`, version1Data)
+      await apiService.post(`documents/${testDocId}/versions`, version2Data)
+
+      // Get all versions
+      const versions = await apiService.get(`documents/${testDocId}/versions`)
+
+      // Verify we got both versions
+      expect(Array.isArray(versions)).toBe(true)
+      expect(versions.length).toBe(2)
+
+      // Verify version properties
+      const [version1, version2] = versions
+      expect(version1.title).toBe('Version 1')
+      expect(version2.title).toBe('Version 2')
+      expect(version1.documentId).toBe(testDocId)
+      expect(version2.documentId).toBe(testDocId)
+    })
+
+    it('should delete a version', async () => {
+      // Create a version
+      const versionData = {
+        documentId: testDocId,
+        content: JSON.stringify({
+          type: 'doc',
+          content: [{ 
+            type: 'paragraph', 
+            content: [{ type: 'text', text: 'Version to delete' }] 
+          }]
+        }),
+        title: 'Version to Delete',
+        userId: 'test-user-id'
+      }
+
+      const version = await apiService.post(`documents/${testDocId}/versions`, versionData)
+      expect(version.id).toBeDefined()
+
+      // Delete the version
+      const result = await apiService.destroy(`documents/${testDocId}/versions?versionId=${version.id}`)
+      expect(result.success).toBe(true)
+
+      // Verify version file was deleted
+      const versionPath = path.join(versionsDir, `${version.id}.json`)
+      expect(fs.existsSync(versionPath)).toBe(false)
+
+      // Verify version is not in the list
+      const versions = await apiService.get(`documents/${testDocId}/versions`)
+      const deletedVersion = versions.find((v: any) => v.id === version.id)
+      expect(deletedVersion).toBeUndefined()
+    }, 10000)
+  })
 }) 
