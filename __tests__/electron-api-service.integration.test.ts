@@ -98,8 +98,8 @@ describe('Electron API Service - Local Storage Integration Tests', () => {
       expect(savedDoc._id).toBe(result._id)
       expect(savedDoc.title).toBe('Test Document')
       expect(savedDoc.content).toBeDefined()
-      expect(savedDoc.content.type).toBe('yjs')
-      expect(Array.isArray(savedDoc.content.state)).toBe(true)
+      expect(typeof savedDoc.content).toBe('object')
+      expect(savedDoc.content.type).toBe('doc')
       
       return result
     }, 10000)
@@ -131,9 +131,11 @@ describe('Electron API Service - Local Storage Integration Tests', () => {
       expect(testDoc?.userId).toBe('test-user-id')
       expect(secondDoc?.userId).toBe('test-user-id')
       
-      // Verify content is parsed from YJS format
-      expect(typeof testDoc?.content).toBe('string')
-      expect(typeof secondDoc?.content).toBe('string')
+      // Verify content is in TipTap format, not YJS
+      expect(typeof testDoc?.content).toBe('object')
+      expect(typeof secondDoc?.content).toBe('object')
+      expect(testDoc?.content.type).toBe('doc')
+      expect(secondDoc?.content.type).toBe('doc')
     }, 10000)
     
     it('should retrieve a document by ID', async () => {
@@ -153,8 +155,9 @@ describe('Electron API Service - Local Storage Integration Tests', () => {
       expect(document.title).toBe('Test Document')
       expect(document.userId).toBe('test-user-id')
       
-      // Verify content is parsed from YJS format
-      expect(typeof document.content).toBe('string')
+      // Verify content is in TipTap format
+      expect(typeof document.content).toBe('object')
+      expect(document.content.type).toBe('doc')
     }, 10000)
     
     it('should update a document', async () => {
@@ -165,10 +168,19 @@ describe('Electron API Service - Local Storage Integration Tests', () => {
       expect(testDoc).toBeDefined()
       expect(testDoc?._id).toBeDefined()
       
-      // Update the document
+      // Update the document with TipTap content
       const updateData: Partial<DocumentData> = {
         title: 'Updated Test Document',
-        content: JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Updated content' }] }] })
+        content: JSON.stringify({
+          type: 'doc', 
+          content: [{ 
+            type: 'paragraph', 
+            content: [{ 
+              type: 'text', 
+              text: 'Updated content' 
+            }] 
+          }]
+        })
       }
       
       const updatedDoc = await apiService.updateDocument(testDoc?._id as string, updateData)
@@ -178,9 +190,14 @@ describe('Electron API Service - Local Storage Integration Tests', () => {
       expect(updatedDoc._id).toBe(testDoc?._id)
       expect(updatedDoc.title).toBe('Updated Test Document')
       
-      // Verify content was updated and is parsed from YJS format
-      expect(typeof updatedDoc.content).toBe('string')
-      expect(updatedDoc.content).toContain('Updated content')
+      // Get the content, whether it's a string or object
+      const content = typeof updatedDoc.content === 'string' 
+        ? JSON.parse(updatedDoc.content)
+        : updatedDoc.content
+      
+      // Verify content was updated and is in TipTap format
+      expect(content.type).toBe('doc')
+      expect(content.content[0].content[0].text).toBe('Updated content')
       
       // Verify file was updated
       const docPath = path.join(documentsDir, `${testDoc?._id}.json`)
@@ -188,7 +205,7 @@ describe('Electron API Service - Local Storage Integration Tests', () => {
       const savedDoc = JSON.parse(fileContent)
       
       expect(savedDoc.title).toBe('Updated Test Document')
-      expect(savedDoc.content.type).toBe('yjs')
+      expect(savedDoc.content.type).toBe('doc')
     }, 10000)
     
     it('should delete a document', async () => {

@@ -1,5 +1,4 @@
 import { FileStorageAdapter } from '../lib/storage/file-storage'
-import { YjsStorageAdapter } from '../lib/storage/yjs-storage'
 import { VersionStorage } from '../lib/storage/version-storage'
 import * as path from 'path'
 import { ObjectId } from 'mongodb'
@@ -35,25 +34,7 @@ console.log('Documents path:', path.join(storagePath, 'documents'))
 console.log('Folders path:', path.join(storagePath, 'folders'))
 console.log('Versions path:', path.join(storagePath, 'versions'))
 
-// Create a custom storage adapter that uses generateUUID for IDs
-class ElectronYjsStorageAdapter extends YjsStorageAdapter {
-  async create(collection: string, data: any): Promise<any> {
-    if (!collection) {
-      throw new Error('Collection name is required')
-    }
-
-    const newDoc = await super.create(collection, {
-      ...data,
-      _id: generateUUID(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    })
-
-    return newDoc
-  }
-}
-
-// For folders, we'll still use the file-based storage
+// For documents and folders, we'll use the file-based storage
 class ElectronFileStorageAdapter extends FileStorageAdapter {
   async create(collection: string, data: any): Promise<any> {
     if (!collection) {
@@ -75,6 +56,38 @@ class ElectronFileStorageAdapter extends FileStorageAdapter {
 
     return newDoc
   }
+
+  async update(collection: string, id: string, data: any): Promise<any> {
+    const doc = await this.findById(collection, id)
+    if (!doc) {
+      throw new Error(`Document not found: ${id}`)
+    }
+
+    // Parse content if it's provided as a string
+    let parsedData = { ...data }
+    if (data.content) {
+      if (typeof data.content === 'string') {
+        try {
+          parsedData.content = JSON.parse(data.content)
+        } catch (e) {
+          console.error('Error parsing content:', e)
+          // Keep content as string if parsing fails
+        }
+      }
+    }
+
+    const updatedDoc = { 
+      ...doc, 
+      ...parsedData,
+      updatedAt: new Date().toISOString(),
+      lastUpdated: Date.now()
+    }
+
+    const filePath = path.join(process.env.JSON_STORAGE_PATH || './data', collection, `${id}.json`)
+    await fs.writeFile(filePath, JSON.stringify(updatedDoc, null, 2))
+
+    return updatedDoc
+  }
 }
 
 // Create a custom version storage adapter that uses generateUUID for IDs
@@ -84,8 +97,8 @@ class ElectronVersionStorage extends VersionStorage {
   }
 }
 
-// Use YJS for documents, file storage for folders
-export const documentStorage = new ElectronYjsStorageAdapter()
+// Use FileStorage for both documents and folders
+export const documentStorage = new ElectronFileStorageAdapter()
 export const folderStorage = new ElectronFileStorageAdapter()
 export const versionStorage = new ElectronVersionStorage()
 

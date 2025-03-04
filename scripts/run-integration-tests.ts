@@ -102,12 +102,15 @@ async function runTests(): Promise<number> {
     ...process.env,
     ...envConfig,
     LOCAL_DB: 'false',
-    SHARED_SERVER: 'true' // Add flag to indicate tests should use shared server
+    SHARED_SERVER: 'true'
   } as NodeJS.ProcessEnv
   
+  // Get pattern from command line args
+  const pattern = process.argv[2] ? `**/*${process.argv[2]}*.integration.test.ts` : '**/*.integration.test.ts'
+  
   return new Promise((resolve, reject) => {
-    console.log('Running integration tests...')
-    const jest = spawn('jest', ['--runInBand', '--testMatch', '**/*.integration.test.ts'], {
+    console.log('Running integration tests matching pattern:', pattern)
+    const jest = spawn('jest', ['--runInBand', '--testMatch', pattern], {
       env,
       stdio: 'inherit'
     })
