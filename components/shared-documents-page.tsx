@@ -245,31 +245,25 @@ const SharedDocumentsPage = ({
         return
       }
 
-      console.log('Attempting bulk delete with:', {
-        selectedItems,
-        selectedDocs,
-        selectedFolders,
-        items: Object.keys(items).map(key => ({ id: key, isFolder: items[key].isFolder }))
-      })
+      // Store current state for potential rollback
+      const prevDocs = [...documents]
+      const prevFolders = [...folders]
 
-      await handleBulkDelete(selectedDocs, selectedFolders)
-      setDeleteModalOpen(false)
-      setSelectedItems([])
-    } catch (error: any) {
-      console.error('Delete error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        selectedItems
-      })
-      
-      // Show error in console with more details
-      if (error.response?.data?.details) {
-        console.error('Server error details:', error.response.data.details)
+      try {
+        await handleBulkDelete(selectedDocs, selectedFolders)
+        setDeleteModalOpen(false)
+        setSelectedItems([])
+      } catch (error: any) {
+        // Revert to previous state
+        mutateDocs(prevDocs)
+        mutateFolders(prevFolders)
+        
+        // Show detailed error if available
+        const errorMessage = error.response?.data?.details || error.message || 'Failed to delete items'
+        console.error('Delete failed:', errorMessage)
       }
-      
-      // Keep the modal open on error
-      // You might want to add an error message to the UI here
+    } catch (error: any) {
+      console.error('Error in delete operation:', error)
     }
   }
 
