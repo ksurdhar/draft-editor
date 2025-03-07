@@ -87,12 +87,17 @@ export default withHybridAuth(async function bulkDeleteHandler(req: ExtendedApiR
       console.log(`Starting to delete ${documentIds.length} documents`)
       const docResults = await Promise.all(
         documentIds.map(async id => {
-          const result = await storage.delete('documents', { _id: id, userId: user.sub })
-          console.log(`Document ${id} deletion result:`, result)
-          if (!result) {
-            throw new Error(`Failed to delete document ${id}`)
+          try {
+            const result = await storage.delete('documents', { _id: id, userId: user.sub })
+            console.log(`Document ${id} deletion result:`, result)
+            if (!result) {
+              throw new Error(`Document not found or unauthorized: ${id}`)
+            }
+            return result
+          } catch (err) {
+            console.error(`Error deleting document ${id}:`, err)
+            throw err
           }
-          return result
         })
       )
       console.log('Document deletion results:', docResults)
@@ -102,15 +107,25 @@ export default withHybridAuth(async function bulkDeleteHandler(req: ExtendedApiR
     if (folderIds.length > 0) {
       console.log(`Starting to delete ${folderIds.length} folders`)
       await Promise.all(
-        folderIds.map(id => deleteFolder(id, user.sub))
+        folderIds.map(async id => {
+          try {
+            await deleteFolder(id, user.sub)
+          } catch (err) {
+            console.error(`Error deleting folder ${id}:`, err)
+            throw err
+          }
+        })
       )
       console.log('Finished deleting all folders')
     }
 
     console.log('Bulk delete operation completed successfully')
     res.status(200).json({ success: true })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Bulk delete error:', error)
-    res.status(500).json({ error: 'Failed to delete items' })
+    res.status(500).json({ 
+      error: 'Failed to delete items',
+      details: error.message || 'Unknown error occurred'
+    })
   }
 }) 

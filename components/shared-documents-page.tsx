@@ -239,22 +239,45 @@ const SharedDocumentsPage = ({
       const selectedDocs = selectedItems.filter(id => !items[id]?.isFolder)
       const selectedFolders = selectedItems.filter(id => items[id]?.isFolder)
 
+      // Validate that we have valid items to delete
+      if (selectedDocs.length === 0 && selectedFolders.length === 0) {
+        console.error('No valid items selected for deletion')
+        return
+      }
+
+      console.log('Attempting bulk delete with:', {
+        selectedItems,
+        selectedDocs,
+        selectedFolders,
+        items: Object.keys(items).map(key => ({ id: key, isFolder: items[key].isFolder }))
+      })
+
       await handleBulkDelete(selectedDocs, selectedFolders)
       setDeleteModalOpen(false)
       setSelectedItems([])
-    } catch (error) {
-      console.error('Error deleting items:', error)
+    } catch (error: any) {
+      console.error('Delete error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        selectedItems
+      })
+      
+      // Show error in console with more details
+      if (error.response?.data?.details) {
+        console.error('Server error details:', error.response.data.details)
+      }
+      
+      // Keep the modal open on error
+      // You might want to add an error message to the UI here
     }
   }
 
   // Add keyboard shortcut for delete
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      console.log('keydown', e.key)
-      // Check if Command+D is pressed and there are selected items
       if ((e.metaKey || e.ctrlKey) && e.key === 'd' && selectedItems.length > 0) {
-        e.preventDefault() // Prevent default browser behavior (bookmark page)
-        console.log('deleting')
+        e.preventDefault()
         setDeleteModalOpen(true)
       }
     }
