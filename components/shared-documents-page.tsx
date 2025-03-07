@@ -247,6 +247,22 @@ const SharedDocumentsPage = ({
     }
   }
 
+  // Add keyboard shortcut for delete
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      console.log('keydown', e.key)
+      // Check if Command+D is pressed and there are selected items
+      if ((e.metaKey || e.ctrlKey) && e.key === 'd' && selectedItems.length > 0) {
+        e.preventDefault() // Prevent default browser behavior (bookmark page)
+        console.log('deleting')
+        setDeleteModalOpen(true)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedItems])
+
   const showSpinner = useSpinner(docsLoading || foldersLoading || userLoading)
   const items = useMemo(() => createTreeItems(documents, folders), [documents, folders])
 
