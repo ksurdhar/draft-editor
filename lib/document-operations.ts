@@ -127,7 +127,6 @@ export const bulkDelete = async (
     // Optimistically update UI
     const updatedDocs = docs.filter(doc => !documentIds.includes(doc._id))
     const updatedFolders = folders.filter(folder => !folderIds.includes(folder._id))
-    
     onUpdateState(updatedDocs, updatedFolders)
 
     // Make API call

@@ -15,8 +15,8 @@ export const NextDocumentsPage = () => {
       documents={documents || []}
       folders={folders || []}
       isLoading={docsLoading || foldersLoading}
-      onDocumentsChange={(docs) => mutateDocuments(docs)}
-      onFoldersChange={(folders) => mutateFolders(folders)}
+      onDocumentsChange={(docs) => mutateDocuments(docs, { revalidate: false })}
+      onFoldersChange={(folders) => mutateFolders(folders, { revalidate: false })}
     />
   )
 }

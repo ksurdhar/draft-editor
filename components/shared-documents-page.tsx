@@ -45,19 +45,13 @@ const SharedDocumentsPage = ({
 
   // Wrap mutation functions in useCallback
   const mutateDocs = useCallback((updatedDocs: DocumentData[] | ((current: DocumentData[]) => DocumentData[])) => {
-    if (typeof updatedDocs === 'function') {
-      onDocumentsChange(updatedDocs(documents))
-    } else {
-      onDocumentsChange(updatedDocs)
-    }
+    const newDocs = typeof updatedDocs === 'function' ? updatedDocs(documents) : updatedDocs
+    onDocumentsChange(newDocs)
   }, [documents, onDocumentsChange])
   
   const mutateFolders = useCallback((updatedFolders: FolderData[] | ((current: FolderData[]) => FolderData[])) => {
-    if (typeof updatedFolders === 'function') {
-      onFoldersChange(updatedFolders(folders))
-    } else {
-      onFoldersChange(updatedFolders)
-    }
+    const newFolders = typeof updatedFolders === 'function' ? updatedFolders(folders) : updatedFolders
+    onFoldersChange(newFolders)
   }, [folders, onFoldersChange])
 
   const docsLoading = isLoading
