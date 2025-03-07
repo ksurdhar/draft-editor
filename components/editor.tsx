@@ -94,7 +94,7 @@ const EditorComponent = ({
     onUpdate: ({ editor }) => {
       if (diffMode) return // Prevent updates in diff mode
       const json = editor.getJSON()
-      onUpdate({ content: json as { type: 'doc', content: any[] } })
+      onUpdate({ content: JSON.stringify(json) })
     },
     onCreate: ({ editor }) => {
       console.log('Editor onCreate - initial content:', editor.getJSON())

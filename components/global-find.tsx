@@ -87,7 +87,7 @@ export default function GlobalFind({ onClose: _onClose }: GlobalFindProps) {
             ? JSON.parse(doc.content).content
               .map((block: any) => block.content?.[0]?.text || '')
               .join('\n')
-            : doc.content.content
+            : (doc.content as { content: any[] }).content
               .map((block: any) => {
                 // Ensure we're getting the exact text with preserved case
                 const text = block.content?.[0]?.text
