@@ -1,19 +1,49 @@
 import { DocumentData, VersionData } from '@typez/globals'
 import axios, { AxiosRequestConfig } from 'axios'
-import * as fs from 'fs'
-import * as path from 'path'
 import authService from './auth-service'
 import { documentStorage, folderStorage, versionStorage } from './storage-adapter'
 import { DEFAULT_DOCUMENT_CONTENT } from '../lib/constants'
 
-const envPath = path.resolve(__dirname, '../../env-electron.json')
-const env = JSON.parse(fs.readFileSync(envPath, 'utf-8'))
-const useLocalDb = env.LOCAL_DB || false
-
+// We'll always use local storage and sync with cloud when possible
 const BASE_URL = 'https://www.whetstone-writer.com/api'
 const DOCUMENTS_COLLECTION = 'documents'
 const FOLDERS_COLLECTION = 'folders'
 
+// Check if we're online
+const isOnline = () => {
+  // For now, always return true while testing
+  // In a production app, we'd implement proper network detection
+  // Options include:
+  // 1. Using Electron's 'online' and 'offline' events
+  // 2. Attempting to reach a known server with a lightweight request
+  // 3. Using Node.js 'dns' module to resolve a hostname
+  return true
+}
+
+// Expose the CRUD methods to the renderer
+export const electronAPI = {
+  create: async (url: string, body: any) => {
+    const result = await makeRequest('post', url, body)
+    return result.data
+  },
+
+  patch: async (url: string, body: any) => {
+    const result = await makeRequest('patch', url, body)
+    return result.data
+  },
+
+  get: async (url: string) => {
+    const result = await makeRequest('get', url)
+    return result.data
+  },
+
+  destroy: async (url: string) => {
+    const result = await makeRequest('delete', url)
+    return result.data
+  }
+}
+
+// Export original apiService interface for backward compatibility
 const apiService = {
   getDocuments: async () => {
     const result = await makeRequest('get', '/documents')
@@ -56,6 +86,8 @@ const apiService = {
   }
 }
 
+export default apiService
+
 const makeRequest = async (
   method: 'get' | 'delete' | 'patch' | 'post',
   endpoint: string,
@@ -64,246 +96,295 @@ const makeRequest = async (
   console.log('\n=== API Request ===')
   console.log(`Method: ${method.toUpperCase()}`)
   console.log(`Endpoint: ${endpoint}`)
-  console.log(`Local DB Mode: ${useLocalDb}`)
+  console.log(`Online Mode: ${isOnline() ? 'Connected' : 'Offline'}`)
 
-  if (useLocalDb) {
-    // Clean the endpoint
-    endpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint
-    console.log(`Cleaned endpoint: ${endpoint}`)
+  // Clean the endpoint
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint
+  console.log(`Cleaned endpoint: ${cleanEndpoint}`)
 
-    // Handle collection-level operations
-    if (endpoint === 'documents') {
-      console.log('Handling collection-level documents request')
-      if (method === 'get') {
-        return { data: await documentStorage.find(DOCUMENTS_COLLECTION, {}) }
-      }
-      if (method === 'post') {
-        console.log('Creating new document:', data)
-        const now = Date.now()
-        const newDocument = await documentStorage.create(DOCUMENTS_COLLECTION, {
-          ...data,
-          content: data?.content || DEFAULT_DOCUMENT_CONTENT,
-          comments: [],
-          lastUpdated: now
-        })
-        console.log('Created document:', newDocument)
-        return { data: newDocument }
-      }
-      return { data: null }
-    }
-    if (endpoint === 'folders') {
-      console.log('Handling collection-level folders request')
-      if (method === 'get') {
-        return { data: await folderStorage.find(FOLDERS_COLLECTION, {}) }
-      }
-      if (method === 'post') {
-        console.log('Creating new folder:', data)
-        const now = Date.now()
-        const newFolder = await folderStorage.create(FOLDERS_COLLECTION, {
-          ...data,
-          lastUpdated: now
-        })
-        console.log('Created folder:', newFolder)
-        return { data: newFolder }
-      }
-      return { data: null }
-    }
-
-    // Handle bulk delete operation
-    if (endpoint === 'documents/bulk-delete') {
-      console.log('Handling bulk delete request')
-      if (method === 'post' && data) {
-        const { documentIds = [], folderIds = [] } = data as { documentIds: string[], folderIds: string[] }
-        console.log('Bulk deleting:', { documentIds, folderIds })
-
-        // Helper function to recursively delete a folder and its contents
-        async function deleteFolder(folderId: string) {
-          console.log(`Starting to delete folder ${folderId}`)
-          
-          // Get all documents and subfolders in this folder
-          const [docs, subfolders] = await Promise.all([
-            documentStorage.find(DOCUMENTS_COLLECTION, { parentId: folderId }),
-            documentStorage.find(FOLDERS_COLLECTION, { parentId: folderId })
-          ])
-
-          console.log(`Found in folder ${folderId}:`, {
-            documentsCount: docs.length,
-            subfoldersCount: subfolders.length,
-            documents: docs.map(d => d._id),
-            subfolders: subfolders.map(f => f._id)
-          })
-
-          // Recursively delete all subfolders
-          if (subfolders.length > 0) {
-            console.log(`Deleting ${subfolders.length} subfolders of ${folderId}`)
-            await Promise.all(
-              subfolders.map(folder => folder._id ? deleteFolder(folder._id) : Promise.resolve())
-            )
-          }
-
-          // Delete all documents in this folder
-          if (docs.length > 0) {
-            console.log(`Deleting ${docs.length} documents from folder ${folderId}`)
-            await Promise.all(
-              docs.map(doc => doc._id ? 
-                documentStorage.delete(DOCUMENTS_COLLECTION, { _id: doc._id }) : 
-                Promise.resolve()
-              )
-            )
-          }
-
-          // Finally delete the folder itself
-          console.log(`Deleting folder ${folderId}`)
-          const result = await documentStorage.delete(FOLDERS_COLLECTION, { _id: folderId })
-          if (!result) {
-            throw new Error(`Failed to delete folder ${folderId}`)
-          }
-          return result
+  try {
+    // Always execute local operation first
+    let localResult = await performLocalOperation(method, cleanEndpoint, data)
+    
+    // If we're online, also try to perform the cloud operation
+    if (isOnline()) {
+      try {
+        console.log('Attempting cloud operation...')
+        const cloudResult = await performCloudOperation(method, endpoint, data)
+        
+        // For reads (GET), if cloud request succeeds, update local data
+        if (method === 'get' && cloudResult && cloudResult.data) {
+          console.log('Cloud data retrieved, syncing to local storage')
+          await syncCloudDataToLocal(cleanEndpoint, cloudResult.data)
+          return cloudResult // Return cloud data for reads when online
         }
-
-        try {
-          // Delete all documents
-          if (documentIds.length > 0) {
-            console.log(`Starting to delete ${documentIds.length} documents`)
-            await Promise.all(
-              documentIds.map(id => 
-                documentStorage.delete(DOCUMENTS_COLLECTION, { _id: id })
-              )
-            )
-          }
-
-          // Delete all folders recursively
-          if (folderIds.length > 0) {
-            console.log(`Starting to delete ${folderIds.length} folders`)
-            await Promise.all(
-              folderIds.map(id => deleteFolder(id))
-            )
-          }
-
-          console.log('Bulk delete operation completed successfully')
-          return { data: { success: true } }
-        } catch (error: any) {
-          console.error('Error during bulk delete:', error)
-          return { data: { success: false, error: error.message || 'Unknown error occurred' } }
-        }
+        
+        console.log('Cloud operation completed successfully')
+      } catch (error) {
+        console.error('Cloud operation failed, falling back to local result:', error)
+        // If cloud operation fails, we'll fall back to local result
       }
-      return { data: null }
+    } else {
+      console.log('Offline mode - using local data only')
     }
+    
+    return localResult
+  } catch (error) {
+    console.error(`Error in makeRequest:`, error)
+    throw error
+  }
+}
 
-    // Handle version operations - check this before document operations
-    const versionMatch = endpoint.match(/^documents\/([^\/]+)\/versions(?:\?versionId=(.+))?$/)
-    if (versionMatch) {
-      const [, documentId, versionId] = versionMatch
-      console.log('Version operation:', { documentId, versionId })
-
-      switch (method) {
-        case 'get':
-          console.log('Getting versions for document:', documentId)
-          return { data: await versionStorage.find('versions', { documentId }) }
-        case 'post':
-          if (!data) return { data: null }
-          console.log('Creating version:', data)
-          return { data: await versionStorage.create('versions', data) }
-        case 'delete':
-          if (!versionId) {
-            console.log('No version ID provided for deletion')
-            return { data: { success: false, error: 'No version ID provided' } }
-          }
-          console.log('Deleting version:', { documentId, versionId })
-          const success = await versionStorage.delete('versions', { _id: versionId })
-          return { data: { success } }
-      }
+// Handles all local storage operations
+async function performLocalOperation(
+  method: 'get' | 'delete' | 'patch' | 'post',
+  endpoint: string,
+  data?: any
+) {
+  console.log('Performing local operation:', { method, endpoint })
+    
+  // Handle collection-level operations
+  if (endpoint === 'documents') {
+    console.log('Handling collection-level documents request')
+    if (method === 'get') {
+      return { data: await documentStorage.find(DOCUMENTS_COLLECTION, {}) }
     }
-
-    // Handle document operations
-    const documentMatch = endpoint.match(/^documents\/([^\/]+)$/)
-    if (documentMatch) {
-      const [, id] = documentMatch
-      console.log('Document operation:', { id, collection: DOCUMENTS_COLLECTION })
-      if (!id) {
-        console.log('No document ID found in endpoint')
-        return { data: null }
-      }
-
-      switch (method) {
-        case 'get':
-          console.log(`Finding document by ID: ${id} in collection: ${DOCUMENTS_COLLECTION}`)
-          const doc = await documentStorage.findById(DOCUMENTS_COLLECTION, id)
-          console.log('Document found:', doc ? 'yes' : 'no')
-          return { data: doc }
-        case 'patch':
-          if (!data) return { data: null }
-          return { data: await documentStorage.update(DOCUMENTS_COLLECTION, id, data as Partial<Document>) }
-        case 'delete':
-          console.log('Attempting to delete document with ID:', id)
-          const deleteResult = await documentStorage.delete(DOCUMENTS_COLLECTION, { _id: id })
-          console.log('Delete operation result:', deleteResult)
-          return { data: { success: deleteResult } }
-        case 'post':
-          if (!data) return { data: null }
-          return { data: await documentStorage.create(DOCUMENTS_COLLECTION, data as Omit<Document, '_id'>) }
-      }
+    if (method === 'post') {
+      console.log('Creating new document:', data)
+      const now = Date.now()
+      const newDocument = await documentStorage.create(DOCUMENTS_COLLECTION, {
+        ...data,
+        content: data?.content || DEFAULT_DOCUMENT_CONTENT,
+        comments: [],
+        lastUpdated: now
+      })
+      console.log('Created document:', newDocument)
+      return { data: newDocument }
     }
-
-    // Handle folder operations
-    const folderMatch = endpoint.match(/^folders\/([^\/]+)$/)
-    if (folderMatch) {
-      const [, id] = folderMatch
-      console.log('Folder operation:', { id, collection: FOLDERS_COLLECTION })
-      if (!id) {
-        console.log('No folder ID found in endpoint')
-        return { data: null }
-      }
-
-      switch (method) {
-        case 'get':
-          console.log(`Finding folder by ID: ${id} in collection: ${FOLDERS_COLLECTION}`)
-          const folder = await folderStorage.findById(FOLDERS_COLLECTION, id)
-          console.log('Folder found:', folder ? 'yes' : 'no')
-          return { data: folder }
-        case 'patch':
-          if (!data) return { data: null }
-          return { data: await folderStorage.update(FOLDERS_COLLECTION, id, data as Partial<Document>) }
-        case 'delete':
-          console.log('Attempting to delete folder with ID:', id)
-          const deleteResult = await folderStorage.delete(FOLDERS_COLLECTION, { _id: id })
-          console.log('Delete operation result:', deleteResult)
-          return { data: { success: deleteResult } }
-        case 'post':
-          if (!data) return { data: null }
-          return { data: await folderStorage.create(FOLDERS_COLLECTION, data as Omit<Document, '_id'>) }
-      }
+    return { data: null }
+  }
+  
+  if (endpoint === 'folders') {
+    console.log('Handling collection-level folders request')
+    if (method === 'get') {
+      return { data: await folderStorage.find(FOLDERS_COLLECTION, {}) }
     }
-
-    // Handle version operations
-    if (endpoint.startsWith('versions/')) {
-      console.log('Version operation detected')
-      const parts = endpoint.split('versions/')[1].split('/')
-      console.log('Version parts:', parts)
-      if (parts.length === 2) {
-        const [docId, versionId] = parts
-        switch (method) {
-          case 'get':
-            return { data: await versionStorage.findById('versions', versionId) }
-          case 'delete':
-            return { data: await versionStorage.delete('versions', { _id: versionId }) }
-        }
-      } else if (parts.length === 1) {
-        switch (method) {
-          case 'get':
-            return { data: await versionStorage.find('versions', { documentId: parts[0] }) }
-          case 'post':
-            if (!data) return { data: null }
-            return { data: await versionStorage.create('versions', data) }
-        }
-      }
+    if (method === 'post') {
+      console.log('Creating new folder:', data)
+      const now = Date.now()
+      const newFolder = await folderStorage.create(FOLDERS_COLLECTION, {
+        ...data,
+        lastUpdated: now
+      })
+      console.log('Created folder:', newFolder)
+      return { data: newFolder }
     }
-
-    console.log('No matching local operation found')
     return { data: null }
   }
 
-  // Remote request
+  // Handle bulk delete operation
+  if (endpoint === 'documents/bulk-delete') {
+    console.log('Handling bulk delete request')
+    if (method === 'post' && data) {
+      const { documentIds = [], folderIds = [] } = data as { documentIds: string[], folderIds: string[] }
+      console.log('Bulk deleting:', { documentIds, folderIds })
+
+      // Helper function to recursively delete a folder and its contents
+      async function deleteFolder(folderId: string) {
+        console.log(`Starting to delete folder ${folderId}`)
+        
+        // Get all documents and subfolders in this folder
+        const [docs, subfolders] = await Promise.all([
+          documentStorage.find(DOCUMENTS_COLLECTION, { parentId: folderId }),
+          documentStorage.find(FOLDERS_COLLECTION, { parentId: folderId })
+        ])
+
+        console.log(`Found in folder ${folderId}:`, {
+          documentsCount: docs.length,
+          subfoldersCount: subfolders.length,
+          documents: docs.map(d => d._id),
+          subfolders: subfolders.map(f => f._id)
+        })
+
+        // Recursively delete all subfolders
+        if (subfolders.length > 0) {
+          console.log(`Deleting ${subfolders.length} subfolders of ${folderId}`)
+          await Promise.all(
+            subfolders.map(folder => folder._id ? deleteFolder(folder._id) : Promise.resolve())
+          )
+        }
+
+        // Delete all documents in this folder
+        if (docs.length > 0) {
+          console.log(`Deleting ${docs.length} documents from folder ${folderId}`)
+          await Promise.all(
+            docs.map(doc => doc._id ? 
+              documentStorage.delete(DOCUMENTS_COLLECTION, { _id: doc._id }) : 
+              Promise.resolve()
+            )
+          )
+        }
+
+        // Finally delete the folder itself
+        console.log(`Deleting folder ${folderId}`)
+        const result = await documentStorage.delete(FOLDERS_COLLECTION, { _id: folderId })
+        if (!result) {
+          throw new Error(`Failed to delete folder ${folderId}`)
+        }
+        return result
+      }
+
+      try {
+        // Delete all documents
+        if (documentIds.length > 0) {
+          console.log(`Starting to delete ${documentIds.length} documents`)
+          await Promise.all(
+            documentIds.map(id => 
+              documentStorage.delete(DOCUMENTS_COLLECTION, { _id: id })
+            )
+          )
+        }
+
+        // Delete all folders recursively
+        if (folderIds.length > 0) {
+          console.log(`Starting to delete ${folderIds.length} folders`)
+          await Promise.all(
+            folderIds.map(id => deleteFolder(id))
+          )
+        }
+
+        console.log('Bulk delete operation completed successfully')
+        return { data: { success: true } }
+      } catch (error: any) {
+        console.error('Error during bulk delete:', error)
+        return { data: { success: false, error: error.message || 'Unknown error occurred' } }
+      }
+    }
+    return { data: null }
+  }
+
+  // Handle version operations - check this before document operations
+  const versionMatch = endpoint.match(/^documents\/([^\/]+)\/versions(?:\?versionId=(.+))?$/)
+  if (versionMatch) {
+    const [, documentId, versionId] = versionMatch
+    console.log('Version operation:', { documentId, versionId })
+
+    switch (method) {
+      case 'get':
+        console.log('Getting versions for document:', documentId)
+        return { data: await versionStorage.find('versions', { documentId }) }
+      case 'post':
+        if (!data) return { data: null }
+        console.log('Creating version:', data)
+        return { data: await versionStorage.create('versions', data) }
+      case 'delete':
+        if (!versionId) {
+          console.log('No version ID provided for deletion')
+          return { data: { success: false, error: 'No version ID provided' } }
+        }
+        console.log('Deleting version:', { documentId, versionId })
+        const success = await versionStorage.delete('versions', { _id: versionId })
+        return { data: { success } }
+    }
+  }
+
+  // Handle document operations
+  const documentMatch = endpoint.match(/^documents\/([^\/]+)$/)
+  if (documentMatch) {
+    const [, id] = documentMatch
+    console.log('Document operation:', { id, collection: DOCUMENTS_COLLECTION })
+    if (!id) {
+      console.log('No document ID found in endpoint')
+      return { data: null }
+    }
+
+    switch (method) {
+      case 'get':
+        console.log(`Finding document by ID: ${id} in collection: ${DOCUMENTS_COLLECTION}`)
+        const doc = await documentStorage.findById(DOCUMENTS_COLLECTION, id)
+        console.log('Document found:', doc ? 'yes' : 'no')
+        return { data: doc }
+      case 'patch':
+        if (!data) return { data: null }
+        return { data: await documentStorage.update(DOCUMENTS_COLLECTION, id, data as Partial<Document>) }
+      case 'delete':
+        console.log('Attempting to delete document with ID:', id)
+        const deleteResult = await documentStorage.delete(DOCUMENTS_COLLECTION, { _id: id })
+        console.log('Delete operation result:', deleteResult)
+        return { data: { success: deleteResult } }
+      case 'post':
+        if (!data) return { data: null }
+        return { data: await documentStorage.create(DOCUMENTS_COLLECTION, data as Omit<Document, '_id'>) }
+    }
+  }
+
+  // Handle folder operations
+  const folderMatch = endpoint.match(/^folders\/([^\/]+)$/)
+  if (folderMatch) {
+    const [, id] = folderMatch
+    console.log('Folder operation:', { id, collection: FOLDERS_COLLECTION })
+    if (!id) {
+      console.log('No folder ID found in endpoint')
+      return { data: null }
+    }
+
+    switch (method) {
+      case 'get':
+        console.log(`Finding folder by ID: ${id} in collection: ${FOLDERS_COLLECTION}`)
+        const folder = await folderStorage.findById(FOLDERS_COLLECTION, id)
+        console.log('Folder found:', folder ? 'yes' : 'no')
+        return { data: folder }
+      case 'patch':
+        if (!data) return { data: null }
+        return { data: await folderStorage.update(FOLDERS_COLLECTION, id, data as Partial<Document>) }
+      case 'delete':
+        console.log('Attempting to delete folder with ID:', id)
+        const deleteResult = await folderStorage.delete(FOLDERS_COLLECTION, { _id: id })
+        console.log('Delete operation result:', deleteResult)
+        return { data: { success: deleteResult } }
+      case 'post':
+        if (!data) return { data: null }
+        return { data: await folderStorage.create(FOLDERS_COLLECTION, data as Omit<Document, '_id'>) }
+    }
+  }
+
+  // Handle version operations
+  if (endpoint.startsWith('versions/')) {
+    console.log('Version operation detected')
+    const parts = endpoint.split('versions/')[1].split('/')
+    console.log('Version parts:', parts)
+    if (parts.length === 2) {
+      const [, versionId] = parts
+      switch (method) {
+        case 'get':
+          return { data: await versionStorage.findById('versions', versionId) }
+        case 'delete':
+          return { data: await versionStorage.delete('versions', { _id: versionId }) }
+      }
+    } else if (parts.length === 1) {
+      switch (method) {
+        case 'get':
+          return { data: await versionStorage.find('versions', { documentId: parts[0] }) }
+        case 'post':
+          if (!data) return { data: null }
+          return { data: await versionStorage.create('versions', data) }
+      }
+    }
+  }
+
+  console.log('No matching local operation found')
+  return { data: null }
+}
+
+// Handles all cloud API operations
+async function performCloudOperation(
+  method: 'get' | 'delete' | 'patch' | 'post',
+  endpoint: string,
+  data?: any
+) {
+  console.log('Performing cloud operation:', { method, endpoint })
+  
+  // Ensure endpoint format is correct for cloud API
   endpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
   const url = `${BASE_URL}${endpoint}`
   
@@ -359,4 +440,58 @@ const makeRequest = async (
   }
 }
 
-export default apiService
+// When we get data from the cloud, update our local storage to match
+async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
+  // Only sync collection-level data for now
+  if (endpoint === 'documents' && Array.isArray(cloudData)) {
+    console.log('Syncing cloud documents to local storage')
+    
+    // Get local documents
+    const localDocs = await documentStorage.find(DOCUMENTS_COLLECTION, {})
+    const localDocsById = new Map(localDocs.map(doc => [doc._id, doc]))
+    
+    // Process cloud documents
+    for (const cloudDoc of cloudData) {
+      const localDoc = localDocsById.get(cloudDoc._id)
+      
+      // If doc doesn't exist locally or cloud version is newer, update local
+      if (!localDoc || 
+          (cloudDoc.updatedAt && localDoc.updatedAt && 
+           new Date(cloudDoc.updatedAt).getTime() > new Date(localDoc.updatedAt).getTime())) {
+        if (localDoc) {
+          // Update existing document
+          await documentStorage.update(DOCUMENTS_COLLECTION, cloudDoc._id, cloudDoc)
+        } else {
+          // Create new document
+          await documentStorage.create(DOCUMENTS_COLLECTION, cloudDoc)
+        }
+      }
+    }
+  }
+  
+  if (endpoint === 'folders' && Array.isArray(cloudData)) {
+    console.log('Syncing cloud folders to local storage')
+    
+    // Get local folders
+    const localFolders = await folderStorage.find(FOLDERS_COLLECTION, {})
+    const localFoldersById = new Map(localFolders.map(folder => [folder._id, folder]))
+    
+    // Process cloud folders
+    for (const cloudFolder of cloudData) {
+      const localFolder = localFoldersById.get(cloudFolder._id)
+      
+      // If folder doesn't exist locally or cloud version is newer, update local
+      if (!localFolder || 
+          (cloudFolder.updatedAt && localFolder.updatedAt && 
+           new Date(cloudFolder.updatedAt).getTime() > new Date(localFolder.updatedAt).getTime())) {
+        if (localFolder) {
+          // Update existing folder
+          await folderStorage.update(FOLDERS_COLLECTION, cloudFolder._id, cloudFolder)
+        } else {
+          // Create new folder
+          await folderStorage.create(FOLDERS_COLLECTION, cloudFolder)
+        }
+      }
+    }
+  }
+}

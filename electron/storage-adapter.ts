@@ -1,5 +1,4 @@
 import { FileStorageAdapter } from '../lib/storage/file-storage'
-import { VersionData } from '@typez/globals'
 import * as path from 'path'
 import { ObjectId } from 'mongodb'
 import * as fs from 'fs-extra'
