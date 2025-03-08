@@ -4,7 +4,8 @@ import Layout from '@components/layout'
 import { Loader } from '@components/loader'
 import { useAPI, useNavigation } from '@components/providers'
 import { CloudIcon } from '@heroicons/react/solid'
-import { useSyncHybridDoc } from '@lib/hooks'
+// Temporarily not using useSyncHybridDoc
+// import { useSyncHybridDoc } from '@lib/hooks'
 import DocumentTree, { createTreeItems } from '@components/document-tree'
 import { DocumentData, VersionData } from '@typez/globals'
 import { useUser } from '@wrappers/auth-wrapper-client'
@@ -78,7 +79,12 @@ export default function SharedDocumentPage() {
   const [hybridDoc, setHybridDoc] = useState<DocumentData | null>()
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [currentContent, setCurrentContent] = useState<any>(null)
-  useSyncHybridDoc(documentId, databaseDoc, setHybridDoc)
+  
+  useEffect(() => {
+    if (databaseDoc) {
+      setHybridDoc(databaseDoc)
+    }
+  }, [databaseDoc])
 
   // Use the current document's content or fall back to hybrid doc
   const documentContent = currentContent || hybridDoc?.content

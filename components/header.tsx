@@ -5,7 +5,7 @@ import { useUser } from '@wrappers/auth-wrapper-client'
 import { Fragment, useCallback, useEffect, useState, useRef } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useAPI, useMouse, useNavigation } from './providers'
-import { useSyncHybridDoc, useFolderSync } from '@lib/hooks'
+import { useFolderSync } from '@lib/hooks'
 import { importFiles } from '@lib/import-utils'
 import { Divider, List, ListItem, ListItemButton, ListItemText } from '@mui/material'
 import Box from '@mui/material/Box'
@@ -97,7 +97,13 @@ const HeaderComponent = ({ id }: HeaderProps) => {
 
   const { data: databaseDoc } = useSWR<DocumentData, Error>(documentPath, fetcher)
   const [hybridDoc, setHybridDoc] = useState<DocumentData | null>()
-  useSyncHybridDoc(id, databaseDoc, setHybridDoc)
+
+  // useSyncHybridDoc(id, databaseDoc, setHybridDoc)
+  useEffect(() => {
+    if (databaseDoc) {
+      setHybridDoc(databaseDoc)
+    }
+  }, [databaseDoc])
 
   const isOwner = user && hybridDoc && hybridDoc.userId === user.sub
 

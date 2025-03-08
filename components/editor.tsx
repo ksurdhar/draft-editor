@@ -96,8 +96,8 @@ const EditorComponent = ({
       const json = editor.getJSON()
       onUpdate({ content: JSON.stringify(json) })
     },
-    onCreate: ({ editor }) => {
-      console.log('Editor onCreate - initial content:', editor.getJSON())
+    onCreate: ({ editor: _editor }) => {
+      // console.log('Editor onCreate - initial content:', editor.getJSON())
     }
   })
 
@@ -108,16 +108,6 @@ const EditorComponent = ({
       editor.commands.setContent(newContent)
     }
   }, [content, editor])
-
-  // Track editor initialization
-  useEffect(() => {
-    if (editor) {
-      console.log('Editor instance changed:', {
-        content: editor.getJSON(),
-        isEditable: editor.isEditable
-      })
-    }
-  }, [editor])
 
   // Only focus once on mount for new documents
   useEffect(() => {
