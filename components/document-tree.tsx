@@ -271,6 +271,7 @@ const DocumentTree = ({
         }
         .rct-tree-item-title-container {
           outline: none !important;
+          -webkit-tap-highlight-color: transparent;
         }
         .rct-tree-item-button {
           outline: none !important;
@@ -282,6 +283,46 @@ const DocumentTree = ({
         }
         .rct-tree-item-button:focus-visible {
           outline: none !important;
+          border-color: transparent !important;
+          box-shadow: none !important;
+        }
+        *:focus-visible {
+          outline: none !important;
+          border-color: transparent !important;
+          box-shadow: none !important;
+        }
+        .rct-tree-item {
+          outline: none !important;
+        }
+        .rct-tree-item-title {
+          outline: none !important;
+        }
+        .rct-tree-item-arrow {
+          outline: none !important;
+        }
+        .rct-tree-root {
+          outline: none !important;
+        }
+        .rct-tree-root-focus {
+          outline: none !important;
+        }
+        .rct-tree-item-title-container-focused {
+          outline: none !important;
+          border-color: transparent !important;
+        }
+        .rct-tree-item-title-container-selected {
+          background-color: transparent !important;
+        }
+        /* Additional focus-visible overrides */
+        .rct-tree-item-title-container:focus-visible,
+        .rct-tree-item-button:focus-visible,
+        .rct-tree-item:focus-visible,
+        .rct-tree-root:focus-visible,
+        .rct-tree-item-title:focus-visible,
+        .rct-tree-item-arrow:focus-visible {
+          outline: none !important;
+          border-color: transparent !important;
+          box-shadow: none !important;
         }
         @keyframes expandIn {
           from {
@@ -299,14 +340,15 @@ const DocumentTree = ({
         getItemTitle={item => item.data}
         viewState={{
           'tree-1': {
-            focusedItem: undefined,
+            focusedItem: selectedItems?.[0],
             expandedItems,
             selectedItems,
           }
         }}
-        onFocusItem={() => {
-          // Prevent focus from being set
-          return
+        onFocusItem={item => {
+          if (item && onSelectedItemsChange) {
+            onSelectedItemsChange([item.index])
+          }
         }}
         onExpandItem={handleExpandItem}
         onCollapseItem={handleCollapseItem}

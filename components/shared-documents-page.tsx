@@ -268,10 +268,22 @@ const SharedDocumentsPage = ({
         e.preventDefault()
         setDeleteModalOpen(true)
       }
+
+      // Handle escape key
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        setSelectedItems([])
+      }
+
+      // Let react-complex-tree handle arrow keys
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault() // Just prevent scroll
+      }
     }
 
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    window.addEventListener('keydown', handleKeyDown, true) // Use capture phase
+    return () => window.removeEventListener('keydown', handleKeyDown, true)
   }, [selectedItems])
 
   const showSpinner = useSpinner(docsLoading || foldersLoading || userLoading)
