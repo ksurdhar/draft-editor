@@ -43,9 +43,10 @@ class ElectronFileStorageAdapter extends FileStorageAdapter {
     const documentsPath = path.join(process.env.JSON_STORAGE_PATH || './data', collection)
     fs.ensureDirSync(documentsPath)
 
+    // Use client-supplied ID if available, otherwise generate a new MongoDB-compatible ID
     const newDoc = {
       ...data,
-      _id: generateUUID(),
+      _id: data._id || generateUUID(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }

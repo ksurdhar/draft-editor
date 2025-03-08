@@ -34,14 +34,24 @@ const handlers = {
     }
 
     const now = Date.now()
-    const newDocument = await storage.create('documents', {
+    
+    // Check if a client-supplied ID was provided
+    const documentData = {
       ...req.body,
       userId: req.user!.sub,
       title: req.body.title || DEFAULT_DOCUMENT_TITLE,
       content,
       comments: [],
       lastUpdated: now
-    })
+    }
+    
+    // If client supplied an _id, use it
+    if (req.body._id) {
+      console.log('Using client-supplied ID:', req.body._id)
+      documentData._id = req.body._id
+    }
+    
+    const newDocument = await storage.create('documents', documentData)
 
     console.log('Document created:', newDocument._id)
 

@@ -1,6 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import { storage } from '@lib/storage'
-import { FolderData } from '@typez/globals'
 
 export default async function handler(
   req: NextApiRequest,
@@ -21,21 +20,27 @@ export default async function handler(
 
     case 'POST':
       try {
-        const { title, parentId, userId } = req.body
+        const { title, parentId, userId, _id } = req.body
         if (!title || !userId) {
           return res.status(400).json({ error: 'Missing required fields' })
         }
 
-        const folder: Omit<FolderData, 'id'> = {
-          _id: '',
+        // Create the folder data
+        const folderData: any = {
           title,
           parentId,
           userId,
           lastUpdated: Date.now(),
           folderIndex: 0
         }
+        
+        // If client supplied an _id, use it
+        if (_id) {
+          console.log('Using client-supplied ID for folder:', _id)
+          folderData._id = _id
+        }
 
-        const newFolder = await storage.create('folders', folder)
+        const newFolder = await storage.create('folders', folderData)
         res.status(201).json(newFolder)
       } catch (error) {
         console.error('Error creating folder:', error)

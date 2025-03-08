@@ -28,6 +28,10 @@ if (global.db) {
 }
 
 const DocumentSchema = new Mongoose.Schema({
+  _id: {
+    type: Mongoose.Schema.Types.String,
+    required: true
+  },
   title: {
     type: Mongoose.Schema.Types.String,
     default: '',
@@ -146,6 +150,10 @@ VersionSchema.set('toJSON', {
 
 // Add a new schema for folders
 const FolderSchema = new Mongoose.Schema({
+  _id: {
+    type: Mongoose.Schema.Types.String,
+    required: true
+  },
   title: {
     type: Mongoose.Schema.Types.String,
     required: true
