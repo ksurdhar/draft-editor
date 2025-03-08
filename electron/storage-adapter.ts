@@ -1,5 +1,4 @@
 import { FileStorageAdapter } from '../lib/storage/file-storage'
-import { VersionData } from '@typez/globals'
 import * as path from 'path'
 import { ObjectId } from 'mongodb'
 import * as fs from 'fs-extra'
@@ -44,9 +43,10 @@ class ElectronFileStorageAdapter extends FileStorageAdapter {
     const documentsPath = path.join(process.env.JSON_STORAGE_PATH || './data', collection)
     fs.ensureDirSync(documentsPath)
 
+    // Use client-supplied ID if available, otherwise generate a new MongoDB-compatible ID
     const newDoc = {
       ...data,
-      _id: generateUUID(),
+      _id: data._id || generateUUID(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }

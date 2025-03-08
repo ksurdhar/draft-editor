@@ -7,8 +7,10 @@ const ElectronDocumentsPage = () => {
     '/documents',
     window.electronAPI.get,
     { 
-      revalidateOnFocus: true,
-      focusThrottleInterval: 5000
+      revalidateOnFocus: false,
+      focusThrottleInterval: 30000,
+      dedupingInterval: 10000,
+      revalidateIfStale: false
     }
   )
 
@@ -16,8 +18,10 @@ const ElectronDocumentsPage = () => {
     '/folders',
     window.electronAPI.get,
     {
-      revalidateOnFocus: true,
-      focusThrottleInterval: 5000
+      revalidateOnFocus: false,
+      focusThrottleInterval: 30000,
+      dedupingInterval: 10000,
+      revalidateIfStale: false
     }
   )
 
