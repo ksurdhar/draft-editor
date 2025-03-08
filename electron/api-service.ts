@@ -118,7 +118,19 @@ const makeRequest = async (
     if (isOnline()) {
       // Since we're now using the same IDs for both local and cloud,
       // we can simply pass the same endpoint to the cloud operation
-      performCloudOperationAsync(method, endpoint, data, cleanEndpoint)
+      
+      // Ensure we're passing the local document ID to the cloud operation
+      if (method === 'post' && localResult && localResult.data && localResult.data._id) {
+        // Create a new data object if it doesn't exist
+        const updatedData: any = data ? { ...data } : {}
+        // Set the _id in the data object to ensure the cloud document uses the same ID
+        updatedData._id = localResult.data._id
+        console.log('Using local document ID for cloud operation:', localResult.data._id)
+        // Use the updated data for the cloud operation
+        performCloudOperationAsync(method, endpoint, updatedData, cleanEndpoint)
+      } else {
+        performCloudOperationAsync(method, endpoint, data, cleanEndpoint)
+      }
     } else {
       console.log('Offline mode - using local data only')
     }
