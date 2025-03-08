@@ -93,10 +93,10 @@ const makeRequest = async (
   endpoint: string,
   data?: Partial<DocumentData | VersionData>,
 ) => {
-  console.log('\n=== API Request ===')
-  console.log(`Method: ${method.toUpperCase()}`)
-  console.log(`Endpoint: ${endpoint}`)
-  console.log(`Online Mode: ${isOnline() ? 'Connected' : 'Offline'}`)
+  // console.log('\n=== API Request ===')
+  // console.log(`Method: ${method.toUpperCase()}`)
+  // console.log(`Endpoint: ${endpoint}`)
+  // console.log(`Online Mode: ${isOnline() ? 'Connected' : 'Offline'}`)
 
   // Clean the endpoint
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint
@@ -105,34 +105,28 @@ const makeRequest = async (
   try {
     // Always execute local operation first
     let localResult = await performLocalOperation(method, cleanEndpoint, data)
+    console.log('Local operation result:', localResult?.data ? 'success' : 'no data')
     
-    // If we're online, also try to perform the cloud operation
+    // If we're online, perform cloud operation in the background without blocking
     if (isOnline()) {
-      try {
-        console.log('Attempting cloud operation...')
-        const cloudResult = await performCloudOperation(method, endpoint, data)
-        
-        // For reads (GET), if cloud request succeeds, update local data
-        if (method === 'get' && cloudResult && cloudResult.data) {
-          console.log('Cloud data retrieved, syncing to local storage')
-          await syncCloudDataToLocal(cleanEndpoint, cloudResult.data)
-          return cloudResult // Return cloud data for reads when online
-        }
-        
-        console.log('Cloud operation completed successfully')
-      } catch (error) {
-        console.error('Cloud operation failed, falling back to local result:', error)
-        // If cloud operation fails, we'll fall back to local result
-      }
+      // Use fire-and-forget pattern - we don't await this
+      performCloudOperationAsync(method, endpoint, data, cleanEndpoint)
     } else {
       console.log('Offline mode - using local data only')
     }
     
+    // Always return the local result immediately
     return localResult
   } catch (error) {
     console.error(`Error in makeRequest:`, error)
     throw error
   }
+}
+
+// Track if a sync operation is in progress
+let syncInProgress = {
+  documents: false,
+  folders: false
 }
 
 // Handles all local storage operations
@@ -306,7 +300,10 @@ async function performLocalOperation(
         return { data: doc }
       case 'patch':
         if (!data) return { data: null }
-        return { data: await documentStorage.update(DOCUMENTS_COLLECTION, id, data as Partial<Document>) }
+        console.log(`Updating document ${id} in collection ${DOCUMENTS_COLLECTION}:`, data)
+        const updateResult = await documentStorage.update(DOCUMENTS_COLLECTION, id, data as Partial<Document>)
+        console.log('Document update result:', updateResult)
+        return { data: updateResult }
       case 'delete':
         console.log('Attempting to delete document with ID:', id)
         const deleteResult = await documentStorage.delete(DOCUMENTS_COLLECTION, { _id: id })
@@ -336,7 +333,10 @@ async function performLocalOperation(
         return { data: folder }
       case 'patch':
         if (!data) return { data: null }
-        return { data: await folderStorage.update(FOLDERS_COLLECTION, id, data as Partial<Document>) }
+        console.log(`Updating folder ${id} in collection ${FOLDERS_COLLECTION}:`, data)
+        const folderUpdateResult = await folderStorage.update(FOLDERS_COLLECTION, id, data as Partial<Document>)
+        console.log('Folder update result:', folderUpdateResult)
+        return { data: folderUpdateResult }
       case 'delete':
         console.log('Attempting to delete folder with ID:', id)
         const deleteResult = await folderStorage.delete(FOLDERS_COLLECTION, { _id: id })
@@ -416,13 +416,13 @@ async function performCloudOperation(
     },
   }
 
-  console.log('Making request to URL:', url)
-  console.log('Request config:', {
-    method,
-    url,
-    headers: config.headers,
-    data: method === 'post' || method === 'patch' ? data : undefined
-  })
+  // console.log('Making request to URL:', url)
+  // console.log('Request config:', {
+  //   method,
+  //   url,
+  //   headers: config.headers,
+  //   data: method === 'post' || method === 'patch' ? data : undefined
+  // })
 
   try {
     if (method === 'patch' || method === 'post') {
@@ -440,58 +440,416 @@ async function performCloudOperation(
   }
 }
 
+function normalizeId(id: any): string {
+  if (!id) return ''
+  // Convert ObjectId or other objects to string
+  return id.toString ? id.toString() : String(id)
+}
+
+// Compare two documents for "equality" regardless of ID
+function areDocumentsEquivalent(doc1: any, doc2: any): boolean {
+  if (!doc1 || !doc2) return false
+  
+  // Title is a good primary indicator
+  if (doc1.title && doc2.title && doc1.title === doc2.title) {
+    // If titles match, check other fields that might indicate the same document
+    
+    // Check parent folder
+    const sameParent = doc1.parentId === doc2.parentId
+    
+    // Check content (first 100 chars to avoid long comparisons)
+    let contentSimilar = false
+    if (doc1.content && doc2.content) {
+      const content1 = typeof doc1.content === 'string' ? doc1.content.substring(0, 100) : ''
+      const content2 = typeof doc2.content === 'string' ? doc2.content.substring(0, 100) : ''
+      contentSimilar = content1 === content2
+    }
+    
+    // For untitled documents or ones with generic titles, be more strict
+    if (doc1.title === 'Untitled' || doc1.title === '') {
+      return sameParent && contentSimilar
+    }
+    
+    // For documents with specific titles, parent folder match is a good indicator
+    return sameParent || contentSimilar
+  }
+  
+  return false
+}
+
+// Improved document hash function
+function generateDocHash(doc: any): string {
+  // This is a simplified hash - in a real app you might use proper hashing
+  if (!doc) return ''
+  
+  // Create hash from fields that identify uniqueness
+  // Make sure the hash isn't too sensitive to small changes
+  return [
+    doc.title || '',
+    doc.parentId || '',
+    doc.content ? (typeof doc.content === 'string' ? doc.content.substring(0, 20) : '') : ''
+  ].join('|')
+}
+
+// Compare two folders for "equality" regardless of ID
+function areFoldersEquivalent(folder1: any, folder2: any): boolean {
+  if (!folder1 || !folder2) return false
+  
+  // Name is a good primary indicator
+  if (folder1.name && folder2.name && folder1.name === folder2.name) {
+    // If names match, check other fields that might indicate the same folder
+    
+    // Check parent folder
+    const sameParent = folder1.parentId === folder2.parentId
+    
+    // For folders with specific names, parent folder match is a good indicator
+    return sameParent
+  }
+  
+  return false
+}
+
 // When we get data from the cloud, update our local storage to match
 async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
   // Only sync collection-level data for now
   if (endpoint === 'documents' && Array.isArray(cloudData)) {
-    console.log('Syncing cloud documents to local storage')
+    // Skip if a sync is already in progress for this collection
+    if (syncInProgress.documents) {
+      console.log('Skipping documents sync - another sync already in progress')
+      return
+    }
     
-    // Get local documents
-    const localDocs = await documentStorage.find(DOCUMENTS_COLLECTION, {})
-    const localDocsById = new Map(localDocs.map(doc => [doc._id, doc]))
-    
-    // Process cloud documents
-    for (const cloudDoc of cloudData) {
-      const localDoc = localDocsById.get(cloudDoc._id)
+    try {
+      // Set sync flag
+      syncInProgress.documents = true
       
-      // If doc doesn't exist locally or cloud version is newer, update local
-      if (!localDoc || 
-          (cloudDoc.updatedAt && localDoc.updatedAt && 
-           new Date(cloudDoc.updatedAt).getTime() > new Date(localDoc.updatedAt).getTime())) {
-        if (localDoc) {
-          // Update existing document
-          await documentStorage.update(DOCUMENTS_COLLECTION, cloudDoc._id, cloudDoc)
-        } else {
-          // Create new document
-          await documentStorage.create(DOCUMENTS_COLLECTION, cloudDoc)
+      console.log('Syncing cloud documents to local storage')
+      console.log(`Cloud documents count: ${cloudData.length}`)
+      
+      // Get local documents
+      const localDocs = await documentStorage.find(DOCUMENTS_COLLECTION, {})
+      console.log(`Local documents count before sync: ${localDocs.length}`)
+      
+      // Print debug info for both sets
+      console.log('Local document IDs:', localDocs.map(doc => doc._id).slice(0, 5))
+      console.log('Cloud document IDs:', cloudData.map(doc => doc._id).slice(0, 5))
+      
+      // For deeper debugging, log a sample document from each source
+      if (localDocs.length > 0) {
+        const sampleLocal = localDocs[0]
+        console.log('Sample local document structure:', {
+          _id: sampleLocal._id,
+          title: sampleLocal.title,
+          parentId: sampleLocal.parentId,
+          contentPreview: typeof sampleLocal.content === 'string' ? sampleLocal.content.substring(0, 50) : typeof sampleLocal.content,
+          updatedAt: sampleLocal.updatedAt,
+          createdAt: sampleLocal.createdAt
+        })
+      }
+      
+      if (cloudData.length > 0) {
+        const sampleCloud = cloudData[0]
+        console.log('Sample cloud document structure:', {
+          _id: sampleCloud._id,
+          title: sampleCloud.title,
+          parentId: sampleCloud.parentId,
+          contentPreview: typeof sampleCloud.content === 'string' ? sampleCloud.content.substring(0, 50) : typeof sampleCloud.content,
+          updatedAt: sampleCloud.updatedAt,
+          createdAt: sampleCloud.createdAt
+        })
+      }
+      
+      // Create maps for faster lookups
+      const localDocsById = new Map()
+      const localDocsByHash = new Map()
+      
+      for (const doc of localDocs) {
+        if (doc._id) {
+          const normalizedId = normalizeId(doc._id)
+          localDocsById.set(normalizedId, doc)
+          
+          // Also index by content hash to catch duplicates with different IDs
+          const docHash = generateDocHash(doc)
+          if (docHash) {
+            localDocsByHash.set(docHash, doc)
+          }
         }
       }
+      
+      console.log(`Map size by ID: ${localDocsById.size}, by hash: ${localDocsByHash.size}`)
+      
+      // Keep track of documents we process
+      let updatedCount = 0
+      let createdCount = 0
+      let skippedCount = 0
+      let duplicateCount = 0
+      
+      // Process cloud documents
+      for (const cloudDoc of cloudData) {
+        if (!cloudDoc._id) {
+          console.warn('Skipping cloud document without ID:', cloudDoc)
+          continue
+        }
+        
+        const normalizedCloudId = normalizeId(cloudDoc._id)
+        const cloudDocHash = generateDocHash(cloudDoc)
+        
+        // Check if we already have this document by ID
+        let localDoc = localDocsById.get(normalizedCloudId)
+        let isDuplicate = false
+        
+        // If not found by ID, try to find by content hash
+        if (!localDoc && cloudDocHash) {
+          const docByHash = localDocsByHash.get(cloudDocHash)
+          if (docByHash) {
+            console.log(`Found potential duplicate by hash: cloud ID ${cloudDoc._id} matches local ID ${docByHash._id}`)
+            localDoc = docByHash
+            isDuplicate = true
+            duplicateCount++
+          } else {
+            // Last resort: check each local doc for equivalence
+            for (const doc of localDocs) {
+              if (areDocumentsEquivalent(cloudDoc, doc)) {
+                console.log(`Found equivalent document: cloud ID ${cloudDoc._id} matches local ID ${doc._id}`)
+                localDoc = doc
+                isDuplicate = true
+                duplicateCount++
+                break
+              }
+            }
+          }
+        }
+        
+        // Debug info
+        console.log(`Processing cloud doc ${cloudDoc._id}, title: "${cloudDoc.title || 'no title'}", parent: ${cloudDoc.parentId || 'none'}, exists locally: ${!!localDoc}, duplicate: ${isDuplicate}`)
+        
+        if (localDoc) {
+          // Document exists locally - only update if cloud version is newer
+          if (cloudDoc.updatedAt && localDoc.updatedAt && 
+              new Date(cloudDoc.updatedAt).getTime() > new Date(localDoc.updatedAt).getTime()) {
+            console.log(`Updating document ${cloudDoc._id} with newer cloud version`)
+            await documentStorage.update(DOCUMENTS_COLLECTION, localDoc._id, {
+              ...cloudDoc,
+              _id: localDoc._id // Keep the local ID to avoid duplication
+            })
+            updatedCount++
+          } else {
+            console.log(`Skipping document ${cloudDoc._id}, local version is current or newer`)
+            skippedCount++
+          }
+        } else {
+          // Perform one final check before creating - look for any documents with the same title and parent
+          const matchByTitleAndParent = localDocs.find(doc => 
+            doc.title === cloudDoc.title && doc.parentId === cloudDoc.parentId
+          )
+          
+          if (matchByTitleAndParent) {
+            console.log(`Found match by title and parent: cloud ID ${cloudDoc._id} matches local ID ${matchByTitleAndParent._id}`)
+            await documentStorage.update(DOCUMENTS_COLLECTION, matchByTitleAndParent._id || '', {
+              ...cloudDoc,
+              _id: matchByTitleAndParent._id // Keep the local ID
+            })
+            duplicateCount++
+            updatedCount++
+          } else {
+            // Document doesn't exist locally - create it
+            console.log(`Creating new local document from cloud: ${cloudDoc._id}`)
+            try {
+              await documentStorage.create(DOCUMENTS_COLLECTION, cloudDoc)
+              createdCount++
+            } catch (error) {
+              console.error(`Error creating document ${cloudDoc._id}:`, error)
+            }
+          }
+        }
+      }
+      
+      // Get updated count of local documents
+      const updatedLocalDocs = await documentStorage.find(DOCUMENTS_COLLECTION, {})
+      console.log(`Local documents count after sync: ${updatedLocalDocs.length}`)
+      
+      console.log(`Document sync complete. Updated: ${updatedCount}, Created: ${createdCount}, Skipped: ${skippedCount}, Duplicates: ${duplicateCount}`)
+    } finally {
+      // Always release the sync flag when done
+      syncInProgress.documents = false
     }
   }
   
   if (endpoint === 'folders' && Array.isArray(cloudData)) {
-    console.log('Syncing cloud folders to local storage')
+    // Skip if a sync is already in progress for this collection
+    if (syncInProgress.folders) {
+      console.log('Skipping folders sync - another sync already in progress')
+      return
+    }
     
-    // Get local folders
-    const localFolders = await folderStorage.find(FOLDERS_COLLECTION, {})
-    const localFoldersById = new Map(localFolders.map(folder => [folder._id, folder]))
-    
-    // Process cloud folders
-    for (const cloudFolder of cloudData) {
-      const localFolder = localFoldersById.get(cloudFolder._id)
+    try {
+      // Set sync flag
+      syncInProgress.folders = true
       
-      // If folder doesn't exist locally or cloud version is newer, update local
-      if (!localFolder || 
-          (cloudFolder.updatedAt && localFolder.updatedAt && 
-           new Date(cloudFolder.updatedAt).getTime() > new Date(localFolder.updatedAt).getTime())) {
-        if (localFolder) {
-          // Update existing folder
-          await folderStorage.update(FOLDERS_COLLECTION, cloudFolder._id, cloudFolder)
-        } else {
-          // Create new folder
-          await folderStorage.create(FOLDERS_COLLECTION, cloudFolder)
+      console.log('Syncing cloud folders to local storage')
+      console.log(`Cloud folders count: ${cloudData.length}`)
+      
+      // Get local folders
+      const localFolders = await folderStorage.find(FOLDERS_COLLECTION, {})
+      console.log(`Local folders count before sync: ${localFolders.length}`)
+      
+      // Print debug info for both sets
+      console.log('Local folder IDs:', localFolders.map(folder => folder._id).slice(0, 5))
+      console.log('Cloud folder IDs:', cloudData.map(folder => folder._id).slice(0, 5))
+      
+      // For deeper debugging, log a sample folder from each source
+      if (localFolders.length > 0) {
+        const sampleLocal = localFolders[0]
+        console.log('Sample local folder structure:', {
+          _id: sampleLocal._id,
+          name: sampleLocal.name,
+          parentId: sampleLocal.parentId,
+          updatedAt: sampleLocal.updatedAt,
+          createdAt: sampleLocal.createdAt
+        })
+      }
+      
+      if (cloudData.length > 0) {
+        const sampleCloud = cloudData[0]
+        console.log('Sample cloud folder structure:', {
+          _id: sampleCloud._id,
+          name: sampleCloud.name,
+          parentId: sampleCloud.parentId,
+          updatedAt: sampleCloud.updatedAt,
+          createdAt: sampleCloud.createdAt
+        })
+      }
+      
+      // Create maps for faster lookups
+      const localFoldersById = new Map()
+      
+      for (const folder of localFolders) {
+        if (folder._id) {
+          const normalizedId = normalizeId(folder._id)
+          localFoldersById.set(normalizedId, folder)
         }
       }
+      
+      console.log(`Map size by ID: ${localFoldersById.size}`)
+      
+      // Keep track of folders we process
+      let updatedCount = 0
+      let createdCount = 0
+      let skippedCount = 0
+      let duplicateCount = 0
+      
+      // Process cloud folders
+      for (const cloudFolder of cloudData) {
+        if (!cloudFolder._id) {
+          console.warn('Skipping cloud folder without ID:', cloudFolder)
+          continue
+        }
+        
+        const normalizedCloudId = normalizeId(cloudFolder._id)
+        
+        // Check if we already have this folder by ID
+        let localFolder = localFoldersById.get(normalizedCloudId)
+        let isDuplicate = false
+        
+        // If not found by ID, look for equivalent folders
+        if (!localFolder) {
+          // Check each local folder for equivalence
+          for (const folder of localFolders) {
+            if (areFoldersEquivalent(cloudFolder, folder)) {
+              console.log(`Found equivalent folder: cloud ID ${cloudFolder._id} matches local ID ${folder._id}`)
+              localFolder = folder
+              isDuplicate = true
+              duplicateCount++
+              break
+            }
+          }
+        }
+        
+        // Debug info
+        console.log(`Processing cloud folder ${cloudFolder._id}, name: "${cloudFolder.name || 'no name'}", parent: ${cloudFolder.parentId || 'none'}, exists locally: ${!!localFolder}, duplicate: ${isDuplicate}`)
+        
+        if (localFolder) {
+          // Folder exists locally - only update if cloud version is newer
+          if (cloudFolder.updatedAt && localFolder.updatedAt && 
+              new Date(cloudFolder.updatedAt).getTime() > new Date(localFolder.updatedAt).getTime()) {
+            console.log(`Updating folder ${cloudFolder._id} with newer cloud version`)
+            await folderStorage.update(FOLDERS_COLLECTION, localFolder._id, {
+              ...cloudFolder,
+              _id: localFolder._id // Keep the local ID to avoid duplication
+            })
+            updatedCount++
+          } else {
+            console.log(`Skipping folder ${cloudFolder._id}, local version is current or newer`)
+            skippedCount++
+          }
+        } else {
+          // Perform one final check before creating - look for any folders with the same name and parent
+          const matchByNameAndParent = localFolders.find(folder => 
+            folder.name === cloudFolder.name && folder.parentId === cloudFolder.parentId
+          )
+          
+          if (matchByNameAndParent) {
+            console.log(`Found match by name and parent: cloud ID ${cloudFolder._id} matches local ID ${matchByNameAndParent._id}`)
+            await folderStorage.update(FOLDERS_COLLECTION, matchByNameAndParent._id || '', {
+              ...cloudFolder,
+              _id: matchByNameAndParent._id // Keep the local ID
+            })
+            duplicateCount++
+            updatedCount++
+          } else {
+            // Folder doesn't exist locally - create it
+            console.log(`Creating new local folder from cloud: ${cloudFolder._id}`)
+            try {
+              await folderStorage.create(FOLDERS_COLLECTION, cloudFolder)
+              createdCount++
+            } catch (error) {
+              console.error(`Error creating folder ${cloudFolder._id}:`, error)
+            }
+          }
+        }
+      }
+      
+      // Get updated count of local folders
+      const updatedLocalFolders = await folderStorage.find(FOLDERS_COLLECTION, {})
+      console.log(`Local folders count after sync: ${updatedLocalFolders.length}`)
+      
+      console.log(`Folder sync complete. Updated: ${updatedCount}, Created: ${createdCount}, Skipped: ${skippedCount}, Duplicates: ${duplicateCount}`)
+    } finally {
+      // Always release the sync flag when done
+      syncInProgress.folders = false
     }
+  }
+}
+
+// Performs cloud operations asynchronously without blocking
+async function performCloudOperationAsync(
+  method: 'get' | 'delete' | 'patch' | 'post',
+  endpoint: string, 
+  data?: any,
+  cleanEndpoint?: string
+) {
+  try {
+    console.log('Starting background cloud operation...')
+    const cloudResult = await performCloudOperation(method, endpoint, data)
+    
+    // For GET operations, we can still sync data in the background
+    // But we need to be careful not to create duplicates
+    if (method === 'get' && cloudResult && cloudResult.data && cleanEndpoint) {
+      // Handle bulk syncing more carefully depending on the endpoint
+      if (cleanEndpoint === 'documents' || cleanEndpoint === 'folders') {
+        console.log('Background sync: carefully updating local storage with cloud data')
+        await syncCloudDataToLocal(cleanEndpoint, cloudResult.data)
+      }
+      // For individual item requests, we might just want to update if it exists
+      else if (cleanEndpoint.includes('/')) {
+        // This is a request for a specific item, handle it differently
+        console.log('Background sync for individual item, handled separately')
+      }
+    }
+    
+    console.log('Background cloud operation completed successfully')
+  } catch (error) {
+    console.error('Background cloud operation failed:', error)
+    // We don't propagate this error since it's a background operation
   }
 }
