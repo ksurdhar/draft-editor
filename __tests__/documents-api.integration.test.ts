@@ -5,24 +5,40 @@ import { mockUser } from '../lib/mock-auth'
 const API_URL = 'http://localhost:3000/api'
 
 describe('Documents API Integration Tests', () => {
+  // Track IDs of documents created during tests - each suite will have its own array
+  let testDocIds: string[] = []
+
+  // Clean up any existing test documents before running any tests
+  beforeAll(async () => {
+    await Doc.deleteMany({ userId: mockUser.sub })
+    await Folder.deleteMany({ userId: mockUser.sub })
+  }, 10000)
+
+  // Reset the tracking array before each test suite
+  beforeEach(async () => {
+    testDocIds = []
+  })
+
   // Only clean up test data after all tests, don't stop the server
   afterAll(async () => {
-    // Clean up all test data
+    // Clean up only the documents we created
     await Promise.all([
-      Doc.deleteMany({}),
-      Folder.deleteMany({})
+      Doc.deleteMany({ userId: mockUser.sub }),
+      Folder.deleteMany({ userId: mockUser.sub })
     ])
   }, 10000)
 
   describe('GET /api/documents', () => {
     beforeEach(async () => {
-      // Clear the documents collection before each test
-      await Doc.deleteMany({})
+      // Clear all documents for our test user
+      await Doc.deleteMany({ userId: mockUser.sub })
+      // Clear the tracking array
+      testDocIds = []
     }, 10000)
 
     afterAll(async () => {
-      // Clean up all test data
-      await Doc.deleteMany({})
+      // Clean up only the documents we created
+      await Doc.deleteMany({ userId: mockUser.sub })
     }, 10000)
 
     it('should return all documents with content when metadataOnly is not set', async () => {
@@ -45,6 +61,8 @@ describe('Documents API Integration Tests', () => {
         content: JSON.stringify(content),
         userId: mockUser.sub
       })
+      // Track the created document ID
+      testDocIds.push(testDoc._id.toString())
 
       const response = await axios.get(`${API_URL}/documents`)
       
@@ -87,20 +105,23 @@ describe('Documents API Integration Tests', () => {
     }, 10000)
 
     it('should handle empty document list', async () => {
-      const response = await axios.get(`${API_URL}/documents`)
+      // Get only documents created by our test user
+      const response = await axios.get(`${API_URL}/documents?userId=${mockUser.sub}`)
       expect(response.data).toHaveLength(0)
     }, 10000)
   })
 
   describe('POST /api/documents/bulk-fetch', () => {
     beforeEach(async () => {
-      // Clear the documents collection before each test
-      await Doc.deleteMany({})
+      // Clear all documents for our test user
+      await Doc.deleteMany({ userId: mockUser.sub })
+      // Clear the tracking array
+      testDocIds = []
     }, 10000)
 
     afterAll(async () => {
-      // Clean up all test data
-      await Doc.deleteMany({})
+      // Clean up only the documents we created
+      await Doc.deleteMany({ userId: mockUser.sub })
     }, 10000)
 
     it('should fetch multiple documents with content', async () => {
@@ -135,6 +156,8 @@ describe('Documents API Integration Tests', () => {
           userId: mockUser.sub
         })
       ])
+      // Track all created document IDs
+      docs.forEach(doc => testDocIds.push(doc._id.toString()))
 
       // Fetch only the first and third documents
       const response = await axios.post(`${API_URL}/documents/bulk-fetch`, {
@@ -171,6 +194,8 @@ describe('Documents API Integration Tests', () => {
         userId: mockUser.sub,
         lastUpdated: Date.now()
       })
+      // Track the created document ID
+      testDocIds.push(doc._id.toString())
 
       const response = await axios.post(`${API_URL}/documents/bulk-fetch`, {
         ids: [doc._id],
@@ -219,13 +244,15 @@ describe('Documents API Integration Tests', () => {
 
   describe('POST /api/documents', () => {
     beforeEach(async () => {
-      // Clear the documents collection before each test
-      await Doc.deleteMany({})
+      // Clear all documents for our test user
+      await Doc.deleteMany({ userId: mockUser.sub })
+      // Clear the tracking array
+      testDocIds = []
     }, 10000)
 
     afterAll(async () => {
-      // Clean up all test data
-      await Doc.deleteMany({})
+      // Clean up only the documents we created
+      await Doc.deleteMany({ userId: mockUser.sub })
     }, 10000)
 
     it('should create a new document with JSON content', async () => {
@@ -311,18 +338,20 @@ describe('Documents API Integration Tests', () => {
 
   describe('POST /api/documents/bulk-delete', () => {
     beforeEach(async () => {
-      // Clear the documents and folders collections before each test
+      // Clear all documents and folders for our test user
       await Promise.all([
-        Doc.deleteMany({}),
-        Folder.deleteMany({})
+        Doc.deleteMany({ userId: mockUser.sub }),
+        Folder.deleteMany({ userId: mockUser.sub })
       ])
+      // Clear the tracking array
+      testDocIds = []
     }, 10000)
 
     afterAll(async () => {
-      // Clean up all test data
+      // Clean up only the documents and folders we created
       await Promise.all([
-        Doc.deleteMany({}),
-        Folder.deleteMany({})
+        Doc.deleteMany({ userId: mockUser.sub }),
+        Folder.deleteMany({ userId: mockUser.sub })
       ])
     }, 10000)
 
@@ -345,6 +374,8 @@ describe('Documents API Integration Tests', () => {
           userId: mockUser.sub
         })
       ])
+      // Track all created document IDs
+      docs.forEach(doc => testDocIds.push(doc._id.toString()))
 
       // Delete the first two documents
       const response = await axios.post(`${API_URL}/documents/bulk-delete`, {
@@ -356,8 +387,8 @@ describe('Documents API Integration Tests', () => {
       expect(response.status).toBe(200)
       expect(response.data.success).toBe(true)
 
-      // Verify documents were deleted
-      const remainingDocs = await Doc.find({})
+      // Verify documents were deleted - only check our test documents
+      const remainingDocs = await Doc.find({ _id: { $in: testDocIds } })
       expect(remainingDocs.length).toBe(1)
       expect(remainingDocs[0]._id.toString()).toBe(docs[2]._id.toString())
     }, 10000)
@@ -398,7 +429,7 @@ describe('Documents API Integration Tests', () => {
       })
 
       // Create documents in both folders
-      await Promise.all([
+      const createdDocs = await Promise.all([
         Doc.create({
           title: 'Doc in Root',
           content: JSON.stringify({ type: 'doc', content: [] }),
@@ -412,6 +443,8 @@ describe('Documents API Integration Tests', () => {
           parentId: subFolder._id.toString()
         })
       ])
+      // Track all created document IDs
+      createdDocs.forEach(doc => testDocIds.push(doc._id.toString()))
 
       // Delete the root folder (should cascade to subfolder and all docs)
       const response = await axios.post(`${API_URL}/documents/bulk-delete`, {
@@ -423,9 +456,9 @@ describe('Documents API Integration Tests', () => {
       expect(response.status).toBe(200)
       expect(response.data.success).toBe(true)
 
-      // Verify everything was deleted
-      const remainingFolders = await Folder.find({})
-      const remainingDocs = await Doc.find({})
+      // Verify everything was deleted - only check our test documents and folders
+      const remainingFolders = await Folder.find({ _id: { $in: [rootFolder._id, subFolder._id] } })
+      const remainingDocs = await Doc.find({ _id: { $in: testDocIds } })
       
       expect(remainingFolders.length).toBe(0)
       expect(remainingDocs.length).toBe(0)
@@ -434,13 +467,15 @@ describe('Documents API Integration Tests', () => {
 
   describe('POST /api/documents/bulk-update', () => {
     beforeEach(async () => {
-      // Clear the documents collection before each test
-      await Doc.deleteMany({})
+      // Clear all documents for our test user
+      await Doc.deleteMany({ userId: mockUser.sub })
+      // Clear the tracking array
+      testDocIds = []
     }, 10000)
 
     afterAll(async () => {
-      // Clean up all test data
-      await Doc.deleteMany({})
+      // Clean up only the documents we created
+      await Doc.deleteMany({ userId: mockUser.sub })
     }, 10000)
 
     it('should update multiple documents with new content', async () => {
@@ -463,6 +498,8 @@ describe('Documents API Integration Tests', () => {
           userId: mockUser.sub
         })
       ])
+      // Track all created document IDs
+      docs.forEach(doc => testDocIds.push(doc._id.toString()))
 
       // New content for updates
       const newContent1 = {
@@ -517,6 +554,8 @@ describe('Documents API Integration Tests', () => {
         }),
         userId: mockUser.sub
       })
+      // Track the created document ID
+      testDocIds.push(doc._id.toString())
 
       // New content as a stringified JSON
       const newContentString = JSON.stringify({
@@ -585,13 +624,15 @@ describe('Documents API Integration Tests', () => {
 
   describe('GET /api/documents/[id]', () => {
     beforeEach(async () => {
-      // Clear the documents collection before each test
-      await Doc.deleteMany({})
+      // Clear all documents for our test user
+      await Doc.deleteMany({ userId: mockUser.sub })
+      // Clear the tracking array
+      testDocIds = []
     }, 10000)
 
     afterAll(async () => {
-      // Clean up all test data
-      await Doc.deleteMany({})
+      // Clean up only the documents we created
+      await Doc.deleteMany({ userId: mockUser.sub })
     }, 10000)
 
     it('should retrieve a single document by ID with parsed content', async () => {
@@ -613,6 +654,8 @@ describe('Documents API Integration Tests', () => {
         content: JSON.stringify(content),
         userId: mockUser.sub
       })
+      // Track the created document ID
+      testDocIds.push(testDoc._id.toString())
 
       const response = await axios.get(`${API_URL}/documents/${testDoc._id}`)
       
@@ -636,13 +679,15 @@ describe('Documents API Integration Tests', () => {
 
   describe('PATCH /api/documents/[id]', () => {
     beforeEach(async () => {
-      // Clear the documents collection before each test
-      await Doc.deleteMany({})
+      // Clear all documents for our test user
+      await Doc.deleteMany({ userId: mockUser.sub })
+      // Clear the tracking array
+      testDocIds = []
     }, 10000)
 
     afterAll(async () => {
-      // Clean up all test data
-      await Doc.deleteMany({})
+      // Clean up only the documents we created
+      await Doc.deleteMany({ userId: mockUser.sub })
     }, 10000)
 
     it('should update a document with object content', async () => {
@@ -664,6 +709,8 @@ describe('Documents API Integration Tests', () => {
         content: JSON.stringify(initialContent),
         userId: mockUser.sub
       })
+      // Track the created document ID
+      testDocIds.push(testDoc._id.toString())
 
       // New content to update with
       const updatedContent = {
@@ -717,6 +764,8 @@ describe('Documents API Integration Tests', () => {
         content: JSON.stringify(initialContent),
         userId: mockUser.sub
       })
+      // Track the created document ID
+      testDocIds.push(testDoc._id.toString())
 
       // New content as a stringified JSON
       const updatedContentString = JSON.stringify({
@@ -767,6 +816,8 @@ describe('Documents API Integration Tests', () => {
         content: JSON.stringify(content),
         userId: mockUser.sub
       })
+      // Track the created document ID
+      testDocIds.push(testDoc._id.toString())
 
       // Update only the title
       const response = await axios.patch(`${API_URL}/documents/${testDoc._id}`, {
@@ -800,13 +851,15 @@ describe('Documents API Integration Tests', () => {
 
   describe('DELETE /api/documents/[id]', () => {
     beforeEach(async () => {
-      // Clear the documents collection before each test
-      await Doc.deleteMany({})
+      // Clear all documents for our test user
+      await Doc.deleteMany({ userId: mockUser.sub })
+      // Clear the tracking array
+      testDocIds = []
     }, 10000)
 
     afterAll(async () => {
-      // Clean up all test data
-      await Doc.deleteMany({})
+      // Clean up only the documents we created
+      await Doc.deleteMany({ userId: mockUser.sub })
     }, 10000)
 
     it('should delete a document by ID', async () => {
@@ -819,6 +872,8 @@ describe('Documents API Integration Tests', () => {
         }),
         userId: mockUser.sub
       })
+      // Track the created document ID
+      testDocIds.push(testDoc._id.toString())
 
       // Delete the document
       const response = await axios.delete(`${API_URL}/documents/${testDoc._id}`)
