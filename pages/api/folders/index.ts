@@ -9,7 +9,9 @@ export default async function handler(
   switch (req.method) {
     case 'GET':
       try {
-        const folders = await storage.find('folders', {})
+        const { userId } = req.query
+        const query = userId ? { userId } : {}
+        const folders = await storage.find('folders', query)
         res.status(200).json(folders)
       } catch (error) {
         console.error('Error fetching folders:', error)
