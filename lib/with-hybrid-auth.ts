@@ -108,7 +108,6 @@ const withHybridAuth = (handler: (req: ExtendedApiRequest, res: NextApiResponse)
   return async (req: ExtendedApiRequest, res: NextApiResponse) => {
     try {
       const userFromToken = await extractBearerToken(req)
-      console.log('userFromToken', userFromToken)
       if (userFromToken) {
         // token-based authentication
         console.log('found user from token, using token-based authentication')

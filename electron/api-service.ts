@@ -118,19 +118,7 @@ const makeRequest = async (
     if (isOnline()) {
       // Since we're now using the same IDs for both local and cloud,
       // we can simply pass the same endpoint to the cloud operation
-      
-      // Ensure we're passing the local document ID to the cloud operation
-      if (method === 'post' && localResult && localResult.data && localResult.data._id) {
-        // Create a new data object if it doesn't exist
-        const updatedData: any = data ? { ...data } : {}
-        // Set the _id in the data object to ensure the cloud document uses the same ID
-        updatedData._id = localResult.data._id
-        console.log('Using local document ID for cloud operation:', localResult.data._id)
-        // Use the updated data for the cloud operation
-        performCloudOperationAsync(method, endpoint, updatedData, cleanEndpoint)
-      } else {
-        performCloudOperationAsync(method, endpoint, data, cleanEndpoint)
-      }
+      performCloudOperationAsync(method, endpoint, data, cleanEndpoint, localResult)
     } else {
       console.log('Offline mode - using local data only')
     }
@@ -436,14 +424,6 @@ async function performCloudOperation(
     },
   }
 
-  // console.log('Making request to URL:', url)
-  // console.log('Request config:', {
-  //   method,
-  //   url,
-  //   headers: config.headers,
-  //   data: method === 'post' || method === 'patch' ? data : undefined
-  // })
-
   try {
     if (method === 'patch' || method === 'post') {
       return axios[method](url, data, config)
@@ -609,10 +589,23 @@ async function performCloudOperationAsync(
   method: 'get' | 'delete' | 'patch' | 'post',
   endpoint: string, 
   data?: any,
-  cleanEndpoint?: string
+  cleanEndpoint?: string,
+  localResult?: any
 ) {
   try {
     console.log('Starting background cloud operation:', { method, endpoint })
+    
+    // Ensure ID consistency between local and cloud for document creation
+    if (method === 'post' && localResult?.data?._id) {
+      // Create a copy of the data with the local document's ID
+      const updatedData = data ? { ...data } : {}
+      // Ensure we use the same ID for cloud operations
+      updatedData._id = localResult.data._id
+      console.log('Using local document ID for cloud operation:', localResult.data._id)
+      // Use the updated data for the cloud operation
+      data = updatedData
+    }
+    
     const cloudResult = await performCloudOperation(method, endpoint, data)
     
     // For GET operations, we can still sync data in the background
