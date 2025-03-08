@@ -160,19 +160,6 @@ export default function SharedDocumentPage() {
     }
   }, [documentId, id])
 
-  // Track document state changes
-  useEffect(() => {
-    console.log('Document state changed:', {
-      id,
-      documentId,
-      hasHybridDoc: !!hybridDoc,
-      hasDatabaseDoc: !!databaseDoc,
-      hasCurrentContent: !!currentContent,
-      isTransitioning,
-      url: window.location.href
-    })
-  }, [id, documentId, databaseDoc, hybridDoc, currentContent, isTransitioning])
-
   const showSpinner = !documentContent && isTransitioning
 
   const { isLoading } = useUser()
@@ -185,11 +172,6 @@ export default function SharedDocumentPage() {
   const [diffContent, setDiffContent] = useState<any>(null)
 
   const debouncedSave = useDebouncedCallback((data: Partial<DocumentData>) => {
-    console.log('Debounced save triggered:', {
-      data,
-      documentId,
-      currentHybridDoc: hybridDoc
-    })
     mutate(`/documents/${documentId}/versions`)
     save(data, documentId, setRecentlySaved)
     mutate(documentPath)

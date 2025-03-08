@@ -32,11 +32,6 @@ export interface DocumentTreeProps {
 }
 
 export const createTreeItems = (docs: DocumentData[], folders: FolderData[]): Record<string, TreeItemData> => {
-  console.log('Creating tree items with:', { 
-    docs: docs.map(d => ({ id: d._id || d.id, title: d.title })),
-    folders: folders.map(f => ({ id: f._id || f.id, title: f.title }))
-  })
-
   const treeItems: Record<string, TreeItemData> = {
     root: {
       index: 'root',
@@ -216,11 +211,9 @@ const DocumentTree = ({
     if (!treeItem.isFolder) {
       const currentUrl = window.location.pathname
       const baseDocumentId = currentUrl.split('/').pop()
-      console.log('Tree selection:', { selectedId, baseDocumentId, currentUrl })
       
       if (baseDocumentId && currentUrl.includes('/documents/')) {
         const newUrl = `/documents/${baseDocumentId}?documentId=${selectedId}`
-        console.log('Updating URL and dispatching event:', newUrl)
         window.history.pushState({}, '', newUrl)
         // Dispatch custom event for document change
         window.dispatchEvent(new Event('documentChanged'))
