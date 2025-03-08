@@ -168,7 +168,8 @@ describe('Documents API Integration Tests', () => {
       const doc = await Doc.create({
         title: 'Test Doc',
         content: JSON.stringify(content),
-        userId: mockUser.sub
+        userId: mockUser.sub,
+        lastUpdated: Date.now()
       })
 
       const response = await axios.post(`${API_URL}/documents/bulk-fetch`, {
@@ -181,6 +182,8 @@ describe('Documents API Integration Tests', () => {
       expect(data[0].content).toBeUndefined()
       expect(data[0].id).toBe(doc._id.toString())
       expect(data[0].title).toBe('Test Doc')
+      expect(data[0].lastUpdated).toBeDefined()
+      expect(typeof data[0].lastUpdated).toBe('number')
     }, 10000)
 
     it('should handle invalid document IDs gracefully', async () => {
