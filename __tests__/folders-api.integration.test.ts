@@ -6,45 +6,66 @@ import mongoose from 'mongoose'
 const API_URL = 'http://localhost:3000/api'
 
 describe('Folders API Integration Tests', () => {
+  // Track IDs of folders created during tests - each suite will have its own array
+  let testFolderIds: string[] = []
+
+  // Clean up any existing test folders before running any tests
+  beforeAll(async () => {
+    await Promise.all([
+      Doc.deleteMany({ userId: mockUser.sub }),
+      Folder.deleteMany({ userId: mockUser.sub })
+    ])
+  }, 10000)
+
+  // Reset the tracking array before each test suite
+  beforeEach(async () => {
+    testFolderIds = []
+  })
+
   // Only clean up test data after all tests, don't stop the server
   afterAll(async () => {
-    // Clean up all test data
+    // Clean up only the folders and documents we created
     await Promise.all([
-      Doc.deleteMany({}),
-      Folder.deleteMany({})
+      Doc.deleteMany({ userId: mockUser.sub }),
+      Folder.deleteMany({ userId: mockUser.sub })
     ])
   }, 10000)
 
   describe('GET /api/folders', () => {
     beforeEach(async () => {
-      // Clear the folders collection before each test
-      await Folder.deleteMany({})
+      // Clear all folders for our test user
+      await Folder.deleteMany({ userId: mockUser.sub })
+      // Clear the tracking array
+      testFolderIds = []
     }, 10000)
 
     afterAll(async () => {
-      // Clean up all test data
-      await Folder.deleteMany({})
+      // Clean up only the folders we created
+      await Folder.deleteMany({ userId: mockUser.sub })
     }, 10000)
 
     it('should return all folders', async () => {
       // Create test folders
-      await Folder.create({
+      const folder1 = await Folder.create({
         title: 'Test Folder 1',
         parentId: 'root',
         userId: mockUser.sub,
         lastUpdated: Date.now(),
         folderIndex: 0
       })
+      testFolderIds.push(folder1._id.toString())
 
-      await Folder.create({
+      const folder2 = await Folder.create({
         title: 'Test Folder 2',
         parentId: 'root',
         userId: mockUser.sub,
         lastUpdated: Date.now(),
         folderIndex: 1
       })
+      testFolderIds.push(folder2._id.toString())
 
-      const response = await axios.get(`${API_URL}/folders`)
+      // Get only folders for our test user
+      const response = await axios.get(`${API_URL}/folders?userId=${mockUser.sub}`)
       
       expect(response.status).toBe(200)
       expect(Array.isArray(response.data)).toBe(true)
@@ -71,13 +92,15 @@ describe('Folders API Integration Tests', () => {
 
   describe('POST /api/folders', () => {
     beforeEach(async () => {
-      // Clear the folders collection before each test
-      await Folder.deleteMany({})
+      // Clear all folders for our test user
+      await Folder.deleteMany({ userId: mockUser.sub })
+      // Clear the tracking array
+      testFolderIds = []
     }, 10000)
 
     afterAll(async () => {
-      // Clean up all test data
-      await Folder.deleteMany({})
+      // Clean up only the folders we created
+      await Folder.deleteMany({ userId: mockUser.sub })
     }, 10000)
 
     it('should create a new folder', async () => {
@@ -128,22 +151,25 @@ describe('Folders API Integration Tests', () => {
     let testFolder: any
 
     beforeEach(async () => {
-      // Clear the folders collection before each test
-      await Folder.deleteMany({})
+      // Clear all folders for our test user
+      await Folder.deleteMany({ userId: mockUser.sub })
+      // Clear the tracking array
+      testFolderIds = []
       
       // Create a test folder
       testFolder = await Folder.create({
         title: 'Test Folder for Update',
         parentId: 'root',
         userId: mockUser.sub,
-        lastUpdated: Date.now() - 10000, // Set to past time to verify update
+        lastUpdated: Date.now() - 10000,
         folderIndex: 0
       })
+      testFolderIds.push(testFolder._id.toString())
     }, 10000)
 
     afterAll(async () => {
-      // Clean up all test data
-      await Folder.deleteMany({})
+      // Clean up only the folders we created
+      await Folder.deleteMany({ userId: mockUser.sub })
     }, 10000)
 
     it('should update a folder', async () => {
@@ -185,11 +211,13 @@ describe('Folders API Integration Tests', () => {
     let folderWithSubfolders: any
 
     beforeEach(async () => {
-      // Clear the collections before each test
+      // Clear all folders and documents for our test user
       await Promise.all([
-        Doc.deleteMany({}),
-        Folder.deleteMany({})
+        Doc.deleteMany({ userId: mockUser.sub }),
+        Folder.deleteMany({ userId: mockUser.sub })
       ])
+      // Clear the tracking array
+      testFolderIds = []
       
       // Create test folders
       emptyFolder = await Folder.create({
@@ -199,6 +227,7 @@ describe('Folders API Integration Tests', () => {
         lastUpdated: Date.now(),
         folderIndex: 0
       })
+      testFolderIds.push(emptyFolder._id.toString())
       
       folderWithDocs = await Folder.create({
         title: 'Folder With Documents',
@@ -207,6 +236,7 @@ describe('Folders API Integration Tests', () => {
         lastUpdated: Date.now(),
         folderIndex: 1
       })
+      testFolderIds.push(folderWithDocs._id.toString())
       
       folderWithSubfolders = await Folder.create({
         title: 'Folder With Subfolders',
@@ -215,6 +245,7 @@ describe('Folders API Integration Tests', () => {
         lastUpdated: Date.now(),
         folderIndex: 2
       })
+      testFolderIds.push(folderWithSubfolders._id.toString())
       
       // Create a document in folderWithDocs
       await Doc.create({
@@ -225,20 +256,21 @@ describe('Folders API Integration Tests', () => {
       })
       
       // Create a subfolder in folderWithSubfolders
-      await Folder.create({
+      const subfolder = await Folder.create({
         title: 'Subfolder',
         parentId: folderWithSubfolders._id.toString(),
         userId: mockUser.sub,
         lastUpdated: Date.now(),
         folderIndex: 0
       })
+      testFolderIds.push(subfolder._id.toString())
     }, 10000)
 
     afterAll(async () => {
-      // Clean up all test data
+      // Clean up only the folders and documents we created
       await Promise.all([
-        Doc.deleteMany({}),
-        Folder.deleteMany({})
+        Doc.deleteMany({ userId: mockUser.sub }),
+        Folder.deleteMany({ userId: mockUser.sub })
       ])
     }, 10000)
 

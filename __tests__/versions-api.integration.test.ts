@@ -6,12 +6,30 @@ import mongoose from 'mongoose'
 const API_URL = 'http://localhost:3000/api'
 
 describe('Versions API Integration Tests', () => {
+  // Track IDs of documents and versions created during tests
+  let testDocIds: string[] = []
+  let testVersionIds: string[] = []
+
+  // Clean up any existing test data before running any tests
+  beforeAll(async () => {
+    await Promise.all([
+      Doc.deleteMany({ userId: mockUser.sub }),
+      Version.deleteMany({ ownerId: mockUser.sub })
+    ])
+  }, 10000)
+
+  // Reset the tracking arrays before each test suite
+  beforeEach(async () => {
+    testDocIds = []
+    testVersionIds = []
+  })
+
   // Only clean up test data after all tests, don't stop the server
   afterAll(async () => {
-    // Clean up all test data
+    // Clean up only the documents and versions we created
     await Promise.all([
-      Doc.deleteMany({}),
-      Version.deleteMany({})
+      Doc.deleteMany({ userId: mockUser.sub }),
+      Version.deleteMany({ ownerId: mockUser.sub })
     ])
   }, 10000)
 
@@ -19,11 +37,14 @@ describe('Versions API Integration Tests', () => {
     let testDoc: any
 
     beforeEach(async () => {
-      // Clear the documents and versions collections before each test
+      // Clear all documents and versions for our test user
       await Promise.all([
-        Doc.deleteMany({}),
-        Version.deleteMany({})
+        Doc.deleteMany({ userId: mockUser.sub }),
+        Version.deleteMany({ ownerId: mockUser.sub })
       ])
+      // Clear the tracking arrays
+      testDocIds = []
+      testVersionIds = []
 
       // Create a test document
       testDoc = await Doc.create({
@@ -34,13 +55,14 @@ describe('Versions API Integration Tests', () => {
         }),
         userId: mockUser.sub
       })
+      testDocIds.push(testDoc._id.toString())
     }, 10000)
 
     afterAll(async () => {
-      // Clean up all test data
+      // Clean up only the documents and versions we created
       await Promise.all([
-        Doc.deleteMany({}),
-        Version.deleteMany({})
+        Doc.deleteMany({ userId: mockUser.sub }),
+        Version.deleteMany({ ownerId: mockUser.sub })
       ])
     }, 10000)
 
@@ -137,11 +159,14 @@ describe('Versions API Integration Tests', () => {
     let testDoc: any
 
     beforeEach(async () => {
-      // Clear the documents and versions collections before each test
+      // Clear all documents and versions for our test user
       await Promise.all([
-        Doc.deleteMany({}),
-        Version.deleteMany({})
+        Doc.deleteMany({ userId: mockUser.sub }),
+        Version.deleteMany({ ownerId: mockUser.sub })
       ])
+      // Clear the tracking arrays
+      testDocIds = []
+      testVersionIds = []
 
       // Create a test document
       testDoc = await Doc.create({
@@ -152,13 +177,14 @@ describe('Versions API Integration Tests', () => {
         }),
         userId: mockUser.sub
       })
+      testDocIds.push(testDoc._id.toString())
     }, 10000)
 
     afterAll(async () => {
-      // Clean up all test data
+      // Clean up only the documents and versions we created
       await Promise.all([
-        Doc.deleteMany({}),
-        Version.deleteMany({})
+        Doc.deleteMany({ userId: mockUser.sub }),
+        Version.deleteMany({ ownerId: mockUser.sub })
       ])
     }, 10000)
 
@@ -278,11 +304,14 @@ describe('Versions API Integration Tests', () => {
     let testVersion: any
 
     beforeEach(async () => {
-      // Clear the documents and versions collections before each test
+      // Clear all documents and versions for our test user
       await Promise.all([
-        Doc.deleteMany({}),
-        Version.deleteMany({})
+        Doc.deleteMany({ userId: mockUser.sub }),
+        Version.deleteMany({ ownerId: mockUser.sub })
       ])
+      // Clear the tracking arrays
+      testDocIds = []
+      testVersionIds = []
 
       // Create a test document
       testDoc = await Doc.create({
@@ -293,6 +322,7 @@ describe('Versions API Integration Tests', () => {
         }),
         userId: mockUser.sub
       })
+      testDocIds.push(testDoc._id.toString())
 
       // Create a test version
       testVersion = await Version.create({
@@ -306,13 +336,14 @@ describe('Versions API Integration Tests', () => {
         createdAt: Date.now(),
         wordCount: 2
       })
+      testVersionIds.push(testVersion._id.toString())
     }, 10000)
 
     afterAll(async () => {
-      // Clean up all test data
+      // Clean up only the documents and versions we created
       await Promise.all([
-        Doc.deleteMany({}),
-        Version.deleteMany({})
+        Doc.deleteMany({ userId: mockUser.sub }),
+        Version.deleteMany({ ownerId: mockUser.sub })
       ])
     }, 10000)
 
