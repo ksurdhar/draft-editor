@@ -10,8 +10,74 @@ interface Profile {
   email: string
 }
 
+// Network status indicator component
+function NetworkStatus() {
+  const [isOnline, setIsOnline] = useState(true)
+
+  useEffect(() => {
+    // Get initial network status
+    const checkInitialStatus = async () => {
+      try {
+        const status = await window.electronAPI.getNetworkStatus()
+        setIsOnline(status)
+      } catch (error) {
+        console.error('Failed to get network status:', error)
+      }
+    }
+
+    checkInitialStatus()
+
+    // Set up listener for network status changes
+    const removeListener = window.electronAPI.onNetworkStatusChanged(status => {
+      setIsOnline(status)
+    })
+
+    return () => {
+      // Clean up listener when component unmounts
+      removeListener()
+    }
+  }, [])
+
+  // Styles for the network indicator
+  const containerStyle = {
+    position: 'fixed',
+    bottom: '20px',
+    right: '20px',
+    padding: '8px 12px',
+    borderRadius: '4px',
+    backgroundColor: isOnline ? 'rgba(0, 128, 0, 0.1)' : 'rgba(255, 0, 0, 0.1)',
+    border: `1px solid ${isOnline ? 'green' : 'red'}`,
+    color: isOnline ? 'green' : 'red',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    zIndex: 1000,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+    transition: 'all 0.3s ease',
+  } as React.CSSProperties
+
+  const indicatorStyle = {
+    width: '8px',
+    height: '8px',
+    borderRadius: '50%',
+    backgroundColor: isOnline ? 'green' : 'red',
+    boxShadow: `0 0 4px ${isOnline ? 'green' : 'red'}`,
+  }
+
+  return (
+    <div style={containerStyle}>
+      <div style={indicatorStyle}></div>
+      {isOnline ? 'Online' : 'Offline'}
+    </div>
+  )
+}
+
 function ElectronApp() {
   const [location, setLocation] = useLocation()
+  // Profile state is maintained for future use but not displayed in the current UI
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [profile, setProfile] = useState({} as Profile)
 
   useEffect(() => {
@@ -48,6 +114,8 @@ function ElectronApp() {
             {location === '/' && <LandingPage />}
             {location === '/documents' && <ElectronDocumentsPage />}
             {isDocumentLocation() && <SharedDocumentPage />}
+            {/* Network status indicator */}
+            <NetworkStatus />
           </Providers>
         </APIProvider>
       </NavigationProvider>

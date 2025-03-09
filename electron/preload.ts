@@ -1,5 +1,4 @@
-import { DocumentData } from '@typez/globals'
-const { contextBridge, ipcRenderer } = require('electron')
+import { contextBridge, ipcRenderer } from 'electron'
 
 // API Definition
 const electronAPI = {
@@ -13,7 +12,15 @@ const electronAPI = {
   get: (url: string) => ipcRenderer.invoke('api:get', url),
   destroy: (url: string) => ipcRenderer.invoke('api:delete', url),
   logOut: () => ipcRenderer.send('auth:log-out'),
-  openFolderDialog: () => ipcRenderer.invoke('dialog:open-folder')
+  openFolderDialog: () => ipcRenderer.invoke('dialog:open-folder'),
+  getNetworkStatus: () => ipcRenderer.invoke('network:get-status'),
+  onNetworkStatusChanged: (callback: (isOnline: boolean) => void) => {
+    const listener = (_: any, isOnline: boolean) => callback(isOnline)
+    ipcRenderer.on('network:status-changed', listener)
+    return () => {
+      ipcRenderer.removeListener('network:status-changed', listener)
+    }
+  },
 }
 
 // Register the API with the contextBridge

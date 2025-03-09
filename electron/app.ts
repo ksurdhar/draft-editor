@@ -14,7 +14,7 @@ export const createAppWindow = async () => {
     webPreferences: {
       nodeIntegration: true,
       nodeIntegrationInWorker: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.js'),
     },
   })
 
@@ -32,6 +32,7 @@ export const createAppWindow = async () => {
       mainWindow.minimize()
     } else {
       mainWindow.show()
+      mainWindow.maximize()
     }
   })
 

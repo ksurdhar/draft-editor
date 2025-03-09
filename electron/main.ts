@@ -2,6 +2,7 @@ import { BrowserWindow, app, ipcMain, dialog } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
 import apiService from './api-service'
+import { initNetworkDetection } from './network-detector'
 import { createAppWindow } from './app'
 import { createAuthWindow, createLogoutWindow } from './auth-process'
 import authService from './auth-service'
@@ -11,6 +12,9 @@ let mainWindow: BrowserWindow | null = null
 const envPath = path.resolve(__dirname, '../../env-electron.json')
 const env = JSON.parse(fs.readFileSync(envPath, 'utf-8'))
 const mockAuth = env.MOCK_AUTH || false
+
+let currentNetworkStatus = true
+let networkDetector: { checkNow: () => void } | null = null
 
 async function createWindow() {
   try {
@@ -42,7 +46,28 @@ app.on('window-all-closed', () => {
 app
   .whenReady()
   .then(() => {
+    // Initialize network detection
+    networkDetector = initNetworkDetection()
+
+    // Set up additional network check on app resume
+    app.on('activate', () => {
+      // Check network on app activation/resume
+      if (networkDetector) networkDetector.checkNow()
+    })
+
+    // Listen for network status changes from the API service
+    ipcMain.on('network-status-changed', isOnline => {
+      currentNetworkStatus = !!isOnline
+      // Broadcast to all windows
+      BrowserWindow.getAllWindows().forEach(window => {
+        if (!window.isDestroyed()) {
+          window.webContents.send('network:status-changed', currentNetworkStatus)
+        }
+      })
+    })
+
     // Handle IPC messages from the renderer process.
+    ipcMain.handle('network:get-status', () => currentNetworkStatus)
     ipcMain.handle('auth:get-profile', authService.getProfile)
     ipcMain.handle('api:get-documents', apiService.getDocuments)
     ipcMain.handle('api:delete-document', (_, id) => apiService.deleteDocument(id))
@@ -54,7 +79,7 @@ app
     ipcMain.handle('api:get', (_, url) => apiService.get(url))
     ipcMain.handle('dialog:open-folder', async () => {
       const result = await dialog.showOpenDialog({
-        properties: ['openDirectory', 'multiSelections']
+        properties: ['openDirectory', 'multiSelections'],
       })
       return result.filePaths
     })

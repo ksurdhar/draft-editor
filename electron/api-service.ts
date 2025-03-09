@@ -3,6 +3,7 @@ import axios, { AxiosRequestConfig } from 'axios'
 import authService from './auth-service'
 import { documentStorage, folderStorage, versionStorage } from './storage-adapter'
 import { DEFAULT_DOCUMENT_CONTENT } from '../lib/constants'
+import { isOnline } from './network-detector'
 
 // We'll always use local storage and sync with cloud when possible
 const BASE_URL = 'https://www.whetstone-writer.com/api'
@@ -14,17 +15,6 @@ function normalizeId(id: any): string {
   if (!id) return ''
   // Convert ObjectId or other objects to string
   return id.toString ? id.toString() : String(id)
-}
-
-// Check if we're online
-const isOnline = () => {
-  // For now, always return true while testing
-  // In a production app, we'd implement proper network detection
-  // Options include:
-  // 1. Using Electron's 'online' and 'offline' events
-  // 2. Attempting to reach a known server with a lightweight request
-  // 3. Using Node.js 'dns' module to resolve a hostname
-  return true
 }
 
 // Expose the CRUD methods to the renderer
@@ -47,7 +37,7 @@ export const electronAPI = {
   destroy: async (url: string) => {
     const result = await makeRequest('delete', url)
     return result.data
-  }
+  },
 }
 
 // Export original apiService interface for backward compatibility
@@ -90,7 +80,7 @@ const apiService = {
   destroy: async (url: string) => {
     const result = await makeRequest('delete', url)
     return result.data
-  }
+  },
 }
 
 export default apiService
@@ -100,11 +90,6 @@ const makeRequest = async (
   endpoint: string,
   data?: Partial<DocumentData | VersionData>,
 ) => {
-  // console.log('\n=== API Request ===')
-  // console.log(`Method: ${method.toUpperCase()}`)
-  // console.log(`Endpoint: ${endpoint}`)
-  // console.log(`Online Mode: ${isOnline() ? 'Connected' : 'Offline'}`)
-
   // Clean the endpoint
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint
   console.log(`Cleaned endpoint: ${cleanEndpoint}`)
@@ -113,7 +98,7 @@ const makeRequest = async (
     // Always execute local operation first
     let localResult = await performLocalOperation(method, cleanEndpoint, data)
     console.log('Local operation result:', localResult?.data ? 'success' : 'no data')
-    
+
     // If we're online, perform cloud operation in the background without blocking
     if (isOnline()) {
       // Since we're now using the same IDs for both local and cloud,
@@ -122,7 +107,7 @@ const makeRequest = async (
     } else {
       console.log('Offline mode - using local data only')
     }
-    
+
     // Always return the local result immediately
     return localResult
   } catch (error) {
@@ -134,17 +119,17 @@ const makeRequest = async (
 // Track if a sync operation is in progress
 let syncInProgress = {
   documents: false,
-  folders: false
+  folders: false,
 }
 
 // Handles all local storage operations
 async function performLocalOperation(
   method: 'get' | 'delete' | 'patch' | 'post',
   endpoint: string,
-  data?: any
+  data?: any,
 ) {
   console.log('Performing local operation:', { method, endpoint })
-    
+
   // Handle collection-level operations
   if (endpoint === 'documents') {
     console.log('Handling collection-level documents request')
@@ -158,14 +143,14 @@ async function performLocalOperation(
         ...data,
         content: data?.content || DEFAULT_DOCUMENT_CONTENT,
         comments: [],
-        lastUpdated: now
+        lastUpdated: now,
       })
       console.log('Created document:', newDocument)
       return { data: newDocument }
     }
     return { data: null }
   }
-  
+
   if (endpoint === 'folders') {
     console.log('Handling collection-level folders request')
     if (method === 'get') {
@@ -176,7 +161,7 @@ async function performLocalOperation(
       const now = Date.now()
       const newFolder = await folderStorage.create(FOLDERS_COLLECTION, {
         ...data,
-        lastUpdated: now
+        lastUpdated: now,
       })
       console.log('Created folder:', newFolder)
       return { data: newFolder }
@@ -188,31 +173,31 @@ async function performLocalOperation(
   if (endpoint === 'documents/bulk-delete') {
     console.log('Handling bulk delete request')
     if (method === 'post' && data) {
-      const { documentIds = [], folderIds = [] } = data as { documentIds: string[], folderIds: string[] }
+      const { documentIds = [], folderIds = [] } = data as { documentIds: string[]; folderIds: string[] }
       console.log('Bulk deleting:', { documentIds, folderIds })
 
       // Helper function to recursively delete a folder and its contents
       async function deleteFolder(folderId: string) {
         console.log(`Starting to delete folder ${folderId}`)
-        
+
         // Get all documents and subfolders in this folder
         const [docs, subfolders] = await Promise.all([
           documentStorage.find(DOCUMENTS_COLLECTION, { parentId: folderId }),
-          documentStorage.find(FOLDERS_COLLECTION, { parentId: folderId })
+          documentStorage.find(FOLDERS_COLLECTION, { parentId: folderId }),
         ])
 
         console.log(`Found in folder ${folderId}:`, {
           documentsCount: docs.length,
           subfoldersCount: subfolders.length,
           documents: docs.map(d => d._id),
-          subfolders: subfolders.map(f => f._id)
+          subfolders: subfolders.map(f => f._id),
         })
 
         // Recursively delete all subfolders
         if (subfolders.length > 0) {
           console.log(`Deleting ${subfolders.length} subfolders of ${folderId}`)
           await Promise.all(
-            subfolders.map(folder => folder._id ? deleteFolder(folder._id) : Promise.resolve())
+            subfolders.map(folder => (folder._id ? deleteFolder(folder._id) : Promise.resolve())),
           )
         }
 
@@ -220,10 +205,9 @@ async function performLocalOperation(
         if (docs.length > 0) {
           console.log(`Deleting ${docs.length} documents from folder ${folderId}`)
           await Promise.all(
-            docs.map(doc => doc._id ? 
-              documentStorage.delete(DOCUMENTS_COLLECTION, { _id: doc._id }) : 
-              Promise.resolve()
-            )
+            docs.map(doc =>
+              doc._id ? documentStorage.delete(DOCUMENTS_COLLECTION, { _id: doc._id }) : Promise.resolve(),
+            ),
           )
         }
 
@@ -240,19 +224,13 @@ async function performLocalOperation(
         // Delete all documents
         if (documentIds.length > 0) {
           console.log(`Starting to delete ${documentIds.length} documents`)
-          await Promise.all(
-            documentIds.map(id => 
-              documentStorage.delete(DOCUMENTS_COLLECTION, { _id: id })
-            )
-          )
+          await Promise.all(documentIds.map(id => documentStorage.delete(DOCUMENTS_COLLECTION, { _id: id })))
         }
 
         // Delete all folders recursively
         if (folderIds.length > 0) {
           console.log(`Starting to delete ${folderIds.length} folders`)
-          await Promise.all(
-            folderIds.map(id => deleteFolder(id))
-          )
+          await Promise.all(folderIds.map(id => deleteFolder(id)))
         }
 
         console.log('Bulk delete operation completed successfully')
@@ -342,7 +320,11 @@ async function performLocalOperation(
       case 'patch':
         if (!data) return { data: null }
         console.log(`Updating folder ${id} in collection ${FOLDERS_COLLECTION}:`, data)
-        const folderUpdateResult = await folderStorage.update(FOLDERS_COLLECTION, id, data as Partial<Document>)
+        const folderUpdateResult = await folderStorage.update(
+          FOLDERS_COLLECTION,
+          id,
+          data as Partial<Document>,
+        )
         console.log('Folder update result:', folderUpdateResult)
         return { data: folderUpdateResult }
       case 'delete':
@@ -388,17 +370,17 @@ async function performLocalOperation(
 async function performCloudOperation(
   method: 'get' | 'delete' | 'patch' | 'post',
   endpoint: string,
-  data?: any
+  data?: any,
 ) {
   console.log('Performing cloud operation:', { method, endpoint })
-  
+
   // Ensure endpoint format is correct for cloud API
   endpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
   const url = `${BASE_URL}${endpoint}`
-  
+
   // Get fresh access token
   let token = authService.getAccessToken()
-  
+
   // If we have a token and it's expired, try to refresh
   if (token && authService.isTokenExpired(token)) {
     console.log('Token expired, attempting to refresh...')
@@ -449,40 +431,43 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
       console.log('Skipping documents sync - another sync already in progress')
       return
     }
-    
+
     try {
       // Set sync flag
       syncInProgress.documents = true
-      
+
       console.log('Syncing cloud documents to local storage')
       console.log(`Cloud documents count: ${cloudData.length}`)
-      
+
       // Get local documents
       const localDocs = await documentStorage.find(DOCUMENTS_COLLECTION, {})
       console.log(`Local documents count before sync: ${localDocs.length}`)
-      
+
       // Create a map of local documents by ID for efficient lookups
       const localDocsById = new Map(localDocs.map(doc => [normalizeId(doc._id), doc]))
-      
+
       // Keep track of documents we process
       let updatedCount = 0
       let createdCount = 0
       let skippedCount = 0
-      
+
       // Process cloud documents
       for (const cloudDoc of cloudData) {
         if (!cloudDoc._id) {
           console.warn('Skipping cloud document without ID:', cloudDoc)
           continue
         }
-        
+
         const normalizedId = normalizeId(cloudDoc._id)
         const localDoc = localDocsById.get(normalizedId)
-        
+
         if (localDoc) {
           // Document exists locally - check if cloud version is newer
-          if (cloudDoc.updatedAt && localDoc.updatedAt && 
-              new Date(cloudDoc.updatedAt).getTime() > new Date(localDoc.updatedAt).getTime()) {
+          if (
+            cloudDoc.updatedAt &&
+            localDoc.updatedAt &&
+            new Date(cloudDoc.updatedAt).getTime() > new Date(localDoc.updatedAt).getTime()
+          ) {
             console.log(`Updating document ${cloudDoc._id} with newer cloud version`)
             await documentStorage.update(DOCUMENTS_COLLECTION, cloudDoc._id, cloudDoc)
             updatedCount++
@@ -497,7 +482,7 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
             await documentStorage.create(DOCUMENTS_COLLECTION, {
               ...cloudDoc,
               // Use the same ID as the cloud version
-              _id: cloudDoc._id
+              _id: cloudDoc._id,
             })
             createdCount++
           } catch (error) {
@@ -505,54 +490,59 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
           }
         }
       }
-      
-      console.log(`Document sync complete. Updated: ${updatedCount}, Created: ${createdCount}, Skipped: ${skippedCount}`)
+
+      console.log(
+        `Document sync complete. Updated: ${updatedCount}, Created: ${createdCount}, Skipped: ${skippedCount}`,
+      )
     } finally {
       // Always release the sync flag when done
       syncInProgress.documents = false
     }
   }
-  
+
   if (endpoint === 'folders' && Array.isArray(cloudData)) {
     // Skip if a sync is already in progress for this collection
     if (syncInProgress.folders) {
       console.log('Skipping folders sync - another sync already in progress')
       return
     }
-    
+
     try {
       // Set sync flag
       syncInProgress.folders = true
-      
+
       console.log('Syncing cloud folders to local storage')
       console.log(`Cloud folders count: ${cloudData.length}`)
-      
+
       // Get local folders
       const localFolders = await folderStorage.find(FOLDERS_COLLECTION, {})
       console.log(`Local folders count before sync: ${localFolders.length}`)
-      
+
       // Create a map of local folders by ID for efficient lookups
       const localFoldersById = new Map(localFolders.map(folder => [normalizeId(folder._id), folder]))
-      
+
       // Keep track of folders we process
       let updatedCount = 0
       let createdCount = 0
       let skippedCount = 0
-      
+
       // Process cloud folders
       for (const cloudFolder of cloudData) {
         if (!cloudFolder._id) {
           console.warn('Skipping cloud folder without ID:', cloudFolder)
           continue
         }
-        
+
         const normalizedId = normalizeId(cloudFolder._id)
         const localFolder = localFoldersById.get(normalizedId)
-        
+
         if (localFolder) {
           // Folder exists locally - check if cloud version is newer
-          if (cloudFolder.updatedAt && localFolder.updatedAt && 
-              new Date(cloudFolder.updatedAt).getTime() > new Date(localFolder.updatedAt).getTime()) {
+          if (
+            cloudFolder.updatedAt &&
+            localFolder.updatedAt &&
+            new Date(cloudFolder.updatedAt).getTime() > new Date(localFolder.updatedAt).getTime()
+          ) {
             console.log(`Updating folder ${cloudFolder._id} with newer cloud version`)
             await folderStorage.update(FOLDERS_COLLECTION, cloudFolder._id, cloudFolder)
             updatedCount++
@@ -567,7 +557,7 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
             await folderStorage.create(FOLDERS_COLLECTION, {
               ...cloudFolder,
               // Use the same ID as the cloud version
-              _id: cloudFolder._id
+              _id: cloudFolder._id,
             })
             createdCount++
           } catch (error) {
@@ -575,8 +565,10 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
           }
         }
       }
-      
-      console.log(`Folder sync complete. Updated: ${updatedCount}, Created: ${createdCount}, Skipped: ${skippedCount}`)
+
+      console.log(
+        `Folder sync complete. Updated: ${updatedCount}, Created: ${createdCount}, Skipped: ${skippedCount}`,
+      )
     } finally {
       // Always release the sync flag when done
       syncInProgress.folders = false
@@ -587,14 +579,14 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
 // Performs cloud operations asynchronously without blocking
 async function performCloudOperationAsync(
   method: 'get' | 'delete' | 'patch' | 'post',
-  endpoint: string, 
+  endpoint: string,
   data?: any,
   cleanEndpoint?: string,
-  localResult?: any
+  localResult?: any,
 ) {
   try {
     console.log('Starting background cloud operation:', { method, endpoint })
-    
+
     // Ensure ID consistency between local and cloud for document creation
     if (method === 'post' && localResult?.data?._id) {
       // Create a copy of the data with the local document's ID
@@ -605,9 +597,9 @@ async function performCloudOperationAsync(
       // Use the updated data for the cloud operation
       data = updatedData
     }
-    
+
     const cloudResult = await performCloudOperation(method, endpoint, data)
-    
+
     // For GET operations, we can still sync data in the background
     // But we need to be careful not to create duplicates
     if (method === 'get' && cloudResult && cloudResult.data && cleanEndpoint) {
@@ -623,10 +615,12 @@ async function performCloudOperationAsync(
       }
     } else if (method !== 'get') {
       // For non-GET operations (mutating operations), log the result
-      console.log(`Background cloud ${method.toUpperCase()} operation completed:`, 
-        cloudResult ? 'success' : 'no result')
+      console.log(
+        `Background cloud ${method.toUpperCase()} operation completed:`,
+        cloudResult ? 'success' : 'no result',
+      )
     }
-    
+
     console.log('Background cloud operation completed successfully')
   } catch (error) {
     console.error('Background cloud operation failed:', error)
