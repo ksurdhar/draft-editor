@@ -21,6 +21,13 @@ const electronAPI = {
       ipcRenderer.removeListener('network:status-changed', listener)
     }
   },
+  onSyncUpdate: (callback: (updates: { documents?: any[]; folders?: any[] }) => void) => {
+    const listener = (_: any, updates: any) => callback(updates)
+    ipcRenderer.on('sync:updates', listener)
+    return () => {
+      ipcRenderer.removeListener('sync:updates', listener)
+    }
+  },
 }
 
 // Register the API with the contextBridge

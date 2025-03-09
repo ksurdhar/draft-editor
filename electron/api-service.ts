@@ -4,6 +4,7 @@ import authService from './auth-service'
 import { documentStorage, folderStorage, versionStorage } from './storage-adapter'
 import { DEFAULT_DOCUMENT_CONTENT } from '../lib/constants'
 import { isOnline } from './network-detector'
+import { BrowserWindow } from 'electron'
 
 // We'll always use local storage and sync with cloud when possible
 const BASE_URL = 'https://www.whetstone-writer.com/api'
@@ -450,6 +451,7 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
       let updatedCount = 0
       let createdCount = 0
       let skippedCount = 0
+      const newDocuments: DocumentData[] = []
 
       // Process cloud documents
       for (const cloudDoc of cloudData) {
@@ -470,6 +472,7 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
           ) {
             console.log(`Updating document ${cloudDoc._id} with newer cloud version`)
             await documentStorage.update(DOCUMENTS_COLLECTION, cloudDoc._id, cloudDoc)
+            newDocuments.push(cloudDoc)
             updatedCount++
           } else {
             console.log(`Skipping document ${cloudDoc._id}, local version is current or newer`)
@@ -479,11 +482,12 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
           // Document doesn't exist locally - create it with the SAME ID
           console.log(`Creating new local document from cloud with ID: ${cloudDoc._id}`)
           try {
-            await documentStorage.create(DOCUMENTS_COLLECTION, {
+            const newDoc = await documentStorage.create(DOCUMENTS_COLLECTION, {
               ...cloudDoc,
               // Use the same ID as the cloud version
               _id: cloudDoc._id,
             })
+            newDocuments.push(newDoc)
             createdCount++
           } catch (error) {
             console.error(`Error creating document ${cloudDoc._id}:`, error)
@@ -494,6 +498,15 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
       console.log(
         `Document sync complete. Updated: ${updatedCount}, Created: ${createdCount}, Skipped: ${skippedCount}`,
       )
+
+      // If we have new or updated documents, notify all windows
+      if (newDocuments.length > 0) {
+        BrowserWindow.getAllWindows().forEach(window => {
+          if (!window.isDestroyed()) {
+            window.webContents.send('sync:updates', { documents: newDocuments })
+          }
+        })
+      }
     } finally {
       // Always release the sync flag when done
       syncInProgress.documents = false
@@ -525,6 +538,7 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
       let updatedCount = 0
       let createdCount = 0
       let skippedCount = 0
+      const newFolders: any[] = []
 
       // Process cloud folders
       for (const cloudFolder of cloudData) {
@@ -545,6 +559,7 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
           ) {
             console.log(`Updating folder ${cloudFolder._id} with newer cloud version`)
             await folderStorage.update(FOLDERS_COLLECTION, cloudFolder._id, cloudFolder)
+            newFolders.push(cloudFolder)
             updatedCount++
           } else {
             console.log(`Skipping folder ${cloudFolder._id}, local version is current or newer`)
@@ -554,11 +569,12 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
           // Folder doesn't exist locally - create it with the SAME ID
           console.log(`Creating new local folder from cloud with ID: ${cloudFolder._id}`)
           try {
-            await folderStorage.create(FOLDERS_COLLECTION, {
+            const newFolder = await folderStorage.create(FOLDERS_COLLECTION, {
               ...cloudFolder,
               // Use the same ID as the cloud version
               _id: cloudFolder._id,
             })
+            newFolders.push(newFolder)
             createdCount++
           } catch (error) {
             console.error(`Error creating folder ${cloudFolder._id}:`, error)
@@ -569,6 +585,15 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
       console.log(
         `Folder sync complete. Updated: ${updatedCount}, Created: ${createdCount}, Skipped: ${skippedCount}`,
       )
+
+      // If we have new or updated folders, notify all windows
+      if (newFolders.length > 0) {
+        BrowserWindow.getAllWindows().forEach(window => {
+          if (!window.isDestroyed()) {
+            window.webContents.send('sync:updates', { folders: newFolders })
+          }
+        })
+      }
     } finally {
       // Always release the sync flag when done
       syncInProgress.folders = false
