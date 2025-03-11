@@ -444,16 +444,18 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
       const localDocs = await documentStorage.find(DOCUMENTS_COLLECTION, {})
       console.log(`Local documents count before sync: ${localDocs.length}`)
 
-      // Create a map of local documents by ID for efficient lookups
+      // Create maps for efficient lookups
       const localDocsById = new Map(localDocs.map(doc => [normalizeId(doc._id), doc]))
+      const cloudDocsById = new Map(cloudData.map(doc => [normalizeId(doc._id), doc]))
 
       // Keep track of documents we process
       let updatedCount = 0
       let createdCount = 0
       let skippedCount = 0
+      let cloudCreatedCount = 0
       const newDocuments: DocumentData[] = []
 
-      // Process cloud documents
+      // First sync cloud documents to local
       for (const cloudDoc of cloudData) {
         if (!cloudDoc._id) {
           console.warn('Skipping cloud document without ID:', cloudDoc)
@@ -495,8 +497,31 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
         }
       }
 
+      // Then sync local documents to cloud
+      for (const localDoc of localDocs) {
+        if (!localDoc._id) {
+          console.warn('Skipping local document without ID:', localDoc)
+          continue
+        }
+
+        const normalizedId = normalizeId(localDoc._id)
+        if (!cloudDocsById.has(normalizedId)) {
+          // Document exists locally but not in cloud - create it in cloud
+          console.log(`Creating document in cloud with local ID: ${localDoc._id}`)
+          try {
+            await performCloudOperation('post', '/documents', {
+              ...localDoc,
+              _id: localDoc._id, // Ensure we use the same ID
+            })
+            cloudCreatedCount++
+          } catch (error) {
+            console.error(`Error creating document ${localDoc._id} in cloud:`, error)
+          }
+        }
+      }
+
       console.log(
-        `Document sync complete. Updated: ${updatedCount}, Created: ${createdCount}, Skipped: ${skippedCount}`,
+        `Document sync complete. Updated locally: ${updatedCount}, Created locally: ${createdCount}, Created in cloud: ${cloudCreatedCount}, Skipped: ${skippedCount}`,
       )
 
       // If we have new or updated documents, notify all windows
@@ -531,16 +556,18 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
       const localFolders = await folderStorage.find(FOLDERS_COLLECTION, {})
       console.log(`Local folders count before sync: ${localFolders.length}`)
 
-      // Create a map of local folders by ID for efficient lookups
+      // Create maps for efficient lookups
       const localFoldersById = new Map(localFolders.map(folder => [normalizeId(folder._id), folder]))
+      const cloudFoldersById = new Map(cloudData.map(folder => [normalizeId(folder._id), folder]))
 
       // Keep track of folders we process
       let updatedCount = 0
       let createdCount = 0
       let skippedCount = 0
+      let cloudCreatedCount = 0
       const newFolders: any[] = []
 
-      // Process cloud folders
+      // First sync cloud folders to local
       for (const cloudFolder of cloudData) {
         if (!cloudFolder._id) {
           console.warn('Skipping cloud folder without ID:', cloudFolder)
@@ -582,8 +609,31 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
         }
       }
 
+      // Then sync local folders to cloud
+      for (const localFolder of localFolders) {
+        if (!localFolder._id) {
+          console.warn('Skipping local folder without ID:', localFolder)
+          continue
+        }
+
+        const normalizedId = normalizeId(localFolder._id)
+        if (!cloudFoldersById.has(normalizedId)) {
+          // Folder exists locally but not in cloud - create it in cloud
+          console.log(`Creating folder in cloud with local ID: ${localFolder._id}`)
+          try {
+            await performCloudOperation('post', '/folders', {
+              ...localFolder,
+              _id: localFolder._id, // Ensure we use the same ID
+            })
+            cloudCreatedCount++
+          } catch (error) {
+            console.error(`Error creating folder ${localFolder._id} in cloud:`, error)
+          }
+        }
+      }
+
       console.log(
-        `Folder sync complete. Updated: ${updatedCount}, Created: ${createdCount}, Skipped: ${skippedCount}`,
+        `Folder sync complete. Updated locally: ${updatedCount}, Created locally: ${createdCount}, Created in cloud: ${cloudCreatedCount}, Skipped: ${skippedCount}`,
       )
 
       // If we have new or updated folders, notify all windows

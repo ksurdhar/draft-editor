@@ -57,13 +57,23 @@ app
 
     // Listen for network status changes from the API service
     ipcMain.on('network-status-changed', isOnline => {
+      const previousStatus = currentNetworkStatus
       currentNetworkStatus = !!isOnline
+
       // Broadcast to all windows
       BrowserWindow.getAllWindows().forEach(window => {
         if (!window.isDestroyed()) {
           window.webContents.send('network:status-changed', currentNetworkStatus)
         }
       })
+
+      // If we're transitioning from offline to online, trigger a sync
+      if (!previousStatus && currentNetworkStatus) {
+        console.log('Network restored: triggering sync')
+        // Trigger sync for documents and folders
+        apiService.get('documents').catch(err => console.error('Error syncing documents:', err))
+        apiService.get('folders').catch(err => console.error('Error syncing folders:', err))
+      }
     })
 
     // Handle IPC messages from the renderer process.

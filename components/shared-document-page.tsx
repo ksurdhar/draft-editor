@@ -29,7 +29,7 @@ const useSave = () => {
     const updatedData = {
       ...data,
       lastUpdated: Date.now(),
-      content: data.content
+      content: data.content,
     }
 
     const cachedDoc = JSON.parse(sessionStorage.getItem(id) || '{}')
@@ -75,11 +75,11 @@ export default function SharedDocumentPage() {
   const { data: databaseDoc } = useSWR<DocumentData, Error>(documentPath, fetcher)
   const { data: allDocs } = useSWR<DocumentData[], Error>('/documents', fetcher)
   const { data: allFolders } = useSWR<DocumentData[], Error>('/folders', fetcher)
-  
+
   const [hybridDoc, setHybridDoc] = useState<DocumentData | null>()
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [currentContent, setCurrentContent] = useState<any>(null)
-  
+
   useEffect(() => {
     if (databaseDoc) {
       setHybridDoc(databaseDoc)
@@ -88,7 +88,7 @@ export default function SharedDocumentPage() {
 
   // Use the current document's content or fall back to hybrid doc
   const documentContent = currentContent || hybridDoc?.content
-  
+
   // Handle document content updates - split into two effects
   useEffect(() => {
     const loadDocument = async (docId: string) => {
@@ -96,26 +96,26 @@ export default function SharedDocumentPage() {
         docId,
         currentDocId: documentId,
         hasCurrentContent: !!currentContent,
-        isTransitioning
+        isTransitioning,
       })
-      
+
       // Only skip if we have content for this specific document
       if (currentContent && docId === documentId && !isTransitioning) {
         console.log('Skipping load - already have content for this document')
         return
       }
-      
+
       setIsTransitioning(true)
       setCurrentContent(null)
-      
+
       try {
         const doc = await get(`/documents/${docId}`)
         console.log('Loaded document:', {
           docId,
           hasContent: !!doc.content,
-          contentLength: doc.content?.content?.length
+          contentLength: doc.content?.content?.length,
         })
-        
+
         // Check if we're still on the same document
         const currentDocId = new URLSearchParams(window.location.search).get('documentId') || id
         if (docId === currentDocId) {
@@ -145,12 +145,12 @@ export default function SharedDocumentPage() {
     const handleDocumentChange = () => {
       const newParams = new URLSearchParams(window.location.search)
       const newDocId = newParams.get('documentId') || id
-      
+
       console.log('Document change event:', {
         newDocId,
         currentDocId: documentId,
         hasCurrentContent: !!currentContent,
-        isTransitioning
+        isTransitioning,
       })
 
       if (newDocId !== documentId) {
@@ -176,6 +176,7 @@ export default function SharedDocumentPage() {
   const [showVersions, setShowVersions] = useState(false)
   const [showGlobalFind, setShowGlobalFind] = useState(false)
   const [diffContent, setDiffContent] = useState<any>(null)
+  const [showInitialLoader, setShowInitialLoader] = useState(false)
 
   const debouncedSave = useDebouncedCallback((data: Partial<DocumentData>) => {
     mutate(`/documents/${documentId}/versions`)
@@ -198,6 +199,16 @@ export default function SharedDocumentPage() {
     }, 250)
   }, [isLoading, skipAnimation])
 
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout
+    if (!hybridDoc) {
+      timeoutId = setTimeout(() => {
+        setShowInitialLoader(true)
+      }, 1000)
+    }
+    return () => clearTimeout(timeoutId)
+  }, [hybridDoc])
+
   const handlePrimaryAction = (item: any) => {
     const selectedId = item.index.toString()
     navigateTo(`/documents/${selectedId}?from=tree`)
@@ -209,13 +220,13 @@ export default function SharedDocumentPage() {
     try {
       await patch(`/documents/${documentId}`, {
         content: version.content,
-        lastUpdated: Date.now()
+        lastUpdated: Date.now(),
       })
-      
+
       const updatedDoc = {
         ...hybridDoc,
         content: version.content,
-        lastUpdated: Date.now()
+        lastUpdated: Date.now(),
       }
 
       // Use window.env for Electron environment variables
@@ -223,10 +234,10 @@ export default function SharedDocumentPage() {
       if (storageType !== 'json') {
         sessionStorage.setItem(documentId, JSON.stringify(updatedDoc))
       }
-      
+
       await Promise.all([
         mutate(documentPath, updatedDoc, true),
-        mutate(`/hybrid-documents/${documentId}`, updatedDoc, true)
+        mutate(`/hybrid-documents/${documentId}`, updatedDoc, true),
       ])
 
       // Update current content to show restored version immediately
@@ -254,14 +265,10 @@ export default function SharedDocumentPage() {
       {!skipAnimation && (
         <>
           <div className={`gradient ${initAnimate ? 'opacity-0' : 'opacity-100'} ${backdropStyles}`} />
-          <div 
-            className={`gradient-editor ${initAnimate ? 'opacity-100' : 'opacity-0'} ${backdropStyles}`} 
-          />
+          <div className={`gradient-editor ${initAnimate ? 'opacity-100' : 'opacity-0'} ${backdropStyles}`} />
         </>
       )}
-      {skipAnimation && (
-        <div className="fixed top-0 left-0 h-screen w-screen z-[-1] gradient-editor" />
-      )}
+      {skipAnimation && <div className="gradient-editor fixed left-0 top-0 z-[-1] h-screen w-screen" />}
       {recentlySaved && (
         <div className={`fixed right-[30px] top-0 z-[40] p-[20px]`}>
           <CloudIcon className="h-[20px] w-[20px] animate-bounce self-center fill-black/[.10] md:h-[24px] md:w-[24px] md:fill-black/[.15]" />
@@ -269,41 +276,38 @@ export default function SharedDocumentPage() {
       )}
       <div className="flex h-screen">
         {/* Control Buttons */}
-        <div className="fixed top-[41px] left-[18px] z-50 flex gap-2">
-          <button 
+        <div className="fixed left-[18px] top-[41px] z-50 flex gap-2">
+          <button
             onClick={() => {
               setShowTree(!showTree)
               if (!showTree) {
                 setShowGlobalFind(false)
               }
             }}
-            className="p-1.5 rounded-lg hover:bg-white/[.1] transition-colors"
-            title={showTree ? "Hide document tree" : "Show document tree"}
-          >
+            className="rounded-lg p-1.5 transition-colors hover:bg-white/[.1]"
+            title={showTree ? 'Hide document tree' : 'Show document tree'}>
             {showTree ? (
-              <EyeIcon className="w-4 h-4 text-black/70" />
+              <EyeIcon className="h-4 w-4 text-black/70" />
             ) : (
-              <EyeOffIcon className="w-4 h-4 text-black/70" />
+              <EyeOffIcon className="h-4 w-4 text-black/70" />
             )}
           </button>
-          <button 
+          <button
             onClick={() => {
               setShowGlobalFind(!showGlobalFind)
               if (!showGlobalFind) {
                 setShowTree(false)
               }
             }}
-            className="p-1.5 rounded-lg hover:bg-white/[.1] transition-colors"
-            title={showGlobalFind ? "Hide global find" : "Show global find"}
-          >
-            <SearchIcon className="w-4 h-4 text-black/70" />
+            className="rounded-lg p-1.5 transition-colors hover:bg-white/[.1]"
+            title={showGlobalFind ? 'Hide global find' : 'Show global find'}>
+            <SearchIcon className="h-4 w-4 text-black/70" />
           </button>
-          <button 
+          <button
             onClick={() => setShowVersions(!showVersions)}
-            className="p-1.5 rounded-lg hover:bg-white/[.1] transition-colors"
-            title={showVersions ? "Hide versions" : "Show versions"}
-          >
-            <ClockIcon className="w-4 h-4 text-black/70" />
+            className="rounded-lg p-1.5 transition-colors hover:bg-white/[.1]"
+            title={showVersions ? 'Hide versions' : 'Show versions'}>
+            <ClockIcon className="h-4 w-4 text-black/70" />
           </button>
         </div>
 
@@ -311,19 +315,18 @@ export default function SharedDocumentPage() {
         <AnimatePresence initial={false}>
           {(showTree || showGlobalFind) && (
             <motion.div
-              initial={{ opacity: 0, scale: 0.98, filter: "blur(8px)" }}
-              animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-              exit={{ opacity: 0, scale: 0.98, filter: "blur(8px)" }}
-              transition={{ 
+              initial={{ opacity: 0, scale: 0.98, filter: 'blur(8px)' }}
+              animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, scale: 0.98, filter: 'blur(8px)' }}
+              transition={{
                 opacity: { duration: 0.5, ease: [0.23, 1, 0.32, 1] },
                 scale: { duration: 0.25, ease: [0.23, 1, 0.32, 1] },
-                filter: { duration: 0.4, ease: [0.23, 1, 0.32, 1] }
+                filter: { duration: 0.4, ease: [0.23, 1, 0.32, 1] },
               }}
-              style={{ willChange: "filter" }}
-              className="lg:fixed lg:left-0 lg:top-0 w-[320px] pt-[44px] h-screen shrink-0"
-            >
+              style={{ willChange: 'filter' }}
+              className="h-screen w-[320px] shrink-0 pt-[44px] lg:fixed lg:left-0 lg:top-0">
               {showTree && allDocs && allFolders && (
-                <div className="h-[calc(100vh_-_44px)] p-4 overflow-y-auto">
+                <div className="h-[calc(100vh_-_44px)] overflow-y-auto p-4">
                   <DocumentTree
                     key="document-tree"
                     items={createTreeItems(allDocs, allFolders)}
@@ -336,9 +339,7 @@ export default function SharedDocumentPage() {
                   />
                 </div>
               )}
-              {showGlobalFind && (
-                <GlobalFind onClose={() => setShowGlobalFind(false)} />
-              )}
+              {showGlobalFind && <GlobalFind onClose={() => setShowGlobalFind(false)} />}
             </motion.div>
           )}
         </AnimatePresence>
@@ -347,20 +348,19 @@ export default function SharedDocumentPage() {
         <AnimatePresence initial={false}>
           {showVersions && (
             <motion.div
-              initial={{ opacity: 0, scale: 0.98, filter: "blur(8px)" }}
-              animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-              exit={{ opacity: 0, scale: 0.98, filter: "blur(8px)" }}
-              transition={{ 
+              initial={{ opacity: 0, scale: 0.98, filter: 'blur(8px)' }}
+              animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, scale: 0.98, filter: 'blur(8px)' }}
+              transition={{
                 opacity: { duration: 0.5, ease: [0.23, 1, 0.32, 1] },
                 scale: { duration: 0.25, ease: [0.23, 1, 0.32, 1] },
-                filter: { duration: 0.4, ease: [0.23, 1, 0.32, 1] }
+                filter: { duration: 0.4, ease: [0.23, 1, 0.32, 1] },
               }}
-              style={{ willChange: "filter" }}
-              className="fixed right-0 top-0 w-[320px] pt-[44px] h-screen shrink-0 bg-white/[.02] backdrop-blur-xl"
-            >
-              <div className="h-[calc(100vh_-_44px)] p-4 overflow-y-auto">
-                <VersionList 
-                  documentId={documentId} 
+              style={{ willChange: 'filter' }}
+              className="fixed right-0 top-0 h-screen w-[320px] shrink-0 bg-white/[.02] pt-[44px] backdrop-blur-xl">
+              <div className="h-[calc(100vh_-_44px)] overflow-y-auto p-4">
+                <VersionList
+                  documentId={documentId}
                   onRestore={handleRestoreVersion}
                   onCompare={setDiffContent}
                   currentContent={documentContent}
@@ -371,16 +371,17 @@ export default function SharedDocumentPage() {
         </AnimatePresence>
 
         {/* Editor Container */}
-        <div className="flex-1 flex justify-center lg:justify-center">
+        <div className="flex flex-1 justify-center lg:justify-center">
           {!hybridDoc ? (
             <div className="flex h-[calc(100vh_-_44px)] items-center justify-center">
-              <Loader />
+              {showInitialLoader && <Loader />}
             </div>
           ) : (
             <div
               id="editor-container"
-              className={`overflow-y-scroll p-[20px] pb-10 font-editor2 text-black/[.79] w-full lg:w-[740px]`}>
-              <div className={`flex transition-flex duration-500 ease-in ${showSpinner ? 'mt-[-36px] flex-col justify-center' : ''} relative pb-10`}>
+              className={`w-full overflow-y-scroll p-[20px] pb-10 font-editor2 text-black/[.79] lg:w-[740px]`}>
+              <div
+                className={`flex transition-flex duration-500 ease-in ${showSpinner ? 'mt-[-36px] flex-col justify-center' : ''} relative pb-10`}>
                 {showSpinner && <Loader />}
                 <AnimatePresence mode="wait">
                   {documentContent && (
@@ -389,8 +390,7 @@ export default function SharedDocumentPage() {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                    >
+                      transition={{ duration: 0.2 }}>
                       <Editor
                         key={documentId}
                         content={diffContent || documentContent}
