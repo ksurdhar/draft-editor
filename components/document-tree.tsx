@@ -222,9 +222,21 @@ const DocumentTree = ({
 
       if (baseDocumentId && currentUrl.includes('/documents/')) {
         const newUrl = `/documents/${baseDocumentId}?documentId=${selectedId}`
+
+        // First clear any cached state by triggering documentChanging
+        window.dispatchEvent(
+          new CustomEvent('documentChanging', {
+            detail: { documentId: selectedId },
+          }),
+        )
+
+        // Update URL
         window.history.pushState({}, '', newUrl)
-        // Dispatch custom event for document change
-        window.dispatchEvent(new Event('documentChanged'))
+
+        // Dispatch document changed event after a brief delay
+        setTimeout(() => {
+          window.dispatchEvent(new Event('documentChanged'))
+        }, 50)
       } else {
         console.log('Navigating to document:', selectedId)
         onPrimaryAction?.(item)

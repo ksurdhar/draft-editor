@@ -107,7 +107,7 @@ export default function SharedDocumentPage() {
         isTransitioning,
       })
 
-      // Only skip if we have content for this specific document
+      // Only skip if we have content for this specific document and we're not in transition
       if (currentContent && docId === documentId && !isTransitioning) {
         console.log('Skipping load - already have content for this document')
         return
@@ -117,6 +117,11 @@ export default function SharedDocumentPage() {
       setCurrentContent(null)
 
       try {
+        // Clear SWR cache for this document to ensure we get fresh data
+        // This is especially important after title changes
+        mutate(documentPath, undefined, false)
+
+        // Get document from API
         const doc = await get(`/documents/${docId}`)
         console.log('Loaded document:', {
           docId,
@@ -128,6 +133,12 @@ export default function SharedDocumentPage() {
         const currentDocId = new URLSearchParams(window.location.search).get('documentId') || id
         if (docId === currentDocId) {
           setCurrentContent(doc.content)
+
+          // Update session storage cache with latest data
+          sessionStorage.setItem(docId, JSON.stringify(doc))
+
+          // Update hybrid doc state with full document data
+          setHybridDoc(doc)
         } else {
           console.log('Document changed while loading, skipping update')
         }
@@ -168,9 +179,29 @@ export default function SharedDocumentPage() {
       }
     }
 
+    const handleDocumentChanging = (event: any) => {
+      // Clear current content and set transitioning state to force fresh load
+      setCurrentContent(null)
+      setIsTransitioning(true)
+
+      // Also invalidate the SWR cache for the document being navigated to
+      const docId = event.detail?.documentId
+      if (docId) {
+        mutate(`/documents/${docId}`, undefined, false)
+      }
+
+      console.log('Document changing event:', {
+        targetDocId: event.detail?.documentId,
+        currentDocId: documentId,
+      })
+    }
+
     window.addEventListener('documentChanged', handleDocumentChange)
+    window.addEventListener('documentChanging', handleDocumentChanging)
+
     return () => {
       window.removeEventListener('documentChanged', handleDocumentChange)
+      window.removeEventListener('documentChanging', handleDocumentChanging)
     }
   }, [documentId, id])
 
@@ -189,16 +220,29 @@ export default function SharedDocumentPage() {
   const debouncedSave = useDebouncedCallback((data: Partial<DocumentData>) => {
     mutate(`/documents/${documentId}/versions`)
     save(data, documentId, setRecentlySaved)
-    mutate(documentPath)
+
+    // When saving, force a refresh of the document data to prevent stale data
+    mutate(documentPath, async () => {
+      // Get fresh data from API after saving
+      const freshDoc = await get(`/documents/${documentId}`)
+      return freshDoc
+    })
 
     // If the title is being updated, also update it in the allDocs array
     // This ensures the document tree shows the latest title immediately
     if (data.title && allDocs) {
+      // Use the false parameter for optimistic UI update, then revalidate to trigger animations
       mutate(
         '/documents',
         allDocs.map(doc => (doc._id === documentId ? { ...doc, title: data.title } : doc)),
         false,
       )
+
+      // After a brief delay, trigger a revalidation to ensure consistency
+      // This also helps trigger the animation by causing a re-render
+      setTimeout(() => {
+        mutate('/documents')
+      }, 100)
     }
   }, 1000)
 
