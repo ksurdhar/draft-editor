@@ -48,19 +48,19 @@ const DEFAULT_CONTENT = {
   content: [
     {
       type: 'paragraph',
-      content: []
-    }
-  ]
+      content: [],
+    },
+  ],
 }
 
-const EditorComponent = ({ 
-  content, 
-  title, 
-  onUpdate, 
-  canEdit, 
-  hideFooter, 
-  shouldFocusTitle, 
-  diffMode
+const EditorComponent = ({
+  content,
+  title,
+  onUpdate,
+  canEdit,
+  hideFooter,
+  shouldFocusTitle,
+  diffMode,
 }: EditorProps) => {
   const [inputValue, setInputValue] = useState(title === 'Untitled' ? '' : title)
   const [showFindPanel, setShowFindPanel] = useState(false)
@@ -84,21 +84,20 @@ const EditorComponent = ({
   })()
 
   const editor = useEditor({
-    extensions: [
-      StarterKit,
-      SearchHighlight,
-      DiffHighlight,
-    ],
+    extensions: [StarterKit, SearchHighlight, DiffHighlight],
     content: initialContent,
     editable: canEdit && !diffMode,
     onUpdate: ({ editor }) => {
       if (diffMode) return // Prevent updates in diff mode
       const json = editor.getJSON()
-      onUpdate({ content: JSON.stringify(json) })
+      onUpdate({
+        content: JSON.stringify(json),
+        title: inputValue || 'Untitled',
+      })
     },
     onCreate: ({ editor: _editor }) => {
       // console.log('Editor onCreate - initial content:', editor.getJSON())
-    }
+    },
   })
 
   // Track content prop changes
@@ -140,24 +139,24 @@ const EditorComponent = ({
   }, [shouldFocusTitle])
 
   return (
-    <div className='flex-grow normal-case animate-fadein'>
+    <div className="flex-grow animate-fadein normal-case">
       <style>{editorStyles}</style>
-      <div className='mb-[20px] mt-[44px]'>
+      <div className="mb-[20px] mt-[44px]">
         <input
           type="text"
           ref={titleRef}
           value={inputValue}
-          placeholder='Untitled'
-          className="editable mb-2 text-3xl md:text-4xl uppercase border-b border-transparent focus:outline-none active:outline-none focus:ring-0 focus:ring-offset-0 focus:border-transparent w-full bg-transparent placeholder:text-black/[.3] [appearance:none] [-webkit-appearance:none]"
+          placeholder="Untitled"
+          className="editable mb-2 w-full border-b border-transparent bg-transparent text-3xl uppercase [-webkit-appearance:none] [appearance:none] placeholder:text-black/[.3] focus:border-transparent focus:outline-none focus:ring-0 focus:ring-offset-0 active:outline-none md:text-4xl"
           style={{ outline: 'none', boxShadow: 'none' }}
           spellCheck={false}
-          onKeyDown={(e) => {
+          onKeyDown={e => {
             if (e.key === 'Enter') {
               e.preventDefault()
               editor?.commands.focus()
             }
           }}
-          onChange={(e) => {
+          onChange={e => {
             const newValue = e.target.value
             setInputValue(newValue)
             onUpdate({ title: newValue || 'Untitled' })
@@ -165,24 +164,13 @@ const EditorComponent = ({
         />
       </div>
       <div ref={containerRef} className="prose max-w-none">
-        <EditorContent 
-          editor={editor} 
-          className='rounded-md w-full h-full static text-[19px] md:text-[22px] focus:outline-none focus:ring-0 [&_*]:focus:outline-none [&_*]:focus:ring-0 min-h-[200px] p-4'
+        <EditorContent
+          editor={editor}
+          className="static h-full min-h-[200px] w-full rounded-md p-4 text-[19px] focus:outline-none focus:ring-0 md:text-[22px] [&_*]:focus:outline-none [&_*]:focus:ring-0"
         />
       </div>
-      {showFindPanel && editor && (
-        <FindPanel 
-          editor={editor} 
-          onClose={() => setShowFindPanel(false)}
-        />
-      )}
-      {!hideFooter && (
-        <Footer 
-          editor={editor}
-          initFadeIn={initFadeIn} 
-          fadeOut={fadeOut} 
-        />
-      )}
+      {showFindPanel && editor && <FindPanel editor={editor} onClose={() => setShowFindPanel(false)} />}
+      {!hideFooter && <Footer editor={editor} initFadeIn={initFadeIn} fadeOut={fadeOut} />}
     </div>
   )
 }
