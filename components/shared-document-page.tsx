@@ -35,7 +35,15 @@ const useSave = () => {
     const cachedDoc = JSON.parse(sessionStorage.getItem(id) || '{}')
     const documentCached = Object.keys(cachedDoc).length > 0
     if (documentCached) {
-      sessionStorage.setItem(id, JSON.stringify({ ...cachedDoc, ...updatedData }))
+      // Ensure we preserve the title when caching the document
+      sessionStorage.setItem(
+        id,
+        JSON.stringify({
+          ...cachedDoc,
+          ...updatedData,
+          title: data.title || cachedDoc.title, // Preserve existing title if not in update data
+        }),
+      )
     }
 
     const path = `/documents/${id}`
@@ -182,6 +190,16 @@ export default function SharedDocumentPage() {
     mutate(`/documents/${documentId}/versions`)
     save(data, documentId, setRecentlySaved)
     mutate(documentPath)
+
+    // If the title is being updated, also update it in the allDocs array
+    // This ensures the document tree shows the latest title immediately
+    if (data.title && allDocs) {
+      mutate(
+        '/documents',
+        allDocs.map(doc => (doc._id === documentId ? { ...doc, title: data.title } : doc)),
+        false,
+      )
+    }
   }, 1000)
 
   useEffect(() => {

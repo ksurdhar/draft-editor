@@ -1,4 +1,10 @@
-import { ControlledTreeEnvironment, Tree, TreeItemIndex, TreeItem, DraggingPosition } from 'react-complex-tree'
+import {
+  ControlledTreeEnvironment,
+  Tree,
+  TreeItemIndex,
+  TreeItem,
+  DraggingPosition,
+} from 'react-complex-tree'
 import 'react-complex-tree/lib/style.css'
 import { IconButton } from '@mui/material'
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz'
@@ -31,7 +37,10 @@ export interface DocumentTreeProps {
   showSelectedStyles?: boolean
 }
 
-export const createTreeItems = (docs: DocumentData[], folders: FolderData[]): Record<string, TreeItemData> => {
+export const createTreeItems = (
+  docs: DocumentData[],
+  folders: FolderData[],
+): Record<string, TreeItemData> => {
   const treeItems: Record<string, TreeItemData> = {
     root: {
       index: 'root',
@@ -39,8 +48,8 @@ export const createTreeItems = (docs: DocumentData[], folders: FolderData[]): Re
       canRename: false,
       isFolder: true,
       children: [],
-      data: 'root'
-    }
+      data: 'root',
+    },
   }
 
   // Add folders first
@@ -61,7 +70,7 @@ export const createTreeItems = (docs: DocumentData[], folders: FolderData[]): Re
       isFolder: true,
       children: [],
       data: folder.title || 'Untitled Folder',
-      folderIndex: folder.folderIndex
+      folderIndex: folder.folderIndex,
     }
   })
 
@@ -82,7 +91,7 @@ export const createTreeItems = (docs: DocumentData[], folders: FolderData[]): Re
       canRename: true,
       isFolder: false,
       data: doc.title || 'Untitled',
-      folderIndex: doc.folderIndex
+      folderIndex: doc.folderIndex,
     }
   })
 
@@ -137,14 +146,13 @@ export interface HandleMoveParams {
 export const handleMove = async ({ draggedItems, position, items, onMove }: HandleMoveParams) => {
   let targetId = 'root'
   let targetIndex = 0
-  
+
   if (position.targetType === 'item') {
     const targetItem = items[position.targetItem]
     if (!targetItem?.isFolder) {
       return
     }
     targetId = position.targetItem.toString()
-    
   } else if (position.targetType === 'between-items') {
     targetId = (position.parentItem || 'root').toString()
     targetIndex = position.childIndex
@@ -153,7 +161,7 @@ export const handleMove = async ({ draggedItems, position, items, onMove }: Hand
   for (const item of draggedItems) {
     const itemId = item.index.toString()
     const targetFolderId = targetId === 'root' ? undefined : targetId
-    
+
     if (onMove) {
       try {
         await onMove(itemId, targetFolderId, targetIndex)
@@ -176,7 +184,7 @@ const DocumentTree = ({
   onSelectedItemsChange,
   persistExpanded = false,
   theme = 'light',
-  showSelectedStyles = true
+  showSelectedStyles = true,
 }: DocumentTreeProps) => {
   const [internalSelectedItems, setInternalSelectedItems] = useState<TreeItemIndex[]>([])
   const [expandedItems, setExpandedItems] = useState<TreeItemIndex[]>(() => {
@@ -211,7 +219,7 @@ const DocumentTree = ({
     if (!treeItem.isFolder) {
       const currentUrl = window.location.pathname
       const baseDocumentId = currentUrl.split('/').pop()
-      
+
       if (baseDocumentId && currentUrl.includes('/documents/')) {
         const newUrl = `/documents/${baseDocumentId}?documentId=${selectedId}`
         window.history.pushState({}, '', newUrl)
@@ -343,7 +351,7 @@ const DocumentTree = ({
             focusedItem: selectedItems?.[0],
             expandedItems,
             selectedItems,
-          }
+          },
         }}
         onFocusItem={item => {
           if (item && onSelectedItemsChange) {
@@ -392,8 +400,7 @@ const DocumentTree = ({
                         onActionButtonClick(e, item.index.toString())
                       }
                     }}
-                    className="hover:bg-black/[.10]"
-                  >
+                    className="hover:bg-black/[.10]">
                     <MoreHorizIcon fontSize="small" />
                   </IconButton>
                 ) : null
@@ -401,21 +408,16 @@ const DocumentTree = ({
               containerProps={props.context.itemContainerWithChildrenProps}
               itemContainerProps={{
                 ...props.context.itemContainerWithoutChildrenProps,
-                ...context.interactiveElementProps
-              }}
-            >
+                ...context.interactiveElementProps,
+              }}>
               {props.children}
             </ListItem>
           )
-        }}
-      >
-        <Tree 
-          treeId="tree-1" 
-          rootItem="root"
-        />
+        }}>
+        <Tree treeId="tree-1" rootItem="root" />
       </ControlledTreeEnvironment>
     </div>
   )
 }
 
-export default DocumentTree 
+export default DocumentTree
