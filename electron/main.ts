@@ -17,6 +17,7 @@ let currentNetworkStatus = true
 let networkDetector: {
   checkNow: () => void
   reportNetworkFailure: () => void
+  reportNetworkSuccess: () => void
 } | null = null
 
 async function createWindow() {
@@ -49,10 +50,8 @@ app.on('window-all-closed', () => {
 app
   .whenReady()
   .then(() => {
-    // Initialize network detection with automatic checking disabled for testing
-    networkDetector = initNetworkDetection({
-      enableIntervalChecking: false, // Disable automatic checking
-    })
+    // Initialize network detection
+    networkDetector = initNetworkDetection()
 
     // Connect the network detector to the API service
     if (networkDetector) {

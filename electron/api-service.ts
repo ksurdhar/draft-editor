@@ -12,10 +12,16 @@ const DOCUMENTS_COLLECTION = 'documents'
 const FOLDERS_COLLECTION = 'folders'
 
 // Reference to the network detector
-let networkDetector: { reportNetworkFailure: () => void } | null = null
+let networkDetector: {
+  reportNetworkFailure: () => void
+  reportNetworkSuccess: () => void
+} | null = null
 
 // Function to set the network detector reference
-export const setNetworkDetector = (detector: { reportNetworkFailure: () => void }) => {
+export const setNetworkDetector = (detector: {
+  reportNetworkFailure: () => void
+  reportNetworkSuccess: () => void
+}) => {
   networkDetector = detector
 }
 
@@ -441,6 +447,14 @@ async function performCloudOperation(
     } else {
       response = await axios[method](url, config)
     }
+
+    // If we successfully made a request and we have the network detector,
+    // report that the network is working (especially important if we thought we were offline)
+    if (networkDetector && !isOnline()) {
+      console.log('API request succeeded while system thought we were offline - reporting success')
+      networkDetector.reportNetworkSuccess()
+    }
+
     return response
   } catch (error: any) {
     console.error('API request failed:', {
