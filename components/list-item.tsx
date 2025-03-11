@@ -37,7 +37,7 @@ const TypewriterText = ({ text, className }: { text: string; className: string }
       if (index >= text.length) {
         clearInterval(interval)
       }
-    }, 20) // Character typing speed
+    }, 15) // Character typing speed
 
     return () => clearInterval(interval)
   }, [text])
@@ -64,6 +64,7 @@ interface ListItemProps {
   depth?: number
   isSelected?: boolean
   onClick?: () => void
+  onDoubleClick?: () => void
   children?: ReactNode
   isExpanded?: boolean
   theme?: 'light' | 'dark'
@@ -79,6 +80,7 @@ export const ListItem = ({
   depth = 0,
   isSelected = false,
   onClick,
+  onDoubleClick,
   children,
   isExpanded,
   theme = 'light',
@@ -86,6 +88,41 @@ export const ListItem = ({
   itemContainerProps = {},
   showSelectedStyles = true,
 }: ListItemProps) => {
+  const [hasRecentClick, setHasRecentClick] = useState(false)
+
+  // Handle single click
+  const handleSingleClick = () => {
+    console.log('CLICK EVENT DETECTED')
+
+    // If we've already handled a double-click recently, ignore this click
+    if (hasRecentClick) return
+
+    // If there's a double-click, the browser will call onDoubleClick instead
+    // and this will be canceled by setting hasRecentClick
+    setTimeout(() => {
+      if (!hasRecentClick) {
+        console.log('✅ SINGLE CLICK CONFIRMED')
+        if (onClick) onClick()
+      }
+      setHasRecentClick(false)
+    }, 10) // Very small delay to let double-click be detected first if it's coming
+  }
+
+  // Handle native double-click event
+  const handleDoubleClick = () => {
+    console.log('🔥 NATIVE DOUBLE CLICK DETECTED')
+    setHasRecentClick(true)
+
+    if (onDoubleClick) {
+      onDoubleClick()
+    }
+
+    // Reset after a short time
+    setTimeout(() => {
+      setHasRecentClick(false)
+    }, 300)
+  }
+
   const getThemeClasses = () => {
     if (theme === 'light') {
       return {
@@ -106,7 +143,8 @@ export const ListItem = ({
   return (
     <li className="group list-none" {...containerProps}>
       <div
-        onClick={onClick}
+        onClick={handleSingleClick}
+        onDoubleClick={handleDoubleClick}
         className={`flex items-center justify-between px-2 py-1.5 ${themeClasses.hover} cursor-pointer rounded-lg ${
           isSelected ? themeClasses.selected : ''
         }`}

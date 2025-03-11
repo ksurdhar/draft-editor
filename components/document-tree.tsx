@@ -272,6 +272,35 @@ const DocumentTree = ({
     }
   }
 
+  const handleDoubleClick = (item: TreeItem) => {
+    const selectedId = item.index.toString()
+    if (!selectedId || !items[selectedId]) return
+
+    const treeItem = items[selectedId]
+
+    // For folders, just toggle expansion for both single and double click
+    if (treeItem.isFolder) {
+      if (expandedItems.includes(selectedId)) {
+        handleCollapseItem(item)
+      } else {
+        handleExpandItem(item)
+      }
+      return
+    }
+
+    // For documents, let's show this is detected by console logging
+    console.log('🔥 Document tree detected DOUBLE CLICK on item:', selectedId)
+
+    // Here you would typically implement rename or edit behavior
+    // For example, you could show a rename dialog for the document
+    alert(`You double-clicked on "${treeItem.data}". This could trigger rename functionality.`)
+
+    // You could trigger rename functionality:
+    // onActionButtonClick(event, selectedId); // If your action button opens rename dialog
+
+    // Or implement custom behavior here
+  }
+
   return (
     <div className={`[&_.rct-tree-root-focus]:!outline-none ${className}`} style={style}>
       <style>{`
@@ -402,6 +431,7 @@ const DocumentTree = ({
                   handlePrimaryAction(item)
                 }
               }}
+              onDoubleClick={() => handleDoubleClick(item)}
               rightContent={
                 showActionButton && item.index !== 'root' ? (
                   <IconButton
