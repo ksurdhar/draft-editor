@@ -1,7 +1,7 @@
 import { BrowserWindow, app, ipcMain, dialog } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
-import apiService from './api-service'
+import apiService, { setNetworkDetector } from './api-service'
 import { initNetworkDetection } from './network-detector'
 import { createAppWindow } from './app'
 import { createAuthWindow, createLogoutWindow } from './auth-process'
@@ -14,7 +14,10 @@ const env = JSON.parse(fs.readFileSync(envPath, 'utf-8'))
 const mockAuth = env.MOCK_AUTH || false
 
 let currentNetworkStatus = true
-let networkDetector: { checkNow: () => void } | null = null
+let networkDetector: {
+  checkNow: () => void
+  reportNetworkFailure: () => void
+} | null = null
 
 async function createWindow() {
   try {
@@ -46,8 +49,15 @@ app.on('window-all-closed', () => {
 app
   .whenReady()
   .then(() => {
-    // Initialize network detection
-    networkDetector = initNetworkDetection()
+    // Initialize network detection with automatic checking disabled for testing
+    networkDetector = initNetworkDetection({
+      enableIntervalChecking: false, // Disable automatic checking
+    })
+
+    // Connect the network detector to the API service
+    if (networkDetector) {
+      setNetworkDetector(networkDetector)
+    }
 
     // Set up additional network check on app resume
     app.on('activate', () => {

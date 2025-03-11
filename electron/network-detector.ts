@@ -1,8 +1,8 @@
 import { ipcMain } from 'electron'
 import * as dns from 'dns'
 
-// Base URL for the API
-const BASE_URL = 'https://www.whetstone-writer.com/api'
+// Network detection timing constants (in milliseconds)
+const NETWORK_CHECK_INTERVAL = 30000 // 30 seconds between regular checks
 
 // Track the current online status
 let onlineStatus = {
@@ -13,55 +13,96 @@ let onlineStatus = {
 /**
  * Initialize network status detection with regular checks
  * Returns a controller with methods to manage the network detection
+ * @param options Configuration options for network detection
  */
-export const initNetworkDetection = () => {
-  // Base interval - checking every 30 seconds
+export const initNetworkDetection = (
+  options: {
+    enableIntervalChecking?: boolean
+  } = {},
+) => {
+  // Default to enabled interval checking if not specified
+  const enableIntervalChecking = options.enableIntervalChecking !== false
+
+  console.log('Initializing network detection:', {
+    enableIntervalChecking,
+    currentStatus: onlineStatus.connected ? 'online' : 'offline',
+  })
+
+  // Base interval - checking every NETWORK_CHECK_INTERVAL
   // Balanced approach between responsiveness and energy usage
   let lastStatus = onlineStatus.connected
-  let intervalId: NodeJS.Timeout
+  let intervalId: NodeJS.Timeout | null = null
+
+  // Updates and broadcasts network status
+  function broadcastNetworkStatus(newStatus: boolean) {
+    console.log('broadcastNetworkStatus called with:', newStatus, 'current lastStatus:', lastStatus)
+
+    const statusChanged = newStatus !== lastStatus
+    lastStatus = newStatus
+
+    // Update internal status tracking
+    onlineStatus.connected = newStatus
+    onlineStatus.lastChecked = Date.now()
+
+    // Always broadcast when testing is enabled to ensure UI is updated
+    // This helps when the app starts in an incorrect state
+    const shouldBroadcast = statusChanged || !enableIntervalChecking
+
+    // If status changed or we're in testing mode, broadcast
+    if (shouldBroadcast) {
+      console.log(
+        `Network status ${statusChanged ? 'changed' : 'being broadcast'}: ${newStatus ? 'online' : 'offline'}`,
+      )
+
+      // Clear existing interval if it exists
+      if (intervalId) {
+        clearInterval(intervalId)
+        intervalId = null
+      }
+
+      // Broadcast status change
+      ipcMain.emit('network-status-changed', newStatus)
+
+      // Only set up intervals if enabled
+      if (enableIntervalChecking) {
+        // If we just detected offline, check more frequently
+        if (!newStatus) {
+          intervalId = setInterval(checkNetworkStatus, NETWORK_CHECK_INTERVAL / 2)
+        } else {
+          // Otherwise restore normal interval
+          intervalId = setInterval(checkNetworkStatus, NETWORK_CHECK_INTERVAL)
+        }
+      }
+    }
+  }
 
   function checkNetworkStatus() {
     updateOnlineStatus()
       .then(isOnline => {
-        const statusChanged = isOnline !== lastStatus
-        lastStatus = isOnline
-
-        // If status changed, temporarily increase check frequency
-        if (statusChanged) {
-          // Clear existing interval
-          if (intervalId) clearInterval(intervalId)
-
-          // Check again sooner (10s) to verify the change wasn't temporary
-          setTimeout(() => {
-            updateOnlineStatus()
-              .then(newStatus => {
-                // Broadcast the confirmed status
-                ipcMain.emit('network-status-changed', newStatus)
-
-                // Restore normal interval
-                if (intervalId) clearInterval(intervalId)
-                intervalId = setInterval(checkNetworkStatus, 30000)
-              })
-              .catch(console.error)
-          }, 10000)
-
-          // Broadcast immediate status change
-          ipcMain.emit('network-status-changed', isOnline)
-        }
+        // Use our new central broadcast function
+        broadcastNetworkStatus(isOnline)
       })
       .catch(console.error)
   }
 
-  // Set up the regular interval
-  intervalId = setInterval(checkNetworkStatus, 30000)
+  // Set up the regular interval if enabled
+  if (enableIntervalChecking) {
+    console.log('Setting up automatic network status checks')
+    intervalId = setInterval(checkNetworkStatus, NETWORK_CHECK_INTERVAL)
+  } else {
+    console.log('Automatic network status checking is disabled')
+  }
 
-  // Do an initial check immediately
+  // Do an initial check immediately regardless of interval setting
   checkNetworkStatus()
 
-  // Also expose a method to manually check network status
-  // This can be called after resuming from sleep, etc.
   return {
     checkNow: checkNetworkStatus,
+    // Allow external services to report network failures
+    reportNetworkFailure: () => {
+      console.log('External service reported network failure')
+      broadcastNetworkStatus(false)
+    },
   }
 }
 
@@ -97,58 +138,73 @@ const updateOnlineStatus = async (): Promise<boolean> => {
  * Uses multiple methods to verify connectivity with fallbacks
  */
 const performConnectivityCheck = async (): Promise<boolean> => {
-  try {
-    // First attempt: Try to resolve a hostname (DNS lookup)
-    // This is lightweight and uses minimal resources
-    console.log('Checking connectivity with DNS lookup for whetstone-writer.com')
+  // List of common reliable domains to check
+  const domainChecks = ['google.com', 'whetstone-writer.com', 'apple.com', 'cloudflare.com']
 
-    const dnsPromise = new Promise<boolean>((resolve, reject) => {
-      dns.lookup('whetstone-writer.com', err => {
-        if (err) {
-          reject(err)
-        } else {
-          resolve(true)
-        }
+  console.log('Performing connectivity check against multiple domains')
+
+  // Try DNS lookups for each domain
+  for (const domain of domainChecks) {
+    try {
+      console.log(`Checking connectivity with DNS lookup for ${domain}`)
+
+      const dnsPromise = new Promise<boolean>((resolve, reject) => {
+        dns.lookup(domain, err => {
+          if (err) {
+            reject(err)
+          } else {
+            resolve(true)
+          }
+        })
       })
-    })
 
-    // Add a timeout to the DNS lookup
-    const timeoutPromise = new Promise<boolean>((_, reject) => {
-      setTimeout(() => reject(new Error('DNS lookup timeout')), 2000)
-    })
+      // Add a timeout to the DNS lookup
+      const timeoutPromise = new Promise<boolean>((_, reject) => {
+        setTimeout(() => reject(new Error('DNS lookup timeout')), 2000)
+      })
 
-    // Race the DNS lookup against the timeout
-    const dnsResult = await Promise.race([dnsPromise, timeoutPromise])
+      // Race the DNS lookup against the timeout
+      const dnsResult = await Promise.race([dnsPromise, timeoutPromise])
 
-    // If DNS check succeeds, we have connectivity
-    if (dnsResult) {
-      return true
+      // If DNS check succeeds for any domain, we have connectivity
+      if (dnsResult) {
+        console.log(`DNS lookup success for ${domain}, network is online`)
+        return true
+      }
+    } catch (dnsError) {
+      console.log(`DNS lookup failed for ${domain}:`, dnsError)
+      // Continue to the next domain
     }
-  } catch (dnsError) {
-    console.log('DNS lookup failed:', dnsError)
-    // DNS check failed, continue to HTTP check
   }
 
+  // If all DNS lookups fail, try HTTP request as a last resort
   try {
-    // Second attempt: Try a lightweight HTTP request to our API
-    // This is more reliable but has more overhead
-    const pingUrl = `${BASE_URL}/ping`
-    console.log('Falling back to ping endpoint:', pingUrl)
+    // Try a lightweight HTTP request to a reliable service
+    const pingUrl = 'https://www.google.com'
+    console.log('Falling back to HTTP check:', pingUrl)
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 3000)
 
     const response = await fetch(pingUrl, {
       method: 'HEAD', // HEAD is perfect for ping - no response body
-      cache: 'no-store', // Don't cache results
-      // Short timeout to avoid hanging
-      signal: AbortSignal.timeout(2000),
+      signal: controller.signal,
     })
 
-    // Any successful response (2xx) indicates connectivity
-    return response.ok
+    clearTimeout(timeoutId)
+
+    if (response.ok) {
+      console.log('HTTP check succeeded, network is online')
+      return true
+    } else {
+      console.log('HTTP check failed with status:', response.status)
+    }
   } catch (httpError) {
-    // Both checks failed, likely offline
-    console.log('All connectivity checks failed, assuming offline')
-    return false
+    console.error('HTTP check failed:', httpError)
   }
+
+  console.log('All connectivity checks failed, network is offline')
+  return false
 }
 
 /**

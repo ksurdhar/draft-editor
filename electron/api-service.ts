@@ -11,6 +11,26 @@ const BASE_URL = 'https://www.whetstone-writer.com/api'
 const DOCUMENTS_COLLECTION = 'documents'
 const FOLDERS_COLLECTION = 'folders'
 
+// Reference to the network detector
+let networkDetector: { reportNetworkFailure: () => void } | null = null
+
+// Function to set the network detector reference
+export const setNetworkDetector = (detector: { reportNetworkFailure: () => void }) => {
+  networkDetector = detector
+}
+
+// Helper to determine if an error is a network connectivity error
+function isNetworkError(error: any): boolean {
+  return (
+    !error.response && // No response from server
+    (error.code === 'ECONNABORTED' || // Connection timeout
+      error.code === 'ECONNREFUSED' || // Connection refused
+      error.code === 'ENOTFOUND' || // DNS lookup failed
+      error.message.includes('Network Error') || // Generic network error
+      error.message.includes('timeout')) // Timeout error
+  )
+}
+
 // Function to normalize ID format to string
 function normalizeId(id: any): string {
   if (!id) return ''
@@ -391,6 +411,13 @@ async function performCloudOperation(
       console.log('Token refreshed successfully')
     } catch (error) {
       console.error('Failed to refresh token:', error)
+
+      // Check if this was a network error
+      if (error && isNetworkError(error) && networkDetector) {
+        console.log('Network error detected when refreshing token')
+        networkDetector.reportNetworkFailure()
+      }
+
       throw new Error('Authentication expired. Please log in again.')
     }
   }
@@ -408,10 +435,13 @@ async function performCloudOperation(
   }
 
   try {
+    let response
     if (method === 'patch' || method === 'post') {
-      return axios[method](url, data, config)
+      response = await axios[method](url, data, config)
+    } else {
+      response = await axios[method](url, config)
     }
-    return axios[method](url, config)
+    return response
   } catch (error: any) {
     console.error('API request failed:', {
       status: error.response?.status,
@@ -419,6 +449,13 @@ async function performCloudOperation(
       data: error.response?.data,
       headers: error.response?.headers,
     })
+
+    // Check if this is a network connectivity error
+    if (isNetworkError(error) && networkDetector) {
+      console.log('Network error detected during API request:', error.message)
+      networkDetector.reportNetworkFailure()
+    }
+
     throw error
   }
 }
@@ -505,7 +542,9 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
         }
 
         const normalizedId = normalizeId(localDoc._id)
-        if (!cloudDocsById.has(normalizedId)) {
+        const cloudDoc = cloudDocsById.get(normalizedId)
+
+        if (!cloudDoc) {
           // Document exists locally but not in cloud - create it in cloud
           console.log(`Creating document in cloud with local ID: ${localDoc._id}`)
           try {
@@ -517,11 +556,27 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
           } catch (error) {
             console.error(`Error creating document ${localDoc._id} in cloud:`, error)
           }
+        } else {
+          // Document exists in both local and cloud - check if local version is newer
+          if (
+            localDoc.updatedAt &&
+            cloudDoc.updatedAt &&
+            new Date(localDoc.updatedAt).getTime() > new Date(cloudDoc.updatedAt).getTime()
+          ) {
+            // Local document is newer, update cloud version
+            console.log(`Updating cloud document ${localDoc._id} with newer local version`)
+            try {
+              await performCloudOperation('patch', `/documents/${localDoc._id}`, localDoc)
+              cloudCreatedCount++ // Reuse this counter for updates too
+            } catch (error) {
+              console.error(`Error updating document ${localDoc._id} in cloud:`, error)
+            }
+          }
         }
       }
 
       console.log(
-        `Document sync complete. Updated locally: ${updatedCount}, Created locally: ${createdCount}, Created in cloud: ${cloudCreatedCount}, Skipped: ${skippedCount}`,
+        `Document sync complete. Updated locally: ${updatedCount}, Created locally: ${createdCount}, Created/Updated in cloud: ${cloudCreatedCount}, Skipped: ${skippedCount}`,
       )
 
       // If we have new or updated documents, notify all windows
@@ -617,7 +672,9 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
         }
 
         const normalizedId = normalizeId(localFolder._id)
-        if (!cloudFoldersById.has(normalizedId)) {
+        const cloudFolder = cloudFoldersById.get(normalizedId)
+
+        if (!cloudFolder) {
           // Folder exists locally but not in cloud - create it in cloud
           console.log(`Creating folder in cloud with local ID: ${localFolder._id}`)
           try {
@@ -629,11 +686,27 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
           } catch (error) {
             console.error(`Error creating folder ${localFolder._id} in cloud:`, error)
           }
+        } else {
+          // Folder exists in both local and cloud - check if local version is newer
+          if (
+            localFolder.updatedAt &&
+            cloudFolder.updatedAt &&
+            new Date(localFolder.updatedAt).getTime() > new Date(cloudFolder.updatedAt).getTime()
+          ) {
+            // Local folder is newer, update cloud version
+            console.log(`Updating cloud folder ${localFolder._id} with newer local version`)
+            try {
+              await performCloudOperation('patch', `/folders/${localFolder._id}`, localFolder)
+              cloudCreatedCount++ // Reuse this counter for updates too
+            } catch (error) {
+              console.error(`Error updating folder ${localFolder._id} in cloud:`, error)
+            }
+          }
         }
       }
 
       console.log(
-        `Folder sync complete. Updated locally: ${updatedCount}, Created locally: ${createdCount}, Created in cloud: ${cloudCreatedCount}, Skipped: ${skippedCount}`,
+        `Folder sync complete. Updated locally: ${updatedCount}, Created locally: ${createdCount}, Created/Updated in cloud: ${cloudCreatedCount}, Skipped: ${skippedCount}`,
       )
 
       // If we have new or updated folders, notify all windows
