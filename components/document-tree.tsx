@@ -200,6 +200,10 @@ const DocumentTree = ({
   })
   const hasRecentDoubleClickRef = useRef(false)
   const pendingActionRef = useRef<{ item: TreeItem; timestamp: number } | null>(null)
+  const [editingItem, setEditingItem] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState('')
+  const floatingInputRef = useRef<HTMLInputElement>(null)
+  const editPositionRef = useRef<{ top: number; left: number; width: number } | null>(null)
 
   // Use external selected items only
   const selectedItems = externalSelectedItems || []
@@ -323,8 +327,85 @@ const DocumentTree = ({
     // For now we'll just log it
   }
 
+  const handleStartEdit = (itemId: string, element: HTMLElement) => {
+    // Find the text element for positioning
+    const textElement = element.querySelector('[data-label-content]')
+    if (!textElement) return
+
+    // Get the exact position and dimensions
+    const textRect = textElement.getBoundingClientRect()
+    const scrollTop = window.scrollY || document.documentElement.scrollTop
+    const scrollLeft = window.scrollX || document.documentElement.scrollLeft
+
+    // Position the input exactly where the text element is
+    editPositionRef.current = {
+      top: textRect.top + scrollTop,
+      left: textRect.left + scrollLeft,
+      width: element.clientWidth - (textRect.left - element.getBoundingClientRect().left) - 8,
+    }
+
+    setEditingItem(itemId)
+    setEditValue(items[itemId].data)
+
+    // Focus and move cursor to end without selecting
+    setTimeout(() => {
+      if (floatingInputRef.current) {
+        floatingInputRef.current.focus()
+        const length = floatingInputRef.current.value.length
+        floatingInputRef.current.setSelectionRange(length, length)
+      }
+    }, 0)
+  }
+
+  const handleEditComplete = (save: boolean) => {
+    if (editingItem && save && editValue.trim() !== '') {
+      handleRename({ index: editingItem } as TreeItem, editValue.trim())
+    }
+    setEditingItem(null)
+    setEditValue('')
+    editPositionRef.current = null
+  }
+
   return (
-    <div className={`[&_.rct-tree-root-focus]:!outline-none ${className}`} style={style}>
+    <div className={`relative [&_.rct-tree-root-focus]:!outline-none ${className}`} style={style}>
+      {editingItem && editPositionRef.current && (
+        <input
+          ref={floatingInputRef}
+          type="text"
+          value={editValue}
+          className={`fixed z-50 block h-[20px] w-full cursor-text overflow-hidden whitespace-nowrap bg-transparent text-sm font-[600] font-semibold uppercase leading-[20px] tracking-wide outline-none ${
+            theme === 'light' ? 'text-black/[.70]' : 'text-black/[.70]'
+          }`}
+          style={{
+            top: `${editPositionRef.current.top}px`,
+            left: `${editPositionRef.current.left}px`,
+            width: `${editPositionRef.current.width}px`,
+            caretColor: theme === 'light' ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.7)',
+            fontSize: '14px',
+            fontWeight: '600',
+            letterSpacing: '0.35px',
+            lineHeight: '20px',
+            height: '20px',
+            padding: '0px',
+            margin: '0px',
+            fontFamily: 'sans-serif',
+            textTransform: 'uppercase',
+            minWidth: '0',
+            maxWidth: '100%',
+          }}
+          onChange={e => setEditValue(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              handleEditComplete(true)
+            } else if (e.key === 'Escape') {
+              e.preventDefault()
+              handleEditComplete(false)
+            }
+          }}
+          onBlur={() => handleEditComplete(true)}
+        />
+      )}
       <style>{`
         :root {
           --rct-color-tree-bg: rgba(255, 255, 255, 0.05);
@@ -429,6 +510,7 @@ const DocumentTree = ({
         canDragAndDrop={true}
         canDropOnFolder={true}
         canReorderItems={true}
+        canSearch={false}
         renderItem={props => {
           const { item, depth, arrow, context } = props
           const isFolder = Boolean(item.isFolder)
@@ -442,6 +524,13 @@ const DocumentTree = ({
               leftIcon={isFolder ? arrow : null}
               theme={theme}
               showSelectedStyles={showSelectedStyles}
+              isEditing={editingItem === item.index.toString()}
+              onStartEdit={() => {
+                const element = document.querySelector(`[data-item-id="${item.index}"]`)
+                if (element instanceof HTMLElement) {
+                  handleStartEdit(item.index.toString(), element)
+                }
+              }}
               onClick={() => {
                 if (isFolder) {
                   if (context.isExpanded) {
@@ -454,7 +543,6 @@ const DocumentTree = ({
                 }
               }}
               onDoubleClick={() => handleDoubleClick(item)}
-              onRename={newName => handleRename(item, newName)}
               rightContent={
                 showActionButton && item.index !== 'root' ? (
                   <IconButton
@@ -471,10 +559,13 @@ const DocumentTree = ({
                 ) : null
               }
               containerProps={props.context.itemContainerWithChildrenProps}
-              itemContainerProps={{
-                ...props.context.itemContainerWithoutChildrenProps,
-                ...context.interactiveElementProps,
-              }}>
+              itemContainerProps={
+                {
+                  ...props.context.itemContainerWithoutChildrenProps,
+                  ...context.interactiveElementProps,
+                  'data-item-id': item.index.toString(),
+                } as React.HTMLAttributes<HTMLDivElement>
+              }>
               {props.children}
             </ListItem>
           )

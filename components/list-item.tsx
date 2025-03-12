@@ -1,61 +1,6 @@
 'use client'
-import { ReactNode, useEffect, useState, useRef, KeyboardEvent } from 'react'
+import { ReactNode, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-
-// Custom TypewriterText component for the typewriter effect
-const TypewriterText = ({ text, className }: { text: string; className: string }) => {
-  const [displayText, setDisplayText] = useState(text) // Initialize with full text
-  const [key, setKey] = useState(0)
-  const isInitialRender = useRef(true)
-  const prevTextRef = useRef(text)
-
-  useEffect(() => {
-    // On initial render, show the full text immediately (no animation)
-    if (isInitialRender.current) {
-      isInitialRender.current = false
-      return
-    }
-
-    // Skip animation if it's just a document navigation (from tree)
-    // Only animate when the text actually changes from user edits
-    if (prevTextRef.current === text) {
-      return
-    }
-
-    // Save current text for future comparison
-    prevTextRef.current = text
-
-    // Reset and start new animation when text changes from edits
-    setDisplayText('')
-    setKey(prev => prev + 1)
-
-    let index = 0
-    const interval = setInterval(() => {
-      setDisplayText(text.substring(0, index + 1))
-      index++
-
-      if (index >= text.length) {
-        clearInterval(interval)
-      }
-    }, 15) // Character typing speed
-
-    return () => clearInterval(interval)
-  }, [text])
-
-  return (
-    <span key={key} className={className}>
-      {displayText}
-      {displayText.length < text.length && (
-        <motion.span
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ repeat: Infinity, duration: 0.5 }}>
-          |
-        </motion.span>
-      )}
-    </span>
-  )
-}
 
 interface ListItemProps {
   leftIcon?: ReactNode
@@ -65,13 +10,14 @@ interface ListItemProps {
   isSelected?: boolean
   onClick?: () => void
   onDoubleClick?: () => void
-  onRename?: (newName: string) => void
   children?: ReactNode
   isExpanded?: boolean
   theme?: 'light' | 'dark'
   containerProps?: React.HTMLAttributes<HTMLLIElement>
   itemContainerProps?: React.HTMLAttributes<HTMLDivElement>
   showSelectedStyles?: boolean
+  isEditing?: boolean
+  onStartEdit?: () => void
 }
 
 export const ListItem = ({
@@ -82,18 +28,17 @@ export const ListItem = ({
   isSelected = false,
   onClick,
   onDoubleClick,
-  onRename,
   children,
   isExpanded,
   theme = 'light',
   containerProps = {},
   itemContainerProps = {},
   showSelectedStyles = true,
+  isEditing = false,
+  onStartEdit,
 }: ListItemProps) => {
-  const [isEditing, setIsEditing] = useState(false)
-  const [editValue, setEditValue] = useState(label)
-  const inputRef = useRef<HTMLInputElement>(null)
   const clickTimeoutRef = useRef<NodeJS.Timeout>()
+  const labelRef = useRef<HTMLDivElement>(null)
 
   // Handle single click
   const handleSingleClick = (e: React.MouseEvent) => {
@@ -136,43 +81,10 @@ export const ListItem = ({
       onDoubleClick()
     }
 
-    // Enter edit mode immediately
-    console.log('✏️ Entering edit mode')
-    setIsEditing(true)
-    setEditValue(label)
-  }
-
-  // Focus input when entering edit mode
-  useEffect(() => {
-    if (isEditing && inputRef.current) {
-      console.log('🔍 Focusing input')
-      inputRef.current.focus()
-      inputRef.current.select()
+    // Notify parent to start editing this item
+    if (onStartEdit) {
+      onStartEdit()
     }
-  }, [isEditing])
-
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      e.stopPropagation()
-      if (onRename && editValue.trim() !== '') {
-        onRename(editValue)
-      }
-      setIsEditing(false)
-    } else if (e.key === 'Escape') {
-      e.preventDefault()
-      e.stopPropagation()
-      setIsEditing(false)
-      setEditValue(label)
-    }
-  }
-
-  const handleBlur = () => {
-    if (onRename && editValue.trim() !== '' && editValue !== label) {
-      onRename(editValue)
-    }
-    setIsEditing(false)
-    setEditValue(label)
   }
 
   const getThemeClasses = () => {
@@ -220,22 +132,14 @@ export const ListItem = ({
               <div className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">{leftIcon}</div>
             </div>
           )}
-          {isEditing ? (
-            <input
-              ref={inputRef}
-              type="text"
-              value={editValue}
-              onChange={e => setEditValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onBlur={handleBlur}
-              className={`${themeClasses.text} block h-[20px] w-full bg-transparent text-sm font-[600] font-semibold leading-[20px] outline-none`}
-            />
-          ) : (
-            <TypewriterText
-              text={label}
-              className={`uppercase ${themeClasses.text} block h-[20px] truncate text-sm font-[600] font-semibold leading-[20px]`}
-            />
-          )}
+          <div
+            ref={labelRef}
+            data-label-content
+            className={`${themeClasses.text} block h-[20px] w-full cursor-pointer overflow-hidden whitespace-nowrap bg-transparent text-sm font-[600] font-semibold uppercase leading-[20px] tracking-wide ${
+              isEditing ? 'opacity-0' : ''
+            }`}>
+            {label}
+          </div>
         </div>
         {rightContent && <div className="ml-2 flex shrink-0 items-center">{rightContent}</div>}
       </div>
