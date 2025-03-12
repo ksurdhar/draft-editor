@@ -1,8 +1,16 @@
-import { NextApiRequest, NextApiResponse } from 'next'
+import { NextApiResponse } from 'next'
 import { storage } from '@lib/storage'
+import withHybridAuth, { ExtendedApiRequest } from '@lib/with-hybrid-auth'
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default withHybridAuth(async function handler(req: ExtendedApiRequest, res: NextApiResponse) {
+  const { user } = req
   const { id } = req.query
+
+  if (!user) {
+    res.status(401).end('Unauthorized')
+    return
+  }
+
   if (!id || typeof id !== 'string') {
     return res.status(400).json({ error: 'Invalid folder ID' })
   }
@@ -11,8 +19,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     case 'PUT':
     case 'PATCH':
       try {
+        // First verify the folder belongs to the user
+        const folders = await storage.find('folders', { _id: id })
+        const folder = folders[0]
+        if (!folder || folder.userId !== user.sub) {
+          return res.status(404).json({ error: 'Folder not found' })
+        }
+
         const updatedFolder = await storage.update('folders', id, {
           ...req.body,
+          userId: user.sub, // Ensure userId cannot be changed
           lastUpdated: Date.now(),
         })
 
@@ -29,10 +45,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     case 'DELETE':
       try {
-        // First, check if there are any documents or folders in this folder
+        // First verify the folder belongs to the user
+        const folders = await storage.find('folders', { _id: id })
+        const folder = folders[0]
+        if (!folder || folder.userId !== user.sub) {
+          return res.status(404).json({ error: 'Folder not found' })
+        }
+
+        // Check if there are any documents or folders in this folder
         const [docs, subfolders] = await Promise.all([
-          storage.find('documents', { location: id } as Record<string, any>),
-          storage.find('folders', { parentId: id } as Record<string, any>),
+          storage.find('documents', { parentId: id }),
+          storage.find('folders', { parentId: id }),
         ])
 
         if (docs.length > 0 || subfolders.length > 0) {
@@ -41,7 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           })
         }
 
-        const success = await storage.delete('folders', { _id: id } as Record<string, any>)
+        const success = await storage.delete('folders', { _id: id, userId: user.sub })
         if (!success) {
           return res.status(404).json({ error: 'Folder not found' })
         }
@@ -57,4 +80,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.setHeader('Allow', ['PUT', 'PATCH', 'DELETE'])
       res.status(405).end(`Method ${req.method} Not Allowed`)
   }
-}
+})

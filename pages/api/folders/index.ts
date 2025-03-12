@@ -1,12 +1,21 @@
-import { NextApiRequest, NextApiResponse } from 'next'
+import { NextApiResponse } from 'next'
 import { storage } from '@lib/storage'
+import withHybridAuth, { ExtendedApiRequest } from '@lib/with-hybrid-auth'
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default withHybridAuth(async function handler(req: ExtendedApiRequest, res: NextApiResponse) {
+  const { user } = req
+
+  if (!user) {
+    res.status(401).end('Unauthorized')
+    return
+  }
+
   switch (req.method) {
     case 'GET':
       try {
         const { userId } = req.query
-        const query = userId ? { userId } : {}
+        // Allow querying only for the authenticated user
+        const query = { userId: userId || user.sub }
         const folders = await storage.find('folders', query)
         res.status(200).json(folders)
       } catch (error) {
@@ -17,8 +26,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     case 'POST':
       try {
-        const { title, parentId, userId, _id } = req.body
-        if (!title || !userId) {
+        const { title, parentId, _id } = req.body
+        if (!title) {
           return res.status(400).json({ error: 'Missing required fields' })
         }
 
@@ -26,7 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const folderData: any = {
           title,
           parentId,
-          userId,
+          userId: user.sub,
           lastUpdated: Date.now(),
           folderIndex: 0,
         }
@@ -49,4 +58,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.setHeader('Allow', ['GET', 'POST'])
       res.status(405).end(`Method ${req.method} Not Allowed`)
   }
-}
+})
