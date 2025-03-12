@@ -44,7 +44,6 @@ const SharedDocumentsPage = ({
   const [renameModalOpen, setRenameModalOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [createFolderModalOpen, setCreateFolderModalOpen] = useState(false)
-  const [newFolderParentId] = useState<string | undefined>()
   const [selectedItems, setSelectedItems] = useState<string[]>([])
   const [initAnimate, setInitAnimate] = useState(false)
 
@@ -159,14 +158,22 @@ const SharedDocumentsPage = ({
   )
 
   const createFolder = useCallback(
-    async (title: string, parentId?: string) => {
+    async (title: string) => {
       try {
+        // Calculate the highest index from existing root-level items
+        const rootItems = [
+          ...documents.filter(doc => !doc.parentId || doc.parentId === 'root'),
+          ...folders.filter(folder => !folder.parentId || folder.parentId === 'root'),
+        ]
+        const highestIndex = rootItems.reduce((max, item) => Math.max(max, item.folderIndex || 0), -1)
+        const newIndex = highestIndex + 1
+
         const folderData = {
           title,
-          parentId: parentId || 'root',
+          parentId: 'root',
           userId: user?.sub || 'current',
           lastUpdated: Date.now(),
-          folderIndex: folders.length,
+          folderIndex: newIndex,
         }
 
         const response = await post('folders', folderData)
@@ -176,20 +183,39 @@ const SharedDocumentsPage = ({
         mutateFolders(folders)
       }
     },
-    [folders, mutateFolders, post, user?.sub],
+    [folders, mutateFolders, post, user?.sub, documents],
   )
 
   const handleCreateDocument = useCallback(async () => {
     if (!user?.sub) return
 
     try {
-      await createDocument(user.sub, operations, docId => {
-        navigateTo(`/documents/${docId}?focus=title`)
-      })
+      // Calculate the highest index from existing root-level documents
+      const rootDocs = documents.filter(doc => !doc.parentId || doc.parentId === 'root')
+      const highestIndex = rootDocs.reduce((max, doc) => Math.max(max, doc.folderIndex || 0), -1)
+      const newIndex = highestIndex + 1
+
+      await createDocument(
+        user.sub,
+        {
+          ...operations,
+          createDocument: async data => {
+            const response = await post('/documents', {
+              ...data,
+              parentId: 'root',
+              folderIndex: newIndex,
+            })
+            return response
+          },
+        },
+        docId => {
+          navigateTo(`/documents/${docId}?focus=title`)
+        },
+      )
     } catch (error) {
       console.error('Error creating document:', error)
     }
-  }, [user?.sub, operations, navigateTo])
+  }, [user?.sub, operations, navigateTo, documents, post])
 
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>, id: string) => {
     event.stopPropagation()
@@ -399,7 +425,7 @@ const SharedDocumentsPage = ({
         open={createFolderModalOpen}
         onClose={() => setCreateFolderModalOpen(false)}
         onConfirm={folderName => {
-          createFolder(folderName, newFolderParentId)
+          createFolder(folderName)
           setCreateFolderModalOpen(false)
         }}
       />
