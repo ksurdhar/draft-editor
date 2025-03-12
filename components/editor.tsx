@@ -70,6 +70,11 @@ const EditorComponent = ({
   const { mouseMoved } = useMouse()
   const [initFadeIn, fadeOut] = useEditorFades(!mouseMoved)
 
+  // Update inputValue when title prop changes
+  useEffect(() => {
+    setInputValue(title === 'Untitled' ? '' : title)
+  }, [title])
+
   // Parse the content JSON string or use default content
   const initialContent = (() => {
     try {

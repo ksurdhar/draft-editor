@@ -13,7 +13,7 @@ const DeleteModal = ({ open, onClose, onConfirm, documentTitle, itemCount }: Del
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!open) return
-      
+
       if (e.key === 'Enter') {
         e.preventDefault()
         onConfirm()
@@ -50,18 +50,18 @@ const DeleteModal = ({ open, onClose, onConfirm, documentTitle, itemCount }: Del
       actions={[
         {
           label: 'CANCEL',
-          onClick: onClose
+          onClick: onClose,
         },
         {
           label: 'DELETE',
           onClick: handleDelete,
           hoverStyle: {
-            backgroundColor: 'rgba(239, 68, 68, 0.15)'
-          }
-        }
+            backgroundColor: 'rgba(239, 68, 68, 0.15)',
+          },
+        },
       ]}
     />
   )
 }
 
-export default DeleteModal 
+export default DeleteModal

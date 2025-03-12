@@ -1,8 +1,7 @@
 'use client'
-import { ReactNode, useEffect, useState, useRef } from 'react'
+import { ReactNode, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-// Custom TypewriterText component for the typewriter effect
 const TypewriterText = ({ text, className }: { text: string; className: string }) => {
   const [displayText, setDisplayText] = useState(text) // Initialize with full text
   const [key, setKey] = useState(0)
@@ -64,12 +63,15 @@ interface ListItemProps {
   depth?: number
   isSelected?: boolean
   onClick?: () => void
+  onDoubleClick?: () => void
   children?: ReactNode
   isExpanded?: boolean
   theme?: 'light' | 'dark'
   containerProps?: React.HTMLAttributes<HTMLLIElement>
   itemContainerProps?: React.HTMLAttributes<HTMLDivElement>
   showSelectedStyles?: boolean
+  isEditing?: boolean
+  onStartEdit?: () => void
 }
 
 export const ListItem = ({
@@ -79,13 +81,66 @@ export const ListItem = ({
   depth = 0,
   isSelected = false,
   onClick,
+  onDoubleClick,
   children,
   isExpanded,
   theme = 'light',
   containerProps = {},
   itemContainerProps = {},
   showSelectedStyles = true,
+  isEditing = false,
+  onStartEdit,
 }: ListItemProps) => {
+  const clickTimeoutRef = useRef<NodeJS.Timeout>()
+  const labelRef = useRef<HTMLDivElement>(null)
+
+  // Handle single click
+  const handleSingleClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    // If we're editing, don't handle clicks
+    if (isEditing) {
+      return
+    }
+
+    // Clear any existing timeout
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current)
+    }
+
+    // Set a timeout to handle single click
+    clickTimeoutRef.current = setTimeout(() => {
+      console.log('🖱️ Single click confirmed')
+      clickTimeoutRef.current = undefined
+      if (onClick) onClick()
+    }, 200) // Wait for potential double click
+  }
+
+  // Handle native double-click event
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    console.log('🔥 Double click intercepted')
+
+    // Clear the single click timeout
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current)
+      clickTimeoutRef.current = undefined
+    }
+
+    // Call the original onDoubleClick first to set flags
+    if (onDoubleClick) {
+      onDoubleClick()
+    }
+
+    // Notify parent to start editing this item
+    if (onStartEdit) {
+      onStartEdit()
+    }
+  }
+
   const getThemeClasses = () => {
     if (theme === 'light') {
       return {
@@ -103,10 +158,20 @@ export const ListItem = ({
 
   const themeClasses = getThemeClasses()
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current)
+      }
+    }
+  }, [])
+
   return (
     <li className="group list-none" {...containerProps}>
       <div
-        onClick={onClick}
+        onClick={handleSingleClick}
+        onDoubleClick={handleDoubleClick}
         className={`flex items-center justify-between px-2 py-1.5 ${themeClasses.hover} cursor-pointer rounded-lg ${
           isSelected ? themeClasses.selected : ''
         }`}
@@ -121,10 +186,17 @@ export const ListItem = ({
               <div className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">{leftIcon}</div>
             </div>
           )}
-          <TypewriterText
-            text={label}
-            className={`uppercase ${themeClasses.text} block h-[20px] truncate text-sm font-[600] font-semibold leading-[20px]`}
-          />
+          <div
+            ref={labelRef}
+            data-label-content
+            className={`block h-[20px] w-full cursor-pointer overflow-hidden whitespace-nowrap bg-transparent ${
+              isEditing ? 'opacity-0' : ''
+            }`}>
+            <TypewriterText
+              text={label}
+              className={`${themeClasses.text} text-sm font-[600] font-semibold uppercase leading-[20px] tracking-wide`}
+            />
+          </div>
         </div>
         {rightContent && <div className="ml-2 flex shrink-0 items-center">{rightContent}</div>}
       </div>

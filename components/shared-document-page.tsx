@@ -9,13 +9,14 @@ import { CloudIcon } from '@heroicons/react/solid'
 import DocumentTree, { createTreeItems } from '@components/document-tree'
 import { DocumentData, VersionData } from '@typez/globals'
 import { useUser } from '@wrappers/auth-wrapper-client'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useMemo } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useDebouncedCallback } from 'use-debounce'
 import { motion, AnimatePresence } from 'framer-motion'
 import { EyeIcon, EyeOffIcon, ClockIcon, SearchIcon } from '@heroicons/react/outline'
 import VersionList from '@components/version-list'
 import GlobalFind from '@components/global-find'
+import { renameItem, DocumentOperations } from '@lib/document-operations'
 
 const backdropStyles = `
   fixed top-0 left-0 h-screen w-screen z-[-1]
@@ -58,7 +59,7 @@ export default function SharedDocumentPage() {
   const { getLocation, navigateTo } = useNavigation()
   const location = getLocation()
   const id = location.split('/').pop()?.split('?')[0] || ''
-  const { get, patch } = useAPI()
+  const { get, patch, post } = useAPI()
   const save = useSave()
 
   const fetcher = useCallback(
@@ -100,16 +101,16 @@ export default function SharedDocumentPage() {
   // Handle document content updates - split into two effects
   useEffect(() => {
     const loadDocument = async (docId: string) => {
-      console.log('Loading document:', {
-        docId,
-        currentDocId: documentId,
-        hasCurrentContent: !!currentContent,
-        isTransitioning,
-      })
+      // console.log('Loading document:', {
+      //   docId,
+      //   currentDocId: documentId,
+      //   hasCurrentContent: !!currentContent,
+      //   isTransitioning,
+      // })
 
       // Only skip if we have content for this specific document and we're not in transition
       if (currentContent && docId === documentId && !isTransitioning) {
-        console.log('Skipping load - already have content for this document')
+        // console.log('Skipping load - already have content for this document')
         return
       }
 
@@ -123,11 +124,11 @@ export default function SharedDocumentPage() {
 
         // Get document from API
         const doc = await get(`/documents/${docId}`)
-        console.log('Loaded document:', {
-          docId,
-          hasContent: !!doc.content,
-          contentLength: doc.content?.content?.length,
-        })
+        // console.log('Loaded document:', {
+        //   docId,
+        //   hasContent: !!doc.content,
+        //   contentLength: doc.content?.content?.length,
+        // })
 
         // Check if we're still on the same document
         const currentDocId = new URLSearchParams(window.location.search).get('documentId') || id
@@ -165,12 +166,12 @@ export default function SharedDocumentPage() {
       const newParams = new URLSearchParams(window.location.search)
       const newDocId = newParams.get('documentId') || id
 
-      console.log('Document change event:', {
-        newDocId,
-        currentDocId: documentId,
-        hasCurrentContent: !!currentContent,
-        isTransitioning,
-      })
+      // console.log('Document change event:', {
+      //   newDocId,
+      //   currentDocId: documentId,
+      //   hasCurrentContent: !!currentContent,
+      //   isTransitioning,
+      // })
 
       if (newDocId !== documentId) {
         // Reset state before loading new document
@@ -190,10 +191,10 @@ export default function SharedDocumentPage() {
         mutate(`/documents/${docId}`, undefined, false)
       }
 
-      console.log('Document changing event:', {
-        targetDocId: event.detail?.documentId,
-        currentDocId: documentId,
-      })
+      // console.log('Document changing event:', {
+      //   targetDocId: event.detail?.documentId,
+      //   currentDocId: documentId,
+      // })
     }
 
     window.addEventListener('documentChanged', handleDocumentChange)
@@ -322,6 +323,48 @@ export default function SharedDocumentPage() {
     setDiffContent(null)
   }, [documentId])
 
+  const handleRename = async (itemId: string, newName: string) => {
+    try {
+      await renameItem(
+        itemId,
+        newName,
+        allDocs || [],
+        allFolders || [],
+        operations,
+        (updatedDocs, updatedFolders) => {
+          mutate('/documents', updatedDocs)
+          mutate('/folders', updatedFolders)
+          mutate(`/documents/${itemId}`)
+          mutate(documentPath)
+        },
+        {
+          currentDocumentId: documentId,
+          setHybridDoc,
+          setCurrentContent,
+        },
+      )
+    } catch (error) {
+      console.error('Failed to rename item:', error)
+    }
+  }
+
+  const operations = useMemo<DocumentOperations>(
+    () => ({
+      patchDocument: (id: string, data: any) => patch(`documents/${id}`, data),
+      patchFolder: (id: string, data: any) => patch(`folders/${id}`, data),
+      bulkDeleteItems: (documentIds: string[], folderIds: string[]) =>
+        post('documents/bulk-delete', { documentIds, folderIds }),
+      createDocument: async (data: any) => {
+        const response = await post('/documents', data)
+        return response
+      },
+      renameItem: async (itemId, newName, docs, folders, ops, onUpdate) => {
+        await renameItem(itemId, newName, docs, folders, ops, onUpdate)
+      },
+    }),
+    [patch, post],
+  )
+
   return (
     <Layout documentId={id} onToggleGlobalSearch={handleToggleGlobalSearch}>
       {!skipAnimation && (
@@ -393,6 +436,7 @@ export default function SharedDocumentPage() {
                     key="document-tree"
                     items={createTreeItems(allDocs, allFolders)}
                     onPrimaryAction={handlePrimaryAction}
+                    onRename={handleRename}
                     showActionButton={false}
                     className="h-full"
                     persistExpanded={true}
