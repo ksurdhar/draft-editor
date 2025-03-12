@@ -35,9 +35,9 @@ export const DiffHighlight = Mark.create<DiffHighlightOptions>({
 
           return {
             'data-diff-type': attributes.type,
-            'class': `diff-${attributes.type}`
+            class: `diff-${attributes.type}`,
           }
-        }
+        },
       },
     }
   },
@@ -59,12 +59,16 @@ export const DiffHighlight = Mark.create<DiffHighlightOptions>({
   },
 
   renderHTML({ HTMLAttributes }) {
-    return ['span', mergeAttributes(
-      this.options.HTMLAttributes,
-      HTMLAttributes,
-      { 'data-diff-type': HTMLAttributes.type },
-      { class: `diff-${HTMLAttributes.type}` }
-    ), 0]
+    return [
+      'span',
+      mergeAttributes(
+        this.options.HTMLAttributes,
+        HTMLAttributes,
+        { 'data-diff-type': HTMLAttributes.type },
+        { class: `diff-${HTMLAttributes.type}` },
+      ),
+      0,
+    ]
   },
 
   addCommands() {
@@ -81,4 +85,4 @@ export const DiffHighlight = Mark.create<DiffHighlightOptions>({
         },
     }
   },
-}) 
+})

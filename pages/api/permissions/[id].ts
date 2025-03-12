@@ -21,14 +21,14 @@ export default withHybridAuth(async function permissionHandler(
   }
 
   const permission = await getPermissionByDoc(documentId)
-  
+
   // If permission doesn't exist, return a default permission object
   if (!permission) {
     return res.status(200).json({
       documentId,
       ownerId: user.sub,
       globalPermission: UserPermission.None,
-      users: []
+      users: [],
     } as PermissionData)
   }
 

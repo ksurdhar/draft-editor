@@ -16,7 +16,7 @@ const tokenStore = {
     store.delete(key)
   },
 
-  getToken(key:string) {
+  getToken(key: string) {
     const buffer = store.get(key)
     return safeStorage.decryptString(Buffer.from(buffer, 'base64'))
   },

@@ -37,7 +37,7 @@ export class MongoStorageAdapter implements StorageAdapter {
   private toMongoDoc(data: Partial<Document>): Partial<MongoDocument> {
     const doc: Record<string, unknown> = { ...data }
     delete doc._id // Remove string _id if it exists
-    
+
     if (data._id) {
       // Add ObjectId _id if string _id existed
       doc._id = new ObjectId(data._id)
@@ -56,7 +56,7 @@ export class MongoStorageAdapter implements StorageAdapter {
       ...doc,
       _id: doc._id?.toString(),
       createdAt: doc.createdAt?.toISOString(),
-      updatedAt: doc.updatedAt?.toISOString()
+      updatedAt: doc.updatedAt?.toISOString(),
     }
   }
 
@@ -70,7 +70,7 @@ export class MongoStorageAdapter implements StorageAdapter {
       const mongoDoc = {
         ...this.toMongoDoc(data),
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       } as MongoDocument
 
       const result = await col.insertOne(mongoDoc)
@@ -121,13 +121,13 @@ export class MongoStorageAdapter implements StorageAdapter {
       const col = await this.getCollection(collection)
       const mongoUpdate = {
         ...this.toMongoDoc(data),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       }
-      
+
       const result = await col.findOneAndUpdate(
         { _id: new ObjectId(id) },
         { $set: mongoUpdate },
-        { returnDocument: 'after' }
+        { returnDocument: 'after' },
       )
 
       return result ? this.toDocument(result) : null
@@ -155,4 +155,4 @@ export class MongoStorageAdapter implements StorageAdapter {
       throw error
     }
   }
-} 
+}

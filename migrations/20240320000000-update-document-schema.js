@@ -9,17 +9,21 @@ module.exports = {
         console.log('Updating documents to TipTap format...')
         const documents = await db.collection('documents').find({}).toArray()
         console.log(`Found ${documents.length} documents to update`)
-        
+
         for (const doc of documents) {
           const newContent = {
             type: 'doc',
-            content: [{
-              type: 'paragraph',
-              content: [{ 
-                type: 'text', 
-                text: typeof doc.content === 'string' ? doc.content : '' 
-              }]
-            }]
+            content: [
+              {
+                type: 'paragraph',
+                content: [
+                  {
+                    type: 'text',
+                    text: typeof doc.content === 'string' ? doc.content : '',
+                  },
+                ],
+              },
+            ],
           }
 
           await db.collection('documents').updateOne(
@@ -29,9 +33,9 @@ module.exports = {
                 content: newContent,
                 parentId: 'root',
                 folderIndex: 0,
-                lastUpdated: doc.lastUpdated || Date.now()
-              }
-            }
+                lastUpdated: doc.lastUpdated || Date.now(),
+              },
+            },
           )
         }
 
@@ -39,7 +43,7 @@ module.exports = {
         console.log('Setting up folders collection...')
         const collections = await db.listCollections().toArray()
         const folderCollectionExists = collections.some(c => c.name === 'folders')
-        
+
         if (!folderCollectionExists) {
           console.log('Creating folders collection...')
           await db.createCollection('folders')
@@ -49,22 +53,10 @@ module.exports = {
 
         // 3. Create indexes safely (will not recreate if they exist)
         console.log('Creating indexes...')
-        await db.collection('folders').createIndex(
-          { userId: 1 },
-          { background: true }
-        )
-        await db.collection('folders').createIndex(
-          { parentId: 1 },
-          { background: true }
-        )
-        await db.collection('documents').createIndex(
-          { userId: 1 },
-          { background: true }
-        )
-        await db.collection('documents').createIndex(
-          { parentId: 1 },
-          { background: true }
-        )
+        await db.collection('folders').createIndex({ userId: 1 }, { background: true })
+        await db.collection('folders').createIndex({ parentId: 1 }, { background: true })
+        await db.collection('documents').createIndex({ userId: 1 }, { background: true })
+        await db.collection('documents').createIndex({ parentId: 1 }, { background: true })
 
         console.log('Migration completed successfully')
       })
@@ -86,7 +78,7 @@ module.exports = {
         console.log('Converting documents back to string content...')
         const documents = await db.collection('documents').find({}).toArray()
         console.log(`Found ${documents.length} documents to rollback`)
-        
+
         for (const doc of documents) {
           let stringContent = ''
           if (doc.content && typeof doc.content === 'object') {
@@ -98,8 +90,8 @@ module.exports = {
             { _id: doc._id },
             {
               $set: { content: stringContent },
-              $unset: { parentId: "", folderIndex: "" }
-            }
+              $unset: { parentId: '', folderIndex: '' },
+            },
           )
         }
 
@@ -131,5 +123,5 @@ module.exports = {
     } finally {
       await session.endSession()
     }
-  }
-} 
+  },
+}

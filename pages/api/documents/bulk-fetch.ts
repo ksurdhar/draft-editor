@@ -30,9 +30,9 @@ async function bulkFetchHandler(req: ExtendedApiRequest, res: NextApiResponse) {
 
   console.log('\n=== Bulk Fetching Documents ===')
   console.log('User ID:', user.sub)
-  
+
   const { ids, metadataOnly } = body
-  
+
   // Filter out any invalid IDs and convert to ObjectId
   const objectIds = ids
     .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0)
@@ -48,47 +48,49 @@ async function bulkFetchHandler(req: ExtendedApiRequest, res: NextApiResponse) {
   if (objectIds.length === 0) {
     return res.status(400).json({ error: 'No valid document IDs provided' })
   }
-  
-  const query = { 
+
+  const query = {
     userId: user.sub,
-    _id: { $in: objectIds }
+    _id: { $in: objectIds },
   }
-  
+
   const documents = await storage.find('documents', query)
   console.log('Found documents:', documents.length)
 
   // Process documents and parse stringified JSON content
-  const docsWithPermissions = await Promise.all(documents.map(async doc => {
-    let parsedContent = undefined
-    
-    // Only include content if metadataOnly is not set to true
-    if (metadataOnly !== true && doc.content) {
-      // Parse stringified JSON content
-      if (typeof doc.content === 'string') {
-        try {
-          parsedContent = JSON.parse(doc.content)
-        } catch (e) {
-          console.log(`Warning: Could not parse content for document ${doc._id}`)
-          // Keep as string if parsing fails
+  const docsWithPermissions = await Promise.all(
+    documents.map(async doc => {
+      let parsedContent = undefined
+
+      // Only include content if metadataOnly is not set to true
+      if (metadataOnly !== true && doc.content) {
+        // Parse stringified JSON content
+        if (typeof doc.content === 'string') {
+          try {
+            parsedContent = JSON.parse(doc.content)
+          } catch (e) {
+            console.log(`Warning: Could not parse content for document ${doc._id}`)
+            // Keep as string if parsing fails
+            parsedContent = doc.content
+          }
+        } else {
+          // If content is already an object (shouldn't happen with our new approach)
           parsedContent = doc.content
         }
-      } else {
-        // If content is already an object (shouldn't happen with our new approach)
-        parsedContent = doc.content
       }
-    }
 
-    return {
-      ...doc,
-      id: doc._id,
-      content: parsedContent,
-      canEdit: true,
-      canComment: true,
-      lastUpdated: doc.lastUpdated || Date.now()
-    }
-  }))
+      return {
+        ...doc,
+        id: doc._id,
+        content: parsedContent,
+        canEdit: true,
+        canComment: true,
+        lastUpdated: doc.lastUpdated || Date.now(),
+      }
+    }),
+  )
 
   res.status(200).json(docsWithPermissions as DocumentData[])
 }
 
-export default withHybridAuth(bulkFetchHandler) 
+export default withHybridAuth(bulkFetchHandler)

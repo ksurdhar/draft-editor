@@ -1,16 +1,16 @@
 export const DEFAULT_DOCUMENT_CONTENT = {
-  type: "doc",
+  type: 'doc',
   content: [
     {
-      type: "paragraph",
+      type: 'paragraph',
       content: [
         {
-          type: "text",
-          text: ""
-        }
-      ]
-    }
-  ]
+          type: 'text',
+          text: '',
+        },
+      ],
+    },
+  ],
 } as const
 
-export const DEFAULT_DOCUMENT_TITLE = 'Untitled' 
+export const DEFAULT_DOCUMENT_TITLE = 'Untitled'

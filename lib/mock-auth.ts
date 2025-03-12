@@ -7,4 +7,4 @@ export const mockUser: UserProfile = {
   sub: 'mock|12345',
 }
 
-export const getMockToken = () => 'mock-token' 
+export const getMockToken = () => 'mock-token'

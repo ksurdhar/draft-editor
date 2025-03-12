@@ -28,7 +28,7 @@ export default function FindPanel({ editor, onClose }: FindPanelProps) {
   const [currentMatch, setCurrentMatch] = useState(-1)
   const [searchOptions, setSearchOptions] = useState<SearchOptions>({
     matchCase: false,
-    wholeWord: false
+    wholeWord: false,
   })
 
   const scrollToMatch = useCallback((_match: Match) => {
@@ -61,7 +61,7 @@ export default function FindPanel({ editor, onClose }: FindPanelProps) {
 
   const handleReplace = useCallback(() => {
     if (currentMatch === -1 || !matches[currentMatch]) return
-    
+
     const match = matches[currentMatch]
     editor.commands.setTextSelection({ from: match.from, to: match.to })
     editor.commands.insertContent(replaceText)
@@ -78,7 +78,7 @@ export default function FindPanel({ editor, onClose }: FindPanelProps) {
 
     const newMatches = findAllMatches(editor.state.doc, searchTerm, searchOptions)
     setMatches(newMatches)
-    
+
     if (newMatches.length > 0) {
       const nextCurrentMatch = Math.min(currentMatch, newMatches.length - 1)
       setCurrentMatch(nextCurrentMatch >= 0 ? nextCurrentMatch : 0)
@@ -101,7 +101,7 @@ export default function FindPanel({ editor, onClose }: FindPanelProps) {
     }
 
     editor.on('transaction', handleTransaction)
-    
+
     return () => {
       editor.off('transaction', handleTransaction)
     }
@@ -156,102 +156,100 @@ export default function FindPanel({ editor, onClose }: FindPanelProps) {
   const toggleSearchOption = useCallback((option: keyof SearchOptions) => {
     setSearchOptions(prev => ({
       ...prev,
-      [option]: !prev[option]
+      [option]: !prev[option],
     }))
   }, [])
 
   return (
-    <div className="fixed right-5 top-[80px] z-50 w-[380px] rounded-lg bg-white/90 backdrop-blur-md border border-black/30">
-      <div className="p-3 flex flex-col gap-3">
+    <div className="fixed right-5 top-[80px] z-50 w-[380px] rounded-lg border border-black/30 bg-white/90 backdrop-blur-md">
+      <div className="flex flex-col gap-3 p-3">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowReplace(!showReplace)}
-            className="p-1 rounded hover:bg-black/5 shrink-0"
-          >
-            <ChevronExpandIcon className={`w-4 h-4 transition-transform ${showReplace ? 'rotate-180' : ''}`} />
+            className="shrink-0 rounded p-1 hover:bg-black/5">
+            <ChevronExpandIcon
+              className={`h-4 w-4 transition-transform ${showReplace ? 'rotate-180' : ''}`}
+            />
           </button>
-          <div className="flex-1 bg-black/[.03] rounded px-2 flex items-center">
+          <div className="flex flex-1 items-center rounded bg-black/[.03] px-2">
             <input
               type="text"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={e => setSearchTerm(e.target.value)}
               placeholder="Find"
-              className="w-full py-1 bg-transparent border-none outline-none text-md font-editor2 text-black/[.70] focus:ring-0 focus:ring-offset-0"
+              className="text-md w-full border-none bg-transparent py-1 font-editor2 text-black/[.70] outline-none focus:ring-0 focus:ring-offset-0"
               autoFocus
             />
-            <div className="flex items-center gap-1.5 shrink-0 ml-1">
+            <div className="ml-1 flex shrink-0 items-center gap-1.5">
               <button
                 onClick={() => toggleSearchOption('matchCase')}
-                className={`p-1 rounded hover:bg-black/5 ${searchOptions.matchCase ? 'bg-black/5' : ''}`}
-                title="Match case"
-              >
-                <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current">
-                  <text x="4" y="17" className="text-[16px] font-bold">A</text>
-                  <text x="12" y="17" className="text-[14px]">a</text>
+                className={`rounded p-1 hover:bg-black/5 ${searchOptions.matchCase ? 'bg-black/5' : ''}`}
+                title="Match case">
+                <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current">
+                  <text x="4" y="17" className="text-[16px] font-bold">
+                    A
+                  </text>
+                  <text x="12" y="17" className="text-[14px]">
+                    a
+                  </text>
                 </svg>
               </button>
               <button
                 onClick={() => toggleSearchOption('wholeWord')}
-                className={`p-1 rounded hover:bg-black/5 ${searchOptions.wholeWord ? 'bg-black/5' : ''}`}
-                title="Match whole word"
-              >
-                <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current">
-                  <text x="6" y="15" className="text-[14px]">ab</text>
-                  <path d="M5 17h14" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                className={`rounded p-1 hover:bg-black/5 ${searchOptions.wholeWord ? 'bg-black/5' : ''}`}
+                title="Match whole word">
+                <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current">
+                  <text x="6" y="15" className="text-[14px]">
+                    ab
+                  </text>
+                  <path d="M5 17h14" stroke="currentColor" strokeWidth="1.5" fill="none" />
                 </svg>
               </button>
             </div>
-            <span className="text-xs text-black/50 min-w-[40px] text-center">
+            <span className="min-w-[40px] text-center text-xs text-black/50">
               {matches.length > 0 ? `${currentMatch + 1}/${matches.length}` : '0/0'}
             </span>
             <div className="flex items-center gap-1.5">
               <button
                 onClick={selectPreviousMatch}
                 disabled={matches.length === 0}
-                className="p-1 rounded hover:bg-black/5 disabled:opacity-30"
-              >
-                <ChevronUpIcon className="w-4 h-4" />
+                className="rounded p-1 hover:bg-black/5 disabled:opacity-30">
+                <ChevronUpIcon className="h-4 w-4" />
               </button>
               <button
                 onClick={selectNextMatch}
                 disabled={matches.length === 0}
-                className="p-1 rounded hover:bg-black/5 disabled:opacity-30"
-              >
-                <ChevronDownIcon className="w-4 h-4" />
+                className="rounded p-1 hover:bg-black/5 disabled:opacity-30">
+                <ChevronDownIcon className="h-4 w-4" />
               </button>
             </div>
           </div>
-          <button
-            onClick={handleClose}
-            className="p-1 rounded hover:bg-black/5 shrink-0"
-          >
-            <XIcon className="w-4 h-4" />
+          <button onClick={handleClose} className="shrink-0 rounded p-1 hover:bg-black/5">
+            <XIcon className="h-4 w-4" />
           </button>
         </div>
 
         {showReplace && (
           <div className="flex items-center gap-2">
-            <div className="flex-1 bg-black/[.03] rounded px-2 flex items-center">
+            <div className="flex flex-1 items-center rounded bg-black/[.03] px-2">
               <input
                 type="text"
                 value={replaceText}
-                onChange={(e) => setReplaceText(e.target.value)}
+                onChange={e => setReplaceText(e.target.value)}
                 placeholder="Replace with..."
-                className="w-full py-1 bg-transparent border-none outline-none text-md font-editor2 text-black/[.70] focus:ring-0 focus:ring-offset-0"
+                className="text-md w-full border-none bg-transparent py-1 font-editor2 text-black/[.70] outline-none focus:ring-0 focus:ring-offset-0"
               />
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex shrink-0 items-center gap-1.5">
                 <button
                   onClick={handleReplace}
                   disabled={matches.length === 0}
-                  className="text-xs px-2 py-1 rounded hover:bg-black/5 disabled:opacity-30 font-editor2 text-black/[.70]"
-                >
+                  className="rounded px-2 py-1 font-editor2 text-xs text-black/[.70] hover:bg-black/5 disabled:opacity-30">
                   Replace
                 </button>
                 <button
                   onClick={handleReplaceAll}
                   disabled={matches.length === 0}
-                  className="text-xs px-2 py-1 rounded hover:bg-black/5 disabled:opacity-30 font-editor2 text-black/[.70]"
-                >
+                  className="rounded px-2 py-1 font-editor2 text-xs text-black/[.70] hover:bg-black/5 disabled:opacity-30">
                   All
                 </button>
               </div>
@@ -261,4 +259,4 @@ export default function FindPanel({ editor, onClose }: FindPanelProps) {
       </div>
     </div>
   )
-} 
+}

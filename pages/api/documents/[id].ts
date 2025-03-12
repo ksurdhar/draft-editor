@@ -17,7 +17,7 @@ export default withHybridAuth(async function documentHandler(req: ExtendedApiReq
     case 'GET': {
       console.log('\n=== Getting Document ===')
       console.log('Document ID:', documentId)
-      
+
       const document = await storage.findById('documents', documentId)
       if (!document) {
         return res.status(404).json({ error: 'Document not found' })
@@ -40,16 +40,16 @@ export default withHybridAuth(async function documentHandler(req: ExtendedApiReq
         content: parsedContent,
         canEdit: true,
         canComment: true,
-        lastUpdated: document.lastUpdated || Date.now()
+        lastUpdated: document.lastUpdated || Date.now(),
       }
-      
+
       res.status(200).json(documentWithPermissions)
       break
     }
     case 'PATCH': {
       console.log('\n=== Updating Document ===')
       console.log('Document ID:', documentId)
-      
+
       const document = await storage.findById('documents', documentId)
       if (!document) {
         return res.status(404).json({ error: 'Document not found' })
@@ -59,7 +59,7 @@ export default withHybridAuth(async function documentHandler(req: ExtendedApiReq
       const updateData = {
         ...req.body,
         updatedAt: new Date().toISOString(),
-        lastUpdated: Date.now()
+        lastUpdated: Date.now(),
       }
 
       // If content is provided, ensure it's stringified
@@ -97,14 +97,14 @@ export default withHybridAuth(async function documentHandler(req: ExtendedApiReq
 
       res.status(200).json({
         ...updatedDocument,
-        content: parsedContent
+        content: parsedContent,
       })
       break
     }
     case 'DELETE': {
       console.log('\n=== Deleting Document ===')
       console.log('Document ID:', documentId)
-      
+
       const { id } = req.query
       if (!id || typeof id !== 'string') {
         return res.status(400).json({ error: 'Invalid document ID' })

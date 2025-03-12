@@ -26,7 +26,7 @@ export const BaseModal = ({
   confirmText = 'CONFIRM',
   onConfirm,
   children,
-  actions
+  actions,
 }: BaseModalProps) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -42,24 +42,26 @@ export const BaseModal = ({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [open, onConfirm])
 
-  const defaultActions = onConfirm ? [
-    {
-      label: 'CANCEL',
-      onClick: onClose
-    },
-    {
-      label: confirmText,
-      onClick: onConfirm,
-      hoverStyle: {
-        backgroundColor: 'rgba(239, 68, 68, 0.1)'
-      }
-    }
-  ] : [
-    {
-      label: 'CLOSE',
-      onClick: onClose
-    }
-  ]
+  const defaultActions = onConfirm
+    ? [
+        {
+          label: 'CANCEL',
+          onClick: onClose,
+        },
+        {
+          label: confirmText,
+          onClick: onConfirm,
+          hoverStyle: {
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          },
+        },
+      ]
+    : [
+        {
+          label: 'CLOSE',
+          onClick: onClose,
+        },
+      ]
 
   return (
     <Modal
@@ -73,9 +75,8 @@ export const BaseModal = ({
         '& .MuiBackdrop-root': {
           backgroundColor: 'rgba(255, 255, 255, 0.1)',
           backdropFilter: 'blur(1px)',
-        }
-      }}
-    >
+        },
+      }}>
       <div
         className="p-6 outline-none"
         style={{
@@ -86,13 +87,10 @@ export const BaseModal = ({
           fontFamily: 'Mukta, sans-serif',
           minWidth: '300px',
           width: '480px',
-        }}
-      >
+        }}>
         <h3 className="mb-4 uppercase text-black/[.70]">{title}</h3>
         {description && (
-          <p className="mb-4 text-black/[.70] focus:outline-none [&_*]:focus:outline-none">
-            {description}
-          </p>
+          <p className="mb-4 text-black/[.70] focus:outline-none [&_*]:focus:outline-none">{description}</p>
         )}
         {children}
         <div className="flex justify-end gap-2">
@@ -106,8 +104,7 @@ export const BaseModal = ({
                 '&:hover': action.hoverStyle || {
                   backgroundColor: 'rgba(255, 255, 255, 0.3)',
                 },
-              }}
-            >
+              }}>
               {action.label}
             </Button>
           ))}
@@ -117,4 +114,4 @@ export const BaseModal = ({
   )
 }
 
-export default BaseModal 
+export default BaseModal

@@ -15,7 +15,7 @@
     "jsx": "preserve",
     "incremental": true,
     "downlevelIteration": true,
-    "plugins": [{"name": "next"}],
+    "plugins": [{ "name": "next" }],
     "noImplicitAny": true,
     "sourceMap": true,
     "baseUrl": ".",
@@ -25,16 +25,9 @@
       "@styles/*": ["styles/*"],
       "@wrappers/*": ["wrappers/*"],
       "@lib/*": ["lib/*"],
-      "@typez/*": ["types/*"],
+      "@typez/*": ["types/*"]
     }
   },
-  "include": [
-    "next-env.d.ts",
-    "types/globals.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    "electron"
-  ],
+  "include": ["next-env.d.ts", "types/globals.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "electron"],
   "exclude": ["node_modules"]
 }

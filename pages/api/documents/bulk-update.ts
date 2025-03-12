@@ -17,12 +17,12 @@ const handlers = {
     try {
       // Verify user has access to all documents
       await Promise.all(
-        updates.map(async (update) => {
+        updates.map(async update => {
           const doc = await storage.findById('documents', update.documentId)
           if (!doc || doc.userId !== userId) {
             throw new Error('Access denied to one or more documents')
           }
-        })
+        }),
       )
 
       // Perform updates with stringified content
@@ -30,7 +30,7 @@ const handlers = {
         updates.map(update => {
           // Prepare content as stringified JSON
           let content = update.content
-          
+
           if (typeof content === 'object') {
             // If content is an object, stringify it
             content = JSON.stringify(content)
@@ -45,12 +45,12 @@ const handlers = {
               content = JSON.stringify(content)
             }
           }
-          
+
           return storage.update('documents', update.documentId, {
             content,
-            lastUpdated: Date.now()
+            lastUpdated: Date.now(),
           })
-        })
+        }),
       )
 
       // Parse content in results for the response
@@ -60,7 +60,7 @@ const handlers = {
             const parsedContent = JSON.parse(result.content)
             return {
               ...result,
-              content: parsedContent
+              content: parsedContent,
             }
           } catch (e) {
             // If parsing fails, return as is
@@ -75,10 +75,13 @@ const handlers = {
       console.error('Error in bulk update:', error)
       res.status(500).json({ error: 'Failed to update documents' })
     }
-  }
+  },
 }
 
-export default withHybridAuth(async function bulkUpdateHandler(req: ExtendedApiRequest, res: NextApiResponse) {
+export default withHybridAuth(async function bulkUpdateHandler(
+  req: ExtendedApiRequest,
+  res: NextApiResponse,
+) {
   const { method, user } = req
 
   if (!user) {
@@ -100,4 +103,4 @@ export default withHybridAuth(async function bulkUpdateHandler(req: ExtendedApiR
     console.error('Unexpected error:', error)
     res.status(500).end('Internal Server Error')
   }
-}) 
+})

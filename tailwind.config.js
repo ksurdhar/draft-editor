@@ -7,31 +7,27 @@ module.exports = {
   ],
   theme: {
     fontFamily: {
-      'editor2': ['var(--font-ibarra)'],
-      'index': ['var(--font-mukta)'],
+      editor2: ['var(--font-ibarra)'],
+      index: ['var(--font-mukta)'],
     },
     extend: {
       keyframes: {
         fadein: {
-          '0%': { 'opacity': '0'},
-          '100%': { 'opacity': '1'}
-        }
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
       },
       animation: {
-        fadein: 'fadein .33s ease-in-out'
+        fadein: 'fadein .33s ease-in-out',
       },
       transitionProperty: {
-        flex: 'flex'
+        flex: 'flex',
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'gradient-conic':
-          'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
+        'gradient-conic': 'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
       },
-    }
+    },
   },
-  plugins: [
-    require('@tailwindcss/forms'),
-    require('@tailwindcss/typography'),
-  ],
+  plugins: [require('@tailwindcss/forms'), require('@tailwindcss/typography')],
 }

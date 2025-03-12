@@ -10,14 +10,15 @@ export class FileStorageAdapter implements StorageAdapter {
   constructor() {
     // In production, use the system's temp directory
     // In development, use the configured path or ./data
-    this.storagePath = process.env.NODE_ENV === 'production'
-      ? path.join(os.tmpdir(), 'draft-editor-data')
-      : (process.env.JSON_STORAGE_PATH || './data')
-    
+    this.storagePath =
+      process.env.NODE_ENV === 'production'
+        ? path.join(os.tmpdir(), 'draft-editor-data')
+        : process.env.JSON_STORAGE_PATH || './data'
+
     console.log('\n=== FileStorageAdapter Initialization ===')
     console.log('Environment:', process.env.NODE_ENV)
     console.log('Storage path:', this.storagePath)
-    
+
     this.initialize()
   }
 
@@ -28,7 +29,7 @@ export class FileStorageAdapter implements StorageAdapter {
     fs.ensureDirSync(documentsPath)
     console.log('Initialized storage directories:', {
       base: this.storagePath,
-      documents: documentsPath
+      documents: documentsPath,
     })
   }
 
@@ -63,7 +64,7 @@ export class FileStorageAdapter implements StorageAdapter {
       ...data,
       _id: new ObjectId().toString(),
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     }
     console.log('Created new document:', newDoc)
 
@@ -86,7 +87,7 @@ export class FileStorageAdapter implements StorageAdapter {
 
     const filePath = this.getDocumentPath(collection, id)
     console.log('Looking for file:', filePath)
-    
+
     if (!fs.existsSync(filePath)) {
       console.log('File not found')
       return null
@@ -112,18 +113,17 @@ export class FileStorageAdapter implements StorageAdapter {
     try {
       const files = await fs.readdir(documentsPath)
       const documents = await Promise.all(
-        files.map(async (file) => {
+        files.map(async file => {
           if (!file.endsWith('.json')) return null
           const content = await fs.readFile(path.join(documentsPath, file), 'utf-8')
           return JSON.parse(content) as Document
-        })
+        }),
       )
 
-      return documents
-        .filter((doc): doc is Document => 
-          doc !== null && 
-          Object.entries(query).every(([key, value]) => doc[key] === value)
-        )
+      return documents.filter(
+        (doc): doc is Document =>
+          doc !== null && Object.entries(query).every(([key, value]) => doc[key] === value),
+      )
     } catch (error) {
       console.error('Error reading documents:', error)
       return []
@@ -158,7 +158,7 @@ export class FileStorageAdapter implements StorageAdapter {
 
     try {
       const documents = await this.find(collection, query)
-      
+
       if (documents.length === 0) {
         return false
       }
@@ -169,7 +169,7 @@ export class FileStorageAdapter implements StorageAdapter {
             throw new Error('Document ID is undefined')
           }
           return fs.unlink(this.getDocumentPath(collection, doc._id))
-        })
+        }),
       )
 
       return true
@@ -178,4 +178,4 @@ export class FileStorageAdapter implements StorageAdapter {
       return false
     }
   }
-} 
+}

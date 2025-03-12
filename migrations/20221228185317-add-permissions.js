@@ -3,12 +3,12 @@ module.exports = {
     // TODO write your migration here.
     // See https://github.com/seppevs/migrate-mongo/#creating-a-new-migration-script
     // Example:
-    await db.collection('documents').updateMany({}, {$set: { edit: [], view: [] }});
+    await db.collection('documents').updateMany({}, { $set: { edit: [], view: [] } })
   },
 
   async down(db, client) {
     // TODO write the statements to rollback your migration (if possible)
     // Example:
-    await db.collection('documents').updateMany({}, {$unset: { edit: [], view: [] }});
-  }
-};
+    await db.collection('documents').updateMany({}, { $unset: { edit: [], view: [] } })
+  },
+}

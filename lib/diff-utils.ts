@@ -6,14 +6,14 @@ export interface TiptapNode {
   type: string
   content?: TiptapNode[]
   text?: string
-  marks?: Array<{ type: string, attrs?: Record<string, any> }>
+  marks?: Array<{ type: string; attrs?: Record<string, any> }>
 }
 
 export interface TiptapDiff {
   type: string
   content?: TiptapDiff[]
   text?: string
-  marks?: Array<{ type: string, attrs?: Record<string, any> }>
+  marks?: Array<{ type: string; attrs?: Record<string, any> }>
   diffType?: 'added' | 'removed'
 }
 
@@ -58,7 +58,7 @@ function computeTextDiff(oldText: string, newText: string): DiffTuple[] {
 export function computeTiptapDiff(oldDoc: any, newDoc: any): TiptapDiff {
   const oldText = flattenTiptapContent(oldDoc)
   const newText = flattenTiptapContent(newDoc)
-  
+
   // Get the diffs - diff_match_patch uses:
   // -1 for deletion (in old, not in new)
   // 1 for insertion (not in old, in new)
@@ -68,12 +68,12 @@ export function computeTiptapDiff(oldDoc: any, newDoc: any): TiptapDiff {
   // Convert the diffs back into a Tiptap document structure
   const diffDoc: TiptapDiff = {
     type: 'doc',
-    content: []
+    content: [],
   }
 
   let currentParagraph: TiptapDiff = {
     type: 'paragraph',
-    content: []
+    content: [],
   }
 
   // Split diffs into paragraphs
@@ -100,7 +100,7 @@ export function computeTiptapDiff(oldDoc: any, newDoc: any): TiptapDiff {
 
     currentParagraph = {
       type: 'paragraph',
-      content: []
+      content: [],
     }
 
     // Process the diffs within this paragraph
@@ -110,19 +110,21 @@ export function computeTiptapDiff(oldDoc: any, newDoc: any): TiptapDiff {
       // Create a text node with appropriate diff highlighting
       const textNode: TiptapDiff = {
         type: 'text',
-        text: text
+        text: text,
       }
 
       // Add diff highlighting marks if this is a change
       if (operation !== 0) {
-        textNode.marks = [{
-          type: 'diffHighlight',
-          attrs: {
-            // -1 means it was in old but not in new (removed)
-            // 1 means it wasn't in old but is in new (added)
-            type: operation === 1 ? 'added' : 'removed'
-          }
-        }]
+        textNode.marks = [
+          {
+            type: 'diffHighlight',
+            attrs: {
+              // -1 means it was in old but not in new (removed)
+              // 1 means it wasn't in old but is in new (added)
+              type: operation === 1 ? 'added' : 'removed',
+            },
+          },
+        ]
       }
 
       currentParagraph.content?.push(textNode)
@@ -135,14 +137,18 @@ export function computeTiptapDiff(oldDoc: any, newDoc: any): TiptapDiff {
 
   // Ensure we have at least one paragraph
   if (!diffDoc.content?.length) {
-    diffDoc.content = [{
-      type: 'paragraph',
-      content: [{
-        type: 'text',
-        text: ' '
-      }]
-    }]
+    diffDoc.content = [
+      {
+        type: 'paragraph',
+        content: [
+          {
+            type: 'text',
+            text: ' ',
+          },
+        ],
+      },
+    ]
   }
 
   return diffDoc
-} 
+}

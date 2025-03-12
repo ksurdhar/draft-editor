@@ -12,16 +12,16 @@ interface FooterProps {
 const getWordCountAtPosition = (doc: any, pos: number) => {
   let text = ''
   let currentPos = 0
-  
+
   doc.descendants((node: any) => {
     if (node.isText) {
       const nodeText = node.text || ''
-      
+
       // If we're past the position, don't include this node
       if (currentPos >= pos) {
         return false
       }
-      
+
       // If this node ends before our position, include all of it
       if (currentPos + nodeText.length <= pos) {
         text += nodeText + ' '
@@ -30,34 +30,34 @@ const getWordCountAtPosition = (doc: any, pos: number) => {
         const substring = nodeText.substring(0, pos - currentPos)
         text += substring + ' '
       }
-      
+
       currentPos += nodeText.length
     }
     return true
   })
-  
+
   return calculateWordCount(text)
 }
 
 const getWordCountInRange = (doc: any, from: number, to: number) => {
   let text = ''
   let currentPos = 0
-  
+
   doc.descendants((node: any) => {
     if (node.isText) {
       const nodeText = node.text || ''
-      
+
       // If we're past the range, don't include this node
       if (currentPos >= to) {
         return false
       }
-      
+
       // If this node is before the range, skip it
       if (currentPos + nodeText.length <= from) {
         currentPos += nodeText.length
         return true
       }
-      
+
       // If this node is fully within the range
       if (currentPos >= from && currentPos + nodeText.length <= to) {
         text += nodeText + ' '
@@ -67,65 +67,61 @@ const getWordCountInRange = (doc: any, from: number, to: number) => {
         const end = Math.min(nodeText.length, to - currentPos)
         text += nodeText.substring(start, end) + ' '
       }
-      
+
       currentPos += nodeText.length
     }
     return true
   })
-  
+
   return calculateWordCount(text)
 }
 
 const getCounterFormats = (editor: Editor | null) => {
   if (!editor) return ['0 words', 'page 1/1', '0%']
-  
+
   const doc = editor.state.doc
   const { from, to } = editor.state.selection
   const totalWords = getTotalWordCount(doc)
-  
+
   // If there's a selection range
   if (from !== to) {
     const selectedWords = getWordCountInRange(doc, from, to)
-    const selectedPages = Math.ceil(selectedWords/500)
-    const totalPages = Math.ceil(totalWords/500)
-    const percentage = totalWords === 0 ? 0 : Math.round((selectedWords/totalWords)*100)
-    
+    const selectedPages = Math.ceil(selectedWords / 500)
+    const totalPages = Math.ceil(totalWords / 500)
+    const percentage = totalWords === 0 ? 0 : Math.round((selectedWords / totalWords) * 100)
+
     return [
       `${selectedWords}/${totalWords} words selected`,
-      `${selectedPages}/${totalPages} pages selected`, 
-      `${percentage}% selected`
+      `${selectedPages}/${totalPages} pages selected`,
+      `${percentage}% selected`,
     ]
   }
-  
+
   // If it's just a cursor position
   const wordsAtPos = getWordCountAtPosition(doc, from)
-  const posPage = Math.ceil(wordsAtPos/500)
-  const totalPages = Math.ceil(totalWords/500)
-  const percentage = totalWords === 0 ? 0 : Math.round((wordsAtPos/totalWords)*100)
+  const posPage = Math.ceil(wordsAtPos / 500)
+  const totalPages = Math.ceil(totalWords / 500)
+  const percentage = totalWords === 0 ? 0 : Math.round((wordsAtPos / totalWords) * 100)
 
-  return [
-    `${wordsAtPos}/${totalWords} words`,
-    `page ${posPage}/${totalPages}`, 
-    `${percentage}%`
-  ]
+  return [`${wordsAtPos}/${totalWords} words`, `page ${posPage}/${totalPages}`, `${percentage}%`]
 }
 
 const Footer = ({ editor, initFadeIn, fadeOut }: FooterProps) => {
   const [activeFormat, setActiveFormat] = useState(0)
   const counterFormats = getCounterFormats(editor)
-    
+
   return (
-    <div className={`fixed ${initFadeIn ? 'footer-gradient' : 'bg-transparent'} ${fadeOut ? 'opacity-0' : 'opacity-100' }  transition-opacity duration-700 hover:opacity-100 w-[100vw] h-[50px] bottom-0 left-0 z-10`}>
-      <div 
-        className='font-index text-sm md:text-base pr-[20px] cursor-pointer fixed bottom-0 right-0' 
+    <div
+      className={`fixed ${initFadeIn ? 'footer-gradient' : 'bg-transparent'} ${fadeOut ? 'opacity-0' : 'opacity-100'}  bottom-0 left-0 z-10 h-[50px] w-[100vw] transition-opacity duration-700 hover:opacity-100`}>
+      <div
+        className="fixed bottom-0 right-0 cursor-pointer pr-[20px] font-index text-sm md:text-base"
         onClick={() => {
           if (activeFormat < 2) {
             setActiveFormat(activeFormat + 1)
           } else {
             setActiveFormat(0)
           }
-        }}
-      > 
+        }}>
         {counterFormats[activeFormat]}
       </div>
     </div>

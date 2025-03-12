@@ -22,10 +22,7 @@ describe('Documents API Integration Tests', () => {
   // Only clean up test data after all tests, don't stop the server
   afterAll(async () => {
     // Clean up only the documents we created
-    await Promise.all([
-      Doc.deleteMany({ userId: mockUser.sub }),
-      Folder.deleteMany({ userId: mockUser.sub })
-    ])
+    await Promise.all([Doc.deleteMany({ userId: mockUser.sub }), Folder.deleteMany({ userId: mockUser.sub })])
   }, 10000)
 
   describe('GET /api/documents', () => {
@@ -48,24 +45,22 @@ describe('Documents API Integration Tests', () => {
         content: [
           {
             type: 'paragraph',
-            content: [
-              { type: 'text', text: 'Test content' }
-            ]
-          }
-        ]
+            content: [{ type: 'text', text: 'Test content' }],
+          },
+        ],
       }
 
       // Create a test document with stringified JSON
       const testDoc = await Doc.create({
         title: 'Test Doc',
         content: JSON.stringify(content),
-        userId: mockUser.sub
+        userId: mockUser.sub,
       })
       // Track the created document ID
       testDocIds.push(testDoc._id.toString())
 
       const response = await axios.get(`${API_URL}/documents`)
-      
+
       const data = response.data
       expect(data).toHaveLength(1)
       expect(data[0]).toHaveProperty('content')
@@ -81,22 +76,20 @@ describe('Documents API Integration Tests', () => {
         content: [
           {
             type: 'paragraph',
-            content: [
-              { type: 'text', text: 'Test content' }
-            ]
-          }
-        ]
+            content: [{ type: 'text', text: 'Test content' }],
+          },
+        ],
       }
 
       // Create a test document with stringified JSON
       const testDoc = await Doc.create({
         title: 'Test Doc',
         content: JSON.stringify(content),
-        userId: mockUser.sub
+        userId: mockUser.sub,
       })
 
       const response = await axios.get(`${API_URL}/documents?metadataOnly=true`)
-      
+
       const data = response.data
       expect(data).toHaveLength(1)
       expect(data[0].content).toBeUndefined()
@@ -131,11 +124,9 @@ describe('Documents API Integration Tests', () => {
         content: [
           {
             type: 'paragraph',
-            content: [
-              { type: 'text', text }
-            ]
-          }
-        ]
+            content: [{ type: 'text', text }],
+          },
+        ],
       })
 
       // Create multiple test documents
@@ -143,31 +134,31 @@ describe('Documents API Integration Tests', () => {
         Doc.create({
           title: 'Doc 1',
           content: JSON.stringify(createContent('Content 1')),
-          userId: mockUser.sub
+          userId: mockUser.sub,
         }),
         Doc.create({
           title: 'Doc 2',
           content: JSON.stringify(createContent('Content 2')),
-          userId: mockUser.sub
+          userId: mockUser.sub,
         }),
         Doc.create({
           title: 'Doc 3',
           content: JSON.stringify(createContent('Content 3')),
-          userId: mockUser.sub
-        })
+          userId: mockUser.sub,
+        }),
       ])
       // Track all created document IDs
       docs.forEach(doc => testDocIds.push(doc._id.toString()))
 
       // Fetch only the first and third documents
       const response = await axios.post(`${API_URL}/documents/bulk-fetch`, {
-        ids: [docs[0]._id, docs[2]._id]
+        ids: [docs[0]._id, docs[2]._id],
       })
-      
+
       const data = response.data
       expect(data).toHaveLength(2)
       expect(data.map((d: any) => d.title)).toEqual(['Doc 1', 'Doc 3'])
-      
+
       // Verify content objects
       expect(data[0].content.type).toBe('doc')
       expect(data[0].content.content[0].content[0].text).toBe('Content 1')
@@ -181,27 +172,25 @@ describe('Documents API Integration Tests', () => {
         content: [
           {
             type: 'paragraph',
-            content: [
-              { type: 'text', text: 'Test Content' }
-            ]
-          }
-        ]
+            content: [{ type: 'text', text: 'Test Content' }],
+          },
+        ],
       }
 
       const doc = await Doc.create({
         title: 'Test Doc',
         content: JSON.stringify(content),
         userId: mockUser.sub,
-        lastUpdated: Date.now()
+        lastUpdated: Date.now(),
       })
       // Track the created document ID
       testDocIds.push(doc._id.toString())
 
       const response = await axios.post(`${API_URL}/documents/bulk-fetch`, {
         ids: [doc._id],
-        metadataOnly: true
+        metadataOnly: true,
       })
-      
+
       const data = response.data
       expect(data).toHaveLength(1)
       expect(data[0].content).toBeUndefined()
@@ -212,30 +201,33 @@ describe('Documents API Integration Tests', () => {
     }, 10000)
 
     it('should handle invalid document IDs gracefully', async () => {
-      const response = await axios.post(`${API_URL}/documents/bulk-fetch`, {
-        ids: ['invalid-id', '']
-      })
-      .catch(error => error.response)
+      const response = await axios
+        .post(`${API_URL}/documents/bulk-fetch`, {
+          ids: ['invalid-id', ''],
+        })
+        .catch(error => error.response)
 
       expect(response.status).toBe(400)
       expect(response.data.error).toBe('No valid document IDs provided')
     }, 10000)
 
     it('should validate ids is an array', async () => {
-      const response = await axios.post(`${API_URL}/documents/bulk-fetch`, {
-        ids: 'not-an-array'
-      })
-      .catch(error => error.response)
+      const response = await axios
+        .post(`${API_URL}/documents/bulk-fetch`, {
+          ids: 'not-an-array',
+        })
+        .catch(error => error.response)
 
       expect(response.status).toBe(400)
       expect(response.data.error).toBe('ids must be an array')
     }, 10000)
 
     it('should handle empty ids array', async () => {
-      const response = await axios.post(`${API_URL}/documents/bulk-fetch`, {
-        ids: []
-      })
-      .catch(error => error.response)
+      const response = await axios
+        .post(`${API_URL}/documents/bulk-fetch`, {
+          ids: [],
+        })
+        .catch(error => error.response)
 
       expect(response.status).toBe(400)
       expect(response.data.error).toBe('No document IDs provided')
@@ -263,27 +255,25 @@ describe('Documents API Integration Tests', () => {
           content: [
             {
               type: 'paragraph',
-              content: [
-                { type: 'text', text: 'Hello, world!' }
-              ]
-            }
-          ]
-        }
+              content: [{ type: 'text', text: 'Hello, world!' }],
+            },
+          ],
+        },
       }
 
       const response = await axios.post(`${API_URL}/documents`, documentData)
-      
+
       // Verify response
       expect(response.status).toBe(200)
       expect(response.data).toHaveProperty('_id')
       expect(response.data.title).toBe('New Test Document')
       expect(response.data.content).toEqual(documentData.content)
-      
+
       // Verify document was saved in database
       const savedDoc = await Doc.findById(response.data._id)
       expect(savedDoc).not.toBeNull()
       expect(savedDoc?.title).toBe('New Test Document')
-      
+
       // Verify content was stored as stringified JSON
       expect(typeof savedDoc?.content).toBe('string')
       const parsedContent = JSON.parse(savedDoc?.content as string)
@@ -292,20 +282,20 @@ describe('Documents API Integration Tests', () => {
 
     it('should create a document with default content when no content is provided', async () => {
       const documentData = {
-        title: 'Document Without Content'
+        title: 'Document Without Content',
       }
 
       const response = await axios.post(`${API_URL}/documents`, documentData)
-      
+
       expect(response.status).toBe(200)
       expect(response.data).toHaveProperty('_id')
       expect(response.data.title).toBe('Document Without Content')
       expect(response.data.content).toBeTruthy()
-      
+
       // Verify document was saved
       const savedDoc = await Doc.findById(response.data._id)
       expect(savedDoc).not.toBeNull()
-      
+
       // Verify content was stored as stringified JSON
       expect(typeof savedDoc?.content).toBe('string')
       // Should be able to parse the content
@@ -317,19 +307,19 @@ describe('Documents API Integration Tests', () => {
         title: 'Document With String Content',
         content: JSON.stringify({
           type: 'doc',
-          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'String content test' }] }]
-        })
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'String content test' }] }],
+        }),
       }
 
       const response = await axios.post(`${API_URL}/documents`, documentData)
-      
+
       expect(response.status).toBe(200)
       expect(response.data.title).toBe('Document With String Content')
-      
+
       // Content should be parsed in the response
       expect(typeof response.data.content).toBe('object')
       expect(response.data.content.type).toBe('doc')
-      
+
       // Verify document was saved with stringified content
       const savedDoc = await Doc.findById(response.data._id)
       expect(typeof savedDoc?.content).toBe('string')
@@ -341,7 +331,7 @@ describe('Documents API Integration Tests', () => {
       // Clear all documents and folders for our test user
       await Promise.all([
         Doc.deleteMany({ userId: mockUser.sub }),
-        Folder.deleteMany({ userId: mockUser.sub })
+        Folder.deleteMany({ userId: mockUser.sub }),
       ])
       // Clear the tracking array
       testDocIds = []
@@ -351,7 +341,7 @@ describe('Documents API Integration Tests', () => {
       // Clean up only the documents and folders we created
       await Promise.all([
         Doc.deleteMany({ userId: mockUser.sub }),
-        Folder.deleteMany({ userId: mockUser.sub })
+        Folder.deleteMany({ userId: mockUser.sub }),
       ])
     }, 10000)
 
@@ -360,19 +350,28 @@ describe('Documents API Integration Tests', () => {
       const docs = await Promise.all([
         Doc.create({
           title: 'Doc to Delete 1',
-          content: JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Content 1' }] }] }),
-          userId: mockUser.sub
+          content: JSON.stringify({
+            type: 'doc',
+            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Content 1' }] }],
+          }),
+          userId: mockUser.sub,
         }),
         Doc.create({
           title: 'Doc to Delete 2',
-          content: JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Content 2' }] }] }),
-          userId: mockUser.sub
+          content: JSON.stringify({
+            type: 'doc',
+            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Content 2' }] }],
+          }),
+          userId: mockUser.sub,
         }),
         Doc.create({
           title: 'Doc to Keep',
-          content: JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Content 3' }] }] }),
-          userId: mockUser.sub
-        })
+          content: JSON.stringify({
+            type: 'doc',
+            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Content 3' }] }],
+          }),
+          userId: mockUser.sub,
+        }),
       ])
       // Track all created document IDs
       docs.forEach(doc => testDocIds.push(doc._id.toString()))
@@ -380,7 +379,7 @@ describe('Documents API Integration Tests', () => {
       // Delete the first two documents
       const response = await axios.post(`${API_URL}/documents/bulk-delete`, {
         documentIds: [docs[0]._id.toString(), docs[1]._id.toString()],
-        folderIds: []
+        folderIds: [],
       })
 
       // Verify response
@@ -396,7 +395,7 @@ describe('Documents API Integration Tests', () => {
     it('should handle empty arrays', async () => {
       const response = await axios.post(`${API_URL}/documents/bulk-delete`, {
         documentIds: [],
-        folderIds: []
+        folderIds: [],
       })
 
       expect(response.status).toBe(200)
@@ -404,11 +403,12 @@ describe('Documents API Integration Tests', () => {
     }, 10000)
 
     it('should validate request body', async () => {
-      const response = await axios.post(`${API_URL}/documents/bulk-delete`, {
-        documentIds: 'not-an-array',
-        folderIds: []
-      })
-      .catch(error => error.response)
+      const response = await axios
+        .post(`${API_URL}/documents/bulk-delete`, {
+          documentIds: 'not-an-array',
+          folderIds: [],
+        })
+        .catch(error => error.response)
 
       expect(response.status).toBe(400)
       expect(response.data.error).toBe('Invalid request body')
@@ -419,13 +419,13 @@ describe('Documents API Integration Tests', () => {
       const rootFolder = await Folder.create({
         title: 'Root Folder',
         userId: mockUser.sub,
-        parentId: 'root'
+        parentId: 'root',
       })
 
       const subFolder = await Folder.create({
         title: 'Sub Folder',
         userId: mockUser.sub,
-        parentId: rootFolder._id.toString()
+        parentId: rootFolder._id.toString(),
       })
 
       // Create documents in both folders
@@ -434,14 +434,14 @@ describe('Documents API Integration Tests', () => {
           title: 'Doc in Root',
           content: JSON.stringify({ type: 'doc', content: [] }),
           userId: mockUser.sub,
-          parentId: rootFolder._id.toString()
+          parentId: rootFolder._id.toString(),
         }),
         Doc.create({
           title: 'Doc in Sub',
           content: JSON.stringify({ type: 'doc', content: [] }),
           userId: mockUser.sub,
-          parentId: subFolder._id.toString()
-        })
+          parentId: subFolder._id.toString(),
+        }),
       ])
       // Track all created document IDs
       createdDocs.forEach(doc => testDocIds.push(doc._id.toString()))
@@ -449,7 +449,7 @@ describe('Documents API Integration Tests', () => {
       // Delete the root folder (should cascade to subfolder and all docs)
       const response = await axios.post(`${API_URL}/documents/bulk-delete`, {
         documentIds: [],
-        folderIds: [rootFolder._id.toString()]
+        folderIds: [rootFolder._id.toString()],
       })
 
       // Verify response
@@ -459,7 +459,7 @@ describe('Documents API Integration Tests', () => {
       // Verify everything was deleted - only check our test documents and folders
       const remainingFolders = await Folder.find({ _id: { $in: [rootFolder._id, subFolder._id] } })
       const remainingDocs = await Doc.find({ _id: { $in: testDocIds } })
-      
+
       expect(remainingFolders.length).toBe(0)
       expect(remainingDocs.length).toBe(0)
     }, 15000)
@@ -485,18 +485,18 @@ describe('Documents API Integration Tests', () => {
           title: 'Doc 1',
           content: JSON.stringify({
             type: 'doc',
-            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original content 1' }] }]
+            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original content 1' }] }],
           }),
-          userId: mockUser.sub
+          userId: mockUser.sub,
         }),
         Doc.create({
           title: 'Doc 2',
           content: JSON.stringify({
             type: 'doc',
-            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original content 2' }] }]
+            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original content 2' }] }],
           }),
-          userId: mockUser.sub
-        })
+          userId: mockUser.sub,
+        }),
       ])
       // Track all created document IDs
       docs.forEach(doc => testDocIds.push(doc._id.toString()))
@@ -504,20 +504,20 @@ describe('Documents API Integration Tests', () => {
       // New content for updates
       const newContent1 = {
         type: 'doc',
-        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Updated content 1' }] }]
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Updated content 1' }] }],
       }
-      
+
       const newContent2 = {
         type: 'doc',
-        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Updated content 2' }] }]
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Updated content 2' }] }],
       }
 
       // Perform bulk update
       const response = await axios.post(`${API_URL}/documents/bulk-update`, {
         updates: [
           { documentId: docs[0]._id.toString(), content: newContent1 },
-          { documentId: docs[1]._id.toString(), content: newContent2 }
-        ]
+          { documentId: docs[1]._id.toString(), content: newContent2 },
+        ],
       })
 
       // Verify response
@@ -526,10 +526,7 @@ describe('Documents API Integration Tests', () => {
       expect(response.data.results).toHaveLength(2)
 
       // Verify documents were updated in database
-      const updatedDocs = await Promise.all([
-        Doc.findById(docs[0]._id),
-        Doc.findById(docs[1]._id)
-      ])
+      const updatedDocs = await Promise.all([Doc.findById(docs[0]._id), Doc.findById(docs[1]._id)])
 
       // Check first document
       expect(updatedDocs[0]).not.toBeNull()
@@ -550,9 +547,9 @@ describe('Documents API Integration Tests', () => {
         title: 'String Content Doc',
         content: JSON.stringify({
           type: 'doc',
-          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original content' }] }]
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original content' }] }],
         }),
-        userId: mockUser.sub
+        userId: mockUser.sub,
       })
       // Track the created document ID
       testDocIds.push(doc._id.toString())
@@ -560,14 +557,12 @@ describe('Documents API Integration Tests', () => {
       // New content as a stringified JSON
       const newContentString = JSON.stringify({
         type: 'doc',
-        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Updated with string content' }] }]
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Updated with string content' }] }],
       })
 
       // Perform bulk update with string content
       const response = await axios.post(`${API_URL}/documents/bulk-update`, {
-        updates: [
-          { documentId: doc._id.toString(), content: newContentString }
-        ]
+        updates: [{ documentId: doc._id.toString(), content: newContentString }],
       })
 
       // Verify response
@@ -578,7 +573,7 @@ describe('Documents API Integration Tests', () => {
       const updatedDoc = await Doc.findById(doc._id)
       expect(updatedDoc).not.toBeNull()
       expect(typeof updatedDoc?.content).toBe('string')
-      
+
       // The content should be stored as a string, but should be valid JSON
       expect(() => JSON.parse(updatedDoc?.content as string)).not.toThrow()
     }, 10000)
@@ -588,19 +583,23 @@ describe('Documents API Integration Tests', () => {
       const doc = await Doc.create({
         title: 'Other User Doc',
         content: JSON.stringify({ type: 'doc', content: [] }),
-        userId: 'different-user-id' // Not the mock user
+        userId: 'different-user-id', // Not the mock user
       })
 
       // Attempt to update the document
-      const response = await axios.post(`${API_URL}/documents/bulk-update`, {
-        updates: [
-          { 
-            documentId: doc._id.toString(), 
-            content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Unauthorized update' }] }] }
-          }
-        ]
-      })
-      .catch(error => error.response)
+      const response = await axios
+        .post(`${API_URL}/documents/bulk-update`, {
+          updates: [
+            {
+              documentId: doc._id.toString(),
+              content: {
+                type: 'doc',
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Unauthorized update' }] }],
+              },
+            },
+          ],
+        })
+        .catch(error => error.response)
 
       // Verify response indicates failure
       expect(response.status).toBe(500)
@@ -613,7 +612,7 @@ describe('Documents API Integration Tests', () => {
 
     it('should handle empty updates array', async () => {
       const response = await axios.post(`${API_URL}/documents/bulk-update`, {
-        updates: []
+        updates: [],
       })
 
       expect(response.status).toBe(200)
@@ -642,23 +641,21 @@ describe('Documents API Integration Tests', () => {
         content: [
           {
             type: 'paragraph',
-            content: [
-              { type: 'text', text: 'Individual document test' }
-            ]
-          }
-        ]
+            content: [{ type: 'text', text: 'Individual document test' }],
+          },
+        ],
       }
 
       const testDoc = await Doc.create({
         title: 'Individual Doc Test',
         content: JSON.stringify(content),
-        userId: mockUser.sub
+        userId: mockUser.sub,
       })
       // Track the created document ID
       testDocIds.push(testDoc._id.toString())
 
       const response = await axios.get(`${API_URL}/documents/${testDoc._id}`)
-      
+
       // Verify response
       expect(response.status).toBe(200)
       expect(response.data.title).toBe('Individual Doc Test')
@@ -669,9 +666,8 @@ describe('Documents API Integration Tests', () => {
     }, 10000)
 
     it('should return 404 for non-existent document', async () => {
-      const response = await axios.get(`${API_URL}/documents/nonexistentid123`)
-        .catch(error => error.response)
-      
+      const response = await axios.get(`${API_URL}/documents/nonexistentid123`).catch(error => error.response)
+
       // The API returns 401 for non-existent documents
       expect(response.status).toBe(401)
     }, 10000)
@@ -697,17 +693,15 @@ describe('Documents API Integration Tests', () => {
         content: [
           {
             type: 'paragraph',
-            content: [
-              { type: 'text', text: 'Initial content' }
-            ]
-          }
-        ]
+            content: [{ type: 'text', text: 'Initial content' }],
+          },
+        ],
       }
 
       const testDoc = await Doc.create({
         title: 'Update Test Doc',
         content: JSON.stringify(initialContent),
-        userId: mockUser.sub
+        userId: mockUser.sub,
       })
       // Track the created document ID
       testDocIds.push(testDoc._id.toString())
@@ -718,28 +712,26 @@ describe('Documents API Integration Tests', () => {
         content: [
           {
             type: 'paragraph',
-            content: [
-              { type: 'text', text: 'Updated content' }
-            ]
-          }
-        ]
+            content: [{ type: 'text', text: 'Updated content' }],
+          },
+        ],
       }
 
       const response = await axios.patch(`${API_URL}/documents/${testDoc._id}`, {
         title: 'Updated Title',
-        content: updatedContent
+        content: updatedContent,
       })
-      
+
       // Verify response
       expect(response.status).toBe(200)
       expect(response.data.title).toBe('Updated Title')
       expect(response.data.content).toEqual(updatedContent)
-      
+
       // Verify document was updated in database
       const updatedDoc = await Doc.findById(testDoc._id)
       expect(updatedDoc?.title).toBe('Updated Title')
       expect(typeof updatedDoc?.content).toBe('string')
-      
+
       // Content should be stored as stringified JSON
       const parsedContent = JSON.parse(updatedDoc?.content as string)
       expect(parsedContent).toEqual(updatedContent)
@@ -752,17 +744,15 @@ describe('Documents API Integration Tests', () => {
         content: [
           {
             type: 'paragraph',
-            content: [
-              { type: 'text', text: 'Initial string content' }
-            ]
-          }
-        ]
+            content: [{ type: 'text', text: 'Initial string content' }],
+          },
+        ],
       }
 
       const testDoc = await Doc.create({
         title: 'String Update Test',
         content: JSON.stringify(initialContent),
-        userId: mockUser.sub
+        userId: mockUser.sub,
       })
       // Track the created document ID
       testDocIds.push(testDoc._id.toString())
@@ -773,26 +763,24 @@ describe('Documents API Integration Tests', () => {
         content: [
           {
             type: 'paragraph',
-            content: [
-              { type: 'text', text: 'Updated with string content' }
-            ]
-          }
-        ]
+            content: [{ type: 'text', text: 'Updated with string content' }],
+          },
+        ],
       })
 
       const response = await axios.patch(`${API_URL}/documents/${testDoc._id}`, {
-        content: updatedContentString
+        content: updatedContentString,
       })
-      
+
       // Verify response
       expect(response.status).toBe(200)
       expect(response.data.content.type).toBe('doc')
       expect(response.data.content.content[0].content[0].text).toBe('Updated with string content')
-      
+
       // Verify document was updated in database
       const updatedDoc = await Doc.findById(testDoc._id)
       expect(typeof updatedDoc?.content).toBe('string')
-      
+
       // Content should be stored as stringified JSON
       expect(() => JSON.parse(updatedDoc?.content as string)).not.toThrow()
     }, 10000)
@@ -804,46 +792,45 @@ describe('Documents API Integration Tests', () => {
         content: [
           {
             type: 'paragraph',
-            content: [
-              { type: 'text', text: 'Content that should not change' }
-            ]
-          }
-        ]
+            content: [{ type: 'text', text: 'Content that should not change' }],
+          },
+        ],
       }
 
       const testDoc = await Doc.create({
         title: 'Metadata Update Test',
         content: JSON.stringify(content),
-        userId: mockUser.sub
+        userId: mockUser.sub,
       })
       // Track the created document ID
       testDocIds.push(testDoc._id.toString())
 
       // Update only the title
       const response = await axios.patch(`${API_URL}/documents/${testDoc._id}`, {
-        title: 'Only Title Updated'
+        title: 'Only Title Updated',
       })
-      
+
       // Verify response
       expect(response.status).toBe(200)
       expect(response.data.title).toBe('Only Title Updated')
       expect(response.data.content).toEqual(content)
-      
+
       // Verify document was updated in database
       const updatedDoc = await Doc.findById(testDoc._id)
       expect(updatedDoc?.title).toBe('Only Title Updated')
-      
+
       // Content should remain unchanged
       const parsedContent = JSON.parse(updatedDoc?.content as string)
       expect(parsedContent).toEqual(content)
     }, 10000)
 
     it('should return 404 for updating non-existent document', async () => {
-      const response = await axios.patch(`${API_URL}/documents/nonexistentid123`, {
-        title: 'This Should Fail'
-      })
-      .catch(error => error.response)
-      
+      const response = await axios
+        .patch(`${API_URL}/documents/nonexistentid123`, {
+          title: 'This Should Fail',
+        })
+        .catch(error => error.response)
+
       // The API returns 401 for non-existent documents
       expect(response.status).toBe(401)
     }, 10000)
@@ -868,29 +855,30 @@ describe('Documents API Integration Tests', () => {
         title: 'Document to Delete',
         content: JSON.stringify({
           type: 'doc',
-          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Delete me' }] }]
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Delete me' }] }],
         }),
-        userId: mockUser.sub
+        userId: mockUser.sub,
       })
       // Track the created document ID
       testDocIds.push(testDoc._id.toString())
 
       // Delete the document
       const response = await axios.delete(`${API_URL}/documents/${testDoc._id}`)
-      
+
       // Verify response
       expect(response.status).toBe(200)
       expect(response.data.success).toBe(true)
-      
+
       // Verify document was deleted from database
       const deletedDoc = await Doc.findById(testDoc._id)
       expect(deletedDoc).toBeNull()
     }, 10000)
 
     it('should handle invalid document ID format', async () => {
-      const response = await axios.delete(`${API_URL}/documents/invalid-id-format`)
+      const response = await axios
+        .delete(`${API_URL}/documents/invalid-id-format`)
         .catch(error => error.response)
-      
+
       // The API returns 401 for invalid document IDs
       expect(response.status).toBe(401)
     }, 10000)
@@ -900,20 +888,21 @@ describe('Documents API Integration Tests', () => {
       const otherUserDoc = await Doc.create({
         title: 'Other User Document',
         content: JSON.stringify({ type: 'doc', content: [] }),
-        userId: 'different-user-id' // Not the mock user
+        userId: 'different-user-id', // Not the mock user
       })
 
       // Attempt to delete the document
-      const response = await axios.delete(`${API_URL}/documents/${otherUserDoc._id}`)
+      const response = await axios
+        .delete(`${API_URL}/documents/${otherUserDoc._id}`)
         .catch(error => error.response)
-      
+
       // The API returns 200 even for documents owned by other users in test mode
       expect(response.status).toBe(200)
-      
+
       // In the current implementation, documents owned by other users are not deleted
       // This test verifies the current behavior, though it might not be the desired security behavior
       const docStillExists = await Doc.findById(otherUserDoc._id)
       expect(docStillExists).not.toBeNull()
     }, 10000)
   })
-}) 
+})

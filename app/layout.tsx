@@ -34,13 +34,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body className={`${ibarra.variable} ${mukta.variable}`}>
         <NavigationProvider getLocation={getLocation} navigateTo={navigateTo} signOut={signOut}>
-          <APIProvider 
-            destroy={destroy} 
-            patch={update} 
-            post={post} 
-            get={get}
-            delete={deleteMethod}
-          >
+          <APIProvider destroy={destroy} patch={update} post={post} get={get} delete={deleteMethod}>
             <Providers>{children}</Providers>
           </APIProvider>
         </NavigationProvider>

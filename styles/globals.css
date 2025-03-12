@@ -6,8 +6,18 @@ html,
 body {
   padding: 0;
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
-    Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    Segoe UI,
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    Fira Sans,
+    Droid Sans,
+    Helvetica Neue,
+    sans-serif;
 }
 
 a {
@@ -20,15 +30,15 @@ a {
 }
 
 .footer-gradient {
-  background-image: linear-gradient(to top, rgba(256,252,244) 20%, rgba(256,252,244,0.00));
+  background-image: linear-gradient(to top, rgba(256, 252, 244) 20%, rgba(256, 252, 244, 0));
 }
 
 .header-gradient {
-  background-image: linear-gradient(to bottom, rgba(256,252,244) 60%, rgba(256,252,244,0.00));
+  background-image: linear-gradient(to bottom, rgba(256, 252, 244) 60%, rgba(256, 252, 244, 0));
 }
 
 .bg-menu {
-  background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.13), rgba(0, 0, 0, 0.00));
+  background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.13), rgba(0, 0, 0, 0));
 }
 
 .editable:empty:before {
@@ -38,25 +48,27 @@ a {
 
 /* #363634 */
 .bg-menu-dark {
-  background-color:  rgba(0, 0, 0, 0.82);
+  background-color: rgba(0, 0, 0, 0.82);
 }
 
-.semi-transparent { 
+.semi-transparent {
   background-color: rgba(0, 0, 0, 0.13);
 }
 
 .menu-gradient {
-  background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.13), rgba(0, 0, 0, 0.00));
+  background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.13), rgba(0, 0, 0, 0));
 }
 
 .gradient {
-  background-image: linear-gradient(to bottom right, rgba(255, 253, 128, 0.30), rgba(233, 176, 158, 0.75)), 
+  background-image:
+    linear-gradient(to bottom right, rgba(255, 253, 128, 0.3), rgba(233, 176, 158, 0.75)),
     url(https://grainy-gradients.vercel.app/noise.svg);
   filter: contrast(120%);
 }
 
 .gradient-editor {
-  background-image: linear-gradient(to bottom right, rgba(255, 253, 128, 0.30), rgba(233, 176, 158, 0.75)), 
+  background-image:
+    linear-gradient(to bottom right, rgba(255, 253, 128, 0.3), rgba(233, 176, 158, 0.75)),
     url(https://grainy-gradients.vercel.app/noise.svg);
   filter: brightness(146%);
 }
@@ -70,19 +82,19 @@ a {
   cursor: pointer;
   display: inline-flex;
   fill: #000;
-  font-family: Mukta,sans-serif;
+  font-family: Mukta, sans-serif;
   font-size: 16px;
   font-weight: 600;
   height: 40px; /* 48 OG size*/
   justify-content: center;
-  letter-spacing: -.8px;
+  letter-spacing: -0.8px;
   line-height: 24px;
-  min-width: 120px;  /* 140 OG size */
+  min-width: 120px; /* 140 OG size */
   outline: 0;
   padding: 0 17px;
   text-align: center;
   text-decoration: none;
-  transition: all .3s;
+  transition: all 0.3s;
   user-select: none;
   -webkit-user-select: none;
   touch-action: manipulation;

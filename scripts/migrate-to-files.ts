@@ -2,14 +2,14 @@ import fs from 'fs-extra'
 import path from 'path'
 
 interface DatabaseSchema {
-  documents: any[];
-  [key: string]: any[];
+  documents: any[]
+  [key: string]: any[]
 }
 
 async function migrateToFiles() {
   const storagePath = process.env.JSON_STORAGE_PATH || './data'
   const dbPath = path.join(storagePath, 'db.json')
-  
+
   // Check if db.json exists
   if (!fs.existsSync(dbPath)) {
     console.error('db.json not found at:', dbPath)
@@ -47,7 +47,7 @@ async function migrateToFiles() {
       for (const doc of db[collection]) {
         const docPath = path.join(collectionPath, `${doc._id}.json`)
         await fs.writeFile(docPath, JSON.stringify(doc, null, 2))
-        
+
         // Log only the first document's path and ID as a sample
         if (db[collection].indexOf(doc) === 0) {
           console.log(`Sample migration:`)
@@ -75,4 +75,4 @@ async function migrateToFiles() {
   }
 }
 
-migrateToFiles() 
+migrateToFiles()

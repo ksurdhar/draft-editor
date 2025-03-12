@@ -36,16 +36,16 @@ export default withHybridAuth(async function versionsHandler(req: ExtendedApiReq
         const versionsWithParsedContent = versions.map(version => {
           console.log('\nProcessing version:', version.id)
           console.log('Version content type:', typeof version.content)
-          
+
           if (typeof version.content === 'string') {
             try {
               // Try to parse the content as JSON
               const parsedContent = JSON.parse(version.content)
               console.log('Successfully parsed content as JSON')
-              
+
               return {
                 ...version,
-                content: parsedContent
+                content: parsedContent,
               }
             } catch (e) {
               console.log('Warning: Could not parse version content as JSON, returning as-is')
@@ -56,7 +56,7 @@ export default withHybridAuth(async function versionsHandler(req: ExtendedApiReq
             return version
           }
         })
-        
+
         res.status(200).json(versionsWithParsedContent)
       } catch (error) {
         console.error('Error fetching versions:', error)
@@ -79,10 +79,10 @@ export default withHybridAuth(async function versionsHandler(req: ExtendedApiReq
         console.log('\n=== Creating Version ===')
         console.log('Document ID:', documentId)
         console.log('Input content type:', typeof req.body.content)
-        
+
         // Prepare content as stringified JSON
         let contentToStore = req.body.content
-        
+
         if (typeof contentToStore === 'object') {
           // If content is an object, stringify it
           console.log('Stringifying object content')
@@ -101,9 +101,10 @@ export default withHybridAuth(async function versionsHandler(req: ExtendedApiReq
         }
 
         // Calculate word count from the content
-        const wordCount = typeof req.body.content === 'string' ? 
-          req.body.content.split(/\s+/).length : 
-          JSON.stringify(req.body.content).split(/\s+/).length
+        const wordCount =
+          typeof req.body.content === 'string'
+            ? req.body.content.split(/\s+/).length
+            : JSON.stringify(req.body.content).split(/\s+/).length
 
         // Create the version with stringified content
         const newVersion = await createVersion({
@@ -112,9 +113,9 @@ export default withHybridAuth(async function versionsHandler(req: ExtendedApiReq
           content: contentToStore,
           createdAt: req.body.createdAt || Date.now(),
           name: req.body.name || '',
-          wordCount
+          wordCount,
         })
-        
+
         console.log('Version created successfully:', newVersion.id)
 
         // Parse the content for the response
@@ -127,17 +128,17 @@ export default withHybridAuth(async function versionsHandler(req: ExtendedApiReq
             // Keep as string if parsing fails
           }
         }
-        
+
         // Return the parsed content in the response
         res.status(200).json({
           ...newVersion,
-          content: responseContent
+          content: responseContent,
         })
       } catch (error) {
         console.error('Error creating version:', error)
-        res.status(500).json({ 
+        res.status(500).json({
           error: 'Failed to create version',
-          details: error instanceof Error ? error.message : 'Unknown error'
+          details: error instanceof Error ? error.message : 'Unknown error',
         })
       }
       break
@@ -164,4 +165,4 @@ export default withHybridAuth(async function versionsHandler(req: ExtendedApiReq
       res.setHeader('Allow', ['GET', 'POST', 'DELETE'])
       res.status(405).end(`Method ${method} Not Allowed`)
   }
-}) 
+})

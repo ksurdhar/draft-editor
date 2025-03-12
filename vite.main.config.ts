@@ -9,8 +9,8 @@ export default defineConfig({
     mainFields: ['module', 'jsnext:main', 'jsnext'],
     alias: {
       // Use Node's crypto module
-      crypto: 'crypto'
-    }
+      crypto: 'crypto',
+    },
   },
   build: {
     rollupOptions: {
@@ -27,7 +27,7 @@ export default defineConfig({
         '@aws-sdk/credential-providers',
         '@mongodb-js/saslprep',
         ...builtinModules,
-      ]
-    }
-  }
+      ],
+    },
+  },
 })

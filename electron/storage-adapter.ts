@@ -15,9 +15,9 @@ const generateUUID = () => {
 }
 
 // Set storage path based on mode
-const storagePath = useAppStorage 
+const storagePath = useAppStorage
   ? path.join(app.getPath('userData'), 'data') // Use electron's storage path otherwise
-  : path.resolve(process.cwd(), 'data') // Use web app's storage path in local mode 
+  : path.resolve(process.cwd(), 'data') // Use web app's storage path in local mode
 
 process.env.JSON_STORAGE_PATH = storagePath
 
@@ -48,7 +48,7 @@ class ElectronFileStorageAdapter extends FileStorageAdapter {
       ...data,
       _id: data._id || generateUUID(),
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     }
 
     const filePath = path.join(documentsPath, `${newDoc._id}.json`)
@@ -76,11 +76,11 @@ class ElectronFileStorageAdapter extends FileStorageAdapter {
       }
     }
 
-    const updatedDoc = { 
-      ...doc, 
+    const updatedDoc = {
+      ...doc,
       ...parsedData,
       updatedAt: new Date().toISOString(),
-      lastUpdated: Date.now()
+      lastUpdated: Date.now(),
     }
 
     const filePath = path.join(process.env.JSON_STORAGE_PATH || './data', collection, `${id}.json`)
@@ -96,7 +96,7 @@ class ElectronFileStorageAdapter extends FileStorageAdapter {
 
     try {
       const documents = await this.find(collection, query)
-      
+
       if (documents.length === 0) {
         return false
       }
@@ -119,7 +119,11 @@ class ElectronFileStorageAdapter extends FileStorageAdapter {
           })
 
           // Delete the folder file itself
-          const filePath = path.join(process.env.JSON_STORAGE_PATH || './data', collection, `${folder._id}.json`)
+          const filePath = path.join(
+            process.env.JSON_STORAGE_PATH || './data',
+            collection,
+            `${folder._id}.json`,
+          )
           await fs.remove(filePath)
         }
       } else {
@@ -144,4 +148,4 @@ export const documentStorage = storage
 export const folderStorage = storage
 export const versionStorage = storage
 
-export default documentStorage 
+export default documentStorage

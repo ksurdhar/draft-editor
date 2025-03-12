@@ -42,7 +42,7 @@ export default function GlobalFind({ onClose: _onClose }: GlobalFindProps) {
   const [showReplace, setShowReplace] = useState(false)
   const [searchOptions, setSearchOptions] = useState({
     matchCase: false,
-    wholeWord: false
+    wholeWord: false,
   })
   const [documents, setDocuments] = useState<DocumentData[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -83,17 +83,18 @@ export default function GlobalFind({ onClose: _onClose }: GlobalFindProps) {
 
         // Handle both string and object content
         try {
-          content = typeof doc.content === 'string' 
-            ? JSON.parse(doc.content).content
-              .map((block: any) => block.content?.[0]?.text || '')
-              .join('\n')
-            : (doc.content as { content: any[] }).content
-              .map((block: any) => {
-                // Ensure we're getting the exact text with preserved case
-                const text = block.content?.[0]?.text
-                return text !== undefined ? text : ''
-              })
-              .join('\n')
+          content =
+            typeof doc.content === 'string'
+              ? JSON.parse(doc.content)
+                  .content.map((block: any) => block.content?.[0]?.text || '')
+                  .join('\n')
+              : (doc.content as { content: any[] }).content
+                  .map((block: any) => {
+                    // Ensure we're getting the exact text with preserved case
+                    const text = block.content?.[0]?.text
+                    return text !== undefined ? text : ''
+                  })
+                  .join('\n')
         } catch (e) {
           console.error('Error parsing document content:', e)
           return
@@ -111,7 +112,7 @@ export default function GlobalFind({ onClose: _onClose }: GlobalFindProps) {
               text: line,
               lineNumber: index + 1,
               matchIndex: match.index,
-              matchLength: actualMatch.length
+              matchLength: actualMatch.length,
             })
           }
         })
@@ -120,7 +121,7 @@ export default function GlobalFind({ onClose: _onClose }: GlobalFindProps) {
           results.push({
             documentId: doc._id,
             documentTitle: doc.title,
-            matches
+            matches,
           })
         }
       })
@@ -158,7 +159,7 @@ export default function GlobalFind({ onClose: _onClose }: GlobalFindProps) {
   const toggleSearchOption = (option: 'matchCase' | 'wholeWord') => {
     setSearchOptions(prev => ({
       ...prev,
-      [option]: !prev[option]
+      [option]: !prev[option],
     }))
   }
 
@@ -166,14 +167,14 @@ export default function GlobalFind({ onClose: _onClose }: GlobalFindProps) {
     return searchResults.reduce((total, result) => total + result.matches.length, 0)
   }
 
-  const HighlightedText = ({ 
-    text, 
-    matchIndex, 
-    matchLength 
-  }: { 
-    text: string, 
-    matchIndex: number, 
-    matchLength: number 
+  const HighlightedText = ({
+    text,
+    matchIndex,
+    matchLength,
+  }: {
+    text: string
+    matchIndex: number
+    matchLength: number
   }) => {
     const before = text.slice(0, matchIndex)
     const match = text.slice(matchIndex, matchIndex + matchLength)
@@ -183,13 +184,11 @@ export default function GlobalFind({ onClose: _onClose }: GlobalFindProps) {
       return (
         <span className="normal-case">
           {before}
-          <span className="bg-red-200/50 text-black/90 rounded px-0.5 line-through decoration-red-500/50">
+          <span className="rounded bg-red-200/50 px-0.5 text-black/90 line-through decoration-red-500/50">
             {match}
           </span>
           <span className="mx-1">→</span>
-          <span className="bg-green-200/50 text-black/90 rounded px-0.5">
-            {replaceText}
-          </span>
+          <span className="rounded bg-green-200/50 px-0.5 text-black/90">{replaceText}</span>
           {after}
         </span>
       )
@@ -198,7 +197,7 @@ export default function GlobalFind({ onClose: _onClose }: GlobalFindProps) {
     return (
       <span className="normal-case">
         {before}
-        <span className="bg-yellow-200/50 text-black/90 rounded px-0.5">{match}</span>
+        <span className="rounded bg-yellow-200/50 px-0.5 text-black/90">{match}</span>
         {after}
       </span>
     )
@@ -208,10 +207,10 @@ export default function GlobalFind({ onClose: _onClose }: GlobalFindProps) {
     try {
       const doc = await get(`/documents/${documentUpdate.documentId}`)
       let content = typeof doc.content === 'string' ? JSON.parse(doc.content) : doc.content
-      
+
       // Sort matches in reverse order to not affect subsequent indices
       const sortedMatches = [...documentUpdate.matches].sort((a, b) => b.lineNumber - a.lineNumber)
-      
+
       // Replace matches in the content
       content.content = content.content.map((block: any, blockIndex: number) => {
         const matches = sortedMatches.filter(m => m.lineNumber === blockIndex + 1)
@@ -219,12 +218,13 @@ export default function GlobalFind({ onClose: _onClose }: GlobalFindProps) {
 
         let text = block.content?.[0]?.text || ''
         matches.forEach(match => {
-          text = text.slice(0, match.matchIndex) + replaceText + text.slice(match.matchIndex + match.matchLength)
+          text =
+            text.slice(0, match.matchIndex) + replaceText + text.slice(match.matchIndex + match.matchLength)
         })
 
         return {
           ...block,
-          content: [{ ...block.content[0], text }]
+          content: [{ ...block.content[0], text }],
         }
       })
 
@@ -241,11 +241,13 @@ export default function GlobalFind({ onClose: _onClose }: GlobalFindProps) {
     setIsReplacing(true)
     try {
       const updates = await Promise.all(
-        searchResults.map(result => handleReplace({
-          documentId: result.documentId,
-          content: null, // Will be set in handleReplace
-          matches: result.matches
-        }))
+        searchResults.map(result =>
+          handleReplace({
+            documentId: result.documentId,
+            content: null, // Will be set in handleReplace
+            matches: result.matches,
+          }),
+        ),
       )
 
       const validUpdates = updates.filter(Boolean)
@@ -257,18 +259,20 @@ export default function GlobalFind({ onClose: _onClose }: GlobalFindProps) {
       await post('/documents/bulk-update', { updates: validUpdates })
 
       // Update in-memory documents state
-      setDocuments(prev => prev.map(doc => {
-        const update = validUpdates.find(u => u?.documentId === doc._id)
-        if (update) {
-          return { ...doc, content: update.content }
-        }
-        return doc
-      }))
+      setDocuments(prev =>
+        prev.map(doc => {
+          const update = validUpdates.find(u => u?.documentId === doc._id)
+          if (update) {
+            return { ...doc, content: update.content }
+          }
+          return doc
+        }),
+      )
 
       // Refresh documents
       await Promise.all([
         ...searchResults.map(result => mutate(`/documents/${result.documentId}`)),
-        mutate('/documents')
+        mutate('/documents'),
       ])
 
       // Clear search results and close replace panel
@@ -291,7 +295,7 @@ export default function GlobalFind({ onClose: _onClose }: GlobalFindProps) {
       const update = await handleReplace({
         documentId,
         content: null, // Will be set in handleReplace
-        matches: result.matches
+        matches: result.matches,
       })
 
       if (!update) {
@@ -302,15 +306,12 @@ export default function GlobalFind({ onClose: _onClose }: GlobalFindProps) {
       await patch(`/documents/${documentId}`, update)
 
       // Update in-memory documents state
-      setDocuments(prev => prev.map(doc => 
-        doc._id === documentId ? { ...doc, content: update.content } : doc
-      ))
+      setDocuments(prev =>
+        prev.map(doc => (doc._id === documentId ? { ...doc, content: update.content } : doc)),
+      )
 
       // Refresh document
-      await Promise.all([
-        mutate(`/documents/${documentId}`),
-        mutate('/documents')
-      ])
+      await Promise.all([mutate(`/documents/${documentId}`), mutate('/documents')])
 
       // Remove this document from search results
       setSearchResults(prev => prev.filter(r => r.documentId !== documentId))
@@ -322,43 +323,48 @@ export default function GlobalFind({ onClose: _onClose }: GlobalFindProps) {
   }
 
   return (
-    <div className="h-[calc(100vh_-_44px)] p-4 overflow-y-auto">
+    <div className="h-[calc(100vh_-_44px)] overflow-y-auto p-4">
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowReplace(!showReplace)}
-            className="p-1 rounded hover:bg-black/5 shrink-0"
-          >
-            <ChevronExpandIcon className={`w-4 h-4 transition-transform ${showReplace ? 'rotate-180' : ''}`} />
+            className="shrink-0 rounded p-1 hover:bg-black/5">
+            <ChevronExpandIcon
+              className={`h-4 w-4 transition-transform ${showReplace ? 'rotate-180' : ''}`}
+            />
           </button>
-          <div className="flex-1 bg-black/[.03] rounded px-2 flex items-center">
+          <div className="flex flex-1 items-center rounded bg-black/[.03] px-2">
             <input
               type="text"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={e => setSearchTerm(e.target.value)}
               placeholder="Find in all documents"
-              className="w-full py-1 bg-transparent border-none outline-none text-md font-editor2 text-black/[.70] focus:ring-0 focus:ring-offset-0"
+              className="text-md w-full border-none bg-transparent py-1 font-editor2 text-black/[.70] outline-none focus:ring-0 focus:ring-offset-0"
               autoFocus
             />
-            <div className="flex items-center gap-1.5 shrink-0 ml-1">
+            <div className="ml-1 flex shrink-0 items-center gap-1.5">
               <button
                 onClick={() => toggleSearchOption('matchCase')}
-                className={`p-1 rounded hover:bg-black/5 ${searchOptions.matchCase ? 'bg-black/5' : ''}`}
-                title="Match case"
-              >
-                <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current">
-                  <text x="4" y="17" className="text-[16px] font-bold">A</text>
-                  <text x="12" y="17" className="text-[14px]">a</text>
+                className={`rounded p-1 hover:bg-black/5 ${searchOptions.matchCase ? 'bg-black/5' : ''}`}
+                title="Match case">
+                <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current">
+                  <text x="4" y="17" className="text-[16px] font-bold">
+                    A
+                  </text>
+                  <text x="12" y="17" className="text-[14px]">
+                    a
+                  </text>
                 </svg>
               </button>
               <button
                 onClick={() => toggleSearchOption('wholeWord')}
-                className={`p-1 rounded hover:bg-black/5 ${searchOptions.wholeWord ? 'bg-black/5' : ''}`}
-                title="Match whole word"
-              >
-                <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current">
-                  <text x="6" y="15" className="text-[14px]">ab</text>
-                  <path d="M5 17h14" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                className={`rounded p-1 hover:bg-black/5 ${searchOptions.wholeWord ? 'bg-black/5' : ''}`}
+                title="Match whole word">
+                <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current">
+                  <text x="6" y="15" className="text-[14px]">
+                    ab
+                  </text>
+                  <path d="M5 17h14" stroke="currentColor" strokeWidth="1.5" fill="none" />
                 </svg>
               </button>
             </div>
@@ -367,27 +373,25 @@ export default function GlobalFind({ onClose: _onClose }: GlobalFindProps) {
 
         {showReplace && (
           <div className="flex items-center gap-2 pl-8">
-            <div className="flex-1 bg-black/[.03] rounded px-2 flex items-center">
+            <div className="flex flex-1 items-center rounded bg-black/[.03] px-2">
               <input
                 type="text"
                 value={replaceText}
-                onChange={(e) => setReplaceText(e.target.value)}
+                onChange={e => setReplaceText(e.target.value)}
                 placeholder="Replace with..."
-                className="w-full py-1 bg-transparent border-none outline-none text-md font-editor2 text-black/[.70] focus:ring-0 focus:ring-offset-0"
+                className="text-md w-full border-none bg-transparent py-1 font-editor2 text-black/[.70] outline-none focus:ring-0 focus:ring-offset-0"
               />
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex shrink-0 items-center gap-1.5">
                 <button
                   onClick={() => searchResults[0] && handleReplaceInDocument(searchResults[0].documentId)}
                   disabled={isReplacing || !replaceText || searchResults.length === 0}
-                  className="text-xs px-2 py-1 rounded hover:bg-black/5 font-editor2 text-black/[.70] disabled:opacity-50 disabled:cursor-not-allowed"
-                >
+                  className="rounded px-2 py-1 font-editor2 text-xs text-black/[.70] hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-50">
                   Replace
                 </button>
                 <button
                   onClick={handleReplaceAll}
                   disabled={isReplacing || !replaceText}
-                  className="text-xs px-2 py-1 rounded hover:bg-black/5 font-editor2 text-black/[.70] disabled:opacity-50 disabled:cursor-not-allowed"
-                >
+                  className="rounded px-2 py-1 font-editor2 text-xs text-black/[.70] hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-50">
                   All
                 </button>
               </div>
@@ -396,36 +400,33 @@ export default function GlobalFind({ onClose: _onClose }: GlobalFindProps) {
         )}
 
         {searchResults.length > 0 && (
-          <div className="text-xs text-black/40 pl-2">
+          <div className="pl-2 text-xs text-black/40">
             {getTotalMatchCount()} matches in {searchResults.length} files
           </div>
         )}
 
         <div className="mt-1">
           {isLoading ? (
-            <div className="text-sm text-black/50 animate-pulse">Loading documents...</div>
+            <div className="animate-pulse text-sm text-black/50">Loading documents...</div>
           ) : searchTerm.trim() === '' ? (
             <div className="text-sm text-black/50">Type to search in all documents</div>
           ) : searchResults.length === 0 ? (
             <div className="text-sm text-black/50">No results found</div>
           ) : (
             <div className="flex flex-col gap-4">
-              {searchResults.map((result) => (
+              {searchResults.map(result => (
                 <div key={result.documentId} className="flex flex-col gap-2">
                   <ListItem
                     label={result.documentTitle}
-                    leftIcon={<DocumentIcon className="w-4 h-4" />}
+                    leftIcon={<DocumentIcon className="h-4 w-4" />}
                     onClick={() => handleDocumentClick(result.documentId)}
                     theme="dark"
                   />
-                  <div className="pl-8 flex flex-col gap-1">
+                  <div className="flex flex-col gap-1 pl-8">
                     {result.matches.slice(0, 3).map((match, index) => (
-                      <div 
-                        key={index}
-                        className="text-sm text-black/70 bg-black/[.03] rounded p-2"
-                      >
-                        <span className="text-black/40 mr-2">Line {match.lineNumber}:</span>
-                        <HighlightedText 
+                      <div key={index} className="rounded bg-black/[.03] p-2 text-sm text-black/70">
+                        <span className="mr-2 text-black/40">Line {match.lineNumber}:</span>
+                        <HighlightedText
                           text={match.text}
                           matchIndex={match.matchIndex}
                           matchLength={match.matchLength}
@@ -433,7 +434,7 @@ export default function GlobalFind({ onClose: _onClose }: GlobalFindProps) {
                       </div>
                     ))}
                     {result.matches.length > 3 && (
-                      <div className="text-xs text-black/40 pl-2">
+                      <div className="pl-2 text-xs text-black/40">
                         +{result.matches.length - 3} more matches
                       </div>
                     )}
@@ -446,4 +447,4 @@ export default function GlobalFind({ onClose: _onClose }: GlobalFindProps) {
       </div>
     </div>
   )
-} 
+}

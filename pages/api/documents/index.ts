@@ -8,10 +8,10 @@ import { createPermission } from '@lib/mongo-utils'
 const handlers = {
   async POST(req: ExtendedApiRequest, res: NextApiResponse) {
     console.log('\n=== Creating New Document ===')
-    
+
     // Prepare content as stringified JSON
     let content = req.body.content
-    
+
     if (!content) {
       console.log('Using default content')
       // Stringify the default content
@@ -34,7 +34,7 @@ const handlers = {
     }
 
     const now = Date.now()
-    
+
     // Check if a client-supplied ID was provided
     const documentData = {
       ...req.body,
@@ -42,15 +42,15 @@ const handlers = {
       title: req.body.title || DEFAULT_DOCUMENT_TITLE,
       content,
       comments: [],
-      lastUpdated: now
+      lastUpdated: now,
     }
-    
+
     // If client supplied an _id, use it
     if (req.body._id) {
       console.log('Using client-supplied ID:', req.body._id)
       documentData._id = req.body._id
     }
-    
+
     const newDocument = await storage.create('documents', documentData)
 
     console.log('Document created:', newDocument._id)
@@ -60,7 +60,7 @@ const handlers = {
       await createPermission({
         documentId: newDocument._id,
         ownerId: req.user!.sub,
-        globalPermission: UserPermission.None
+        globalPermission: UserPermission.None,
       })
       console.log('Permission record created')
     } catch (error) {
@@ -80,46 +80,48 @@ const handlers = {
     // Return document with parsed content for the response
     res.status(200).json({
       ...newDocument,
-      content: responseContent
+      content: responseContent,
     })
   },
 
   async GET(req: ExtendedApiRequest, res: NextApiResponse) {
     console.log('\n=== Fetching Documents ===')
     console.log('User ID:', req.user!.sub)
-    
+
     const { metadataOnly } = req.query
     console.log('Metadata only:', metadataOnly)
-    
+
     const documents = await storage.find('documents', { userId: req.user!.sub })
     console.log('Found documents:', documents.length)
 
     // Process documents and parse stringified JSON
-    const docsWithPermissions = await Promise.all(documents.map(async doc => {
-      let content = doc.content
-      
-      // Only include content if metadataOnly is not set to true
-      if (metadataOnly === 'true') {
-        content = undefined
-      } else if (typeof content === 'string') {
-        // Try to parse stringified JSON
-        try {
-          content = JSON.parse(content)
-        } catch (e) {
-          console.log(`Warning: Could not parse content for document ${doc._id}`)
-          // Keep as string if parsing fails
-        }
-      }
+    const docsWithPermissions = await Promise.all(
+      documents.map(async doc => {
+        let content = doc.content
 
-      return {
-        ...doc,
-        id: doc._id,
-        content,
-        canEdit: true,
-        canComment: true,
-        lastUpdated: doc.lastUpdated || Date.now()
-      }
-    }))
+        // Only include content if metadataOnly is not set to true
+        if (metadataOnly === 'true') {
+          content = undefined
+        } else if (typeof content === 'string') {
+          // Try to parse stringified JSON
+          try {
+            content = JSON.parse(content)
+          } catch (e) {
+            console.log(`Warning: Could not parse content for document ${doc._id}`)
+            // Keep as string if parsing fails
+          }
+        }
+
+        return {
+          ...doc,
+          id: doc._id,
+          content,
+          canEdit: true,
+          canComment: true,
+          lastUpdated: doc.lastUpdated || Date.now(),
+        }
+      }),
+    )
 
     res.status(200).json(docsWithPermissions as DocumentData[])
   },
@@ -137,7 +139,7 @@ export default withHybridAuth(async function documentsHandler(req: ExtendedApiRe
       headers: req.headers,
       method,
       url: req.url,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     })
     res.status(401).end('Unauthorized')
     return
@@ -160,7 +162,7 @@ export default withHybridAuth(async function documentsHandler(req: ExtendedApiRe
       method,
       url: req.url,
       user: user.sub,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     })
     res.status(500).end('Internal Server Error')
   }

@@ -52,7 +52,7 @@ const apiContextDefaultValue: apiContextType = {
   patch: async () => ({ data: {} }),
   destroy: async () => {},
   get: async () => ({ data: {} }),
-  delete: async () => ({ data: {} })
+  delete: async () => ({ data: {} }),
 }
 
 const APIContext = createContext<apiContextType>(apiContextDefaultValue)
@@ -134,17 +134,17 @@ export function NavigationProvider({
     }
   }
 
-  const value = { 
+  const value = {
     navigateTo: (path: string) => {
       // Clear tree state when navigating to documents list
       if (path === '/documents') {
         clearTreeState()
       }
       navigateTo(path)
-    }, 
-    getLocation, 
+    },
+    getLocation,
     signOut,
-    clearTreeState
+    clearTreeState,
   }
 
   return <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>

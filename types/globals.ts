@@ -59,7 +59,6 @@ export enum UserPermission {
 
 export type AnimationState = 'Active' | 'Complete' | 'Inactive'
 
-
 export type FolderData = {
   _id: string
   id?: string // Added for compatibility with frontend

@@ -15,16 +15,11 @@ interface VersionListProps {
   currentContent: any
 }
 
-const VersionList = ({ 
-  documentId, 
-  onRestore, 
-  onCompare,
-  currentContent 
-}: VersionListProps) => {
+const VersionList = ({ documentId, onRestore, onCompare, currentContent }: VersionListProps) => {
   const api = useAPI()
   const [versionToDelete, setVersionToDelete] = useState<VersionData | null>(null)
   const [selectedVersion, setSelectedVersion] = useState<VersionData | null>(null)
-  
+
   const fetcher = useCallback(
     async (path: string) => {
       return await api.get(path)
@@ -34,7 +29,7 @@ const VersionList = ({
 
   const { data: versions = [], isLoading } = useSWR<VersionData[]>(
     `/documents/${documentId}/versions`,
-    fetcher
+    fetcher,
   )
 
   const handleCreateVersion = async () => {
@@ -46,7 +41,7 @@ const VersionList = ({
 
       console.log('Fetching document for version creation:', documentId)
       const doc = await api.get(`/documents/${documentId}`)
-      
+
       if (!doc) {
         console.error('Document not found')
         return
@@ -59,14 +54,14 @@ const VersionList = ({
         content: doc.content,
         createdAt: Date.now(),
         name: '',
-        ownerId: doc.ownerId // Use the document's owner ID
+        ownerId: doc.ownerId, // Use the document's owner ID
       }
 
       // Optimistically update the versions list
       mutate(
         `/documents/${documentId}/versions`,
         (currentVersions: VersionData[] = []) => [optimisticVersion, ...currentVersions],
-        false
+        false,
       )
 
       console.log('Creating version for document:', documentId)
@@ -74,15 +69,15 @@ const VersionList = ({
         documentId,
         content: doc.content,
         createdAt: optimisticVersion.createdAt,
-        name: ''
+        name: '',
       })
 
       // Update with the real version from the server, without we cant delete properly
       mutate(
         `/documents/${documentId}/versions`,
-        (currentVersions: VersionData[] = []) => 
-          currentVersions.map(v => v.id === optimisticVersion.id ? newVersion : v),
-        false
+        (currentVersions: VersionData[] = []) =>
+          currentVersions.map(v => (v.id === optimisticVersion.id ? newVersion : v)),
+        false,
       )
 
       console.log('Version created successfully')
@@ -123,13 +118,12 @@ const VersionList = ({
   if (isLoading) {
     return (
       <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between mb-2">
+        <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-gray-400">Versions</h2>
           <button
             onClick={handleCreateVersion}
-            className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <PlusIcon className="w-4 h-4" />
+            className="p-1 text-gray-400 transition-colors hover:text-gray-600">
+            <PlusIcon className="h-4 w-4" />
           </button>
         </div>
         <div className="flex h-full items-center justify-center">
@@ -142,13 +136,12 @@ const VersionList = ({
   if (versions.length === 0) {
     return (
       <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between mb-2">
+        <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-gray-400">Versions</h2>
           <button
             onClick={handleCreateVersion}
-            className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <PlusIcon className="w-4 h-4" />
+            className="p-1 text-gray-400 transition-colors hover:text-gray-600">
+            <PlusIcon className="h-4 w-4" />
           </button>
         </div>
         <div className="flex h-full items-center justify-center">
@@ -160,71 +153,69 @@ const VersionList = ({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between mb-2">
+      <div className="mb-2 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-gray-400">
           {selectedVersion ? 'Comparing Version' : 'Versions'}
         </h2>
         <button
           onClick={handleCreateVersion}
-          className={`p-1 text-gray-400 hover:text-gray-600 transition-colors ${
+          className={`p-1 text-gray-400 transition-colors hover:text-gray-600 ${
             selectedVersion ? 'invisible' : ''
-          }`}
-        >
-          <PlusIcon className="w-4 h-4" />
+          }`}>
+          <PlusIcon className="h-4 w-4" />
         </button>
       </div>
 
-      {[...versions].sort((a, b) => b.createdAt - a.createdAt).map((version) => (
-        <ListItem
-          key={version.id}
-          label={new Date(version.createdAt).toLocaleString()}
-          leftIcon={<ClockIcon className="w-4 h-4" />}
-          theme="dark"
-          isSelected={version === selectedVersion}
-          rightContent={
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-              <button
-                onClick={() => handleCompareClick(version)}
-                className={`p-1 ${
-                  version === selectedVersion 
-                    ? 'text-gray-600' 
-                    : 'text-gray-400 hover:text-gray-600'
-                } transition-colors`}
-                title={version === selectedVersion ? "Exit comparison" : "Compare with current"}
-              >
-                <EyeIcon className="w-4 h-4" />
-              </button>
-              {!selectedVersion && (
-                <>
-                  <button
-                    onClick={() => onRestore(version)}
-                    className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                    title="Restore version"
-                  >
-                    <RewindIcon className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteClick(version)}
-                    className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                    title="Delete version"
-                  >
-                    <TrashIcon className="w-4 h-4" />
-                  </button>
-                </>
-              )}
-            </div>
-          }
-        />
-      ))}
+      {[...versions]
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .map(version => (
+          <ListItem
+            key={version.id}
+            label={new Date(version.createdAt).toLocaleString()}
+            leftIcon={<ClockIcon className="h-4 w-4" />}
+            theme="dark"
+            isSelected={version === selectedVersion}
+            rightContent={
+              <div className="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                <button
+                  onClick={() => handleCompareClick(version)}
+                  className={`p-1 ${
+                    version === selectedVersion ? 'text-gray-600' : 'text-gray-400 hover:text-gray-600'
+                  } transition-colors`}
+                  title={version === selectedVersion ? 'Exit comparison' : 'Compare with current'}>
+                  <EyeIcon className="h-4 w-4" />
+                </button>
+                {!selectedVersion && (
+                  <>
+                    <button
+                      onClick={() => onRestore(version)}
+                      className="p-1 text-gray-400 transition-colors hover:text-gray-600"
+                      title="Restore version">
+                      <RewindIcon className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteClick(version)}
+                      className="p-1 text-gray-400 transition-colors hover:text-gray-600"
+                      title="Delete version">
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  </>
+                )}
+              </div>
+            }
+          />
+        ))}
 
       <DeleteModal
         open={!!versionToDelete}
         onClose={() => setVersionToDelete(null)}
         onConfirm={handleDeleteVersion}
-        documentTitle={versionToDelete ? `version from ${new Date(versionToDelete.createdAt).toLocaleString()}` : ''}
+        documentTitle={
+          versionToDelete ? `version from ${new Date(versionToDelete.createdAt).toLocaleString()}` : ''
+        }
       />
     </div>
   )
 }
 
-export default VersionList 
+export default VersionList

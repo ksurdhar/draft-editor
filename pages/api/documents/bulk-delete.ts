@@ -8,7 +8,7 @@ async function getFolderDepth(folderId: string, cache = new Map<string, number>(
     return cache.get(folderId)!
   }
 
-  const folders = await storage.find('folders', { _id: folderId }) as FolderData[]
+  const folders = (await storage.find('folders', { _id: folderId })) as FolderData[]
   const folder = folders[0]
   if (!folder || !folder.parentId || folder.parentId === 'root') {
     cache.set(folderId, 0)
@@ -27,18 +27,15 @@ async function deleteFolder(folderId: string, userId: string, deletedFolders = n
     return true
   }
 
-  
   // Get all documents and subfolders in this folder
   const [docs, subfolders] = await Promise.all([
     storage.find('documents', { parentId: folderId }),
-    storage.find('folders', { parentId: folderId }) as Promise<FolderData[]>
+    storage.find('folders', { parentId: folderId }) as Promise<FolderData[]>,
   ])
 
   // Delete all documents in this folder
   if (docs.length > 0) {
-    await Promise.all(
-      docs.map(doc => storage.delete('documents', { _id: doc._id, userId }))
-    )
+    await Promise.all(docs.map(doc => storage.delete('documents', { _id: doc._id, userId })))
   }
 
   // Delete all subfolders
@@ -51,11 +48,11 @@ async function deleteFolder(folderId: string, userId: string, deletedFolders = n
 
   // Delete the folder itself
   let result = await storage.delete('folders', { _id: folderId, userId })
-  
+
   if (!result) {
     result = await storage.delete('folders', { _id: folderId, userId: 'current' })
   }
-  
+
   if (!result) {
     throw new Error(`Failed to delete folder ${folderId}`)
   }
@@ -64,7 +61,10 @@ async function deleteFolder(folderId: string, userId: string, deletedFolders = n
   return result
 }
 
-export default withHybridAuth(async function bulkDeleteHandler(req: ExtendedApiRequest, res: NextApiResponse) {
+export default withHybridAuth(async function bulkDeleteHandler(
+  req: ExtendedApiRequest,
+  res: NextApiResponse,
+) {
   const { method, user, body } = req
 
   if (!user) {
@@ -81,7 +81,6 @@ export default withHybridAuth(async function bulkDeleteHandler(req: ExtendedApiR
   const { documentIds, folderIds } = body
 
   if (!Array.isArray(documentIds) || !Array.isArray(folderIds)) {
-    
     return res.status(400).json({ error: 'Invalid request body' })
   }
 
@@ -92,7 +91,7 @@ export default withHybridAuth(async function bulkDeleteHandler(req: ExtendedApiR
         documentIds.map(async id => {
           try {
             const result = await storage.delete('documents', { _id: id, userId: user.sub })
-            
+
             if (!result) {
               throw new Error(`Document not found or unauthorized: ${id}`)
             }
@@ -101,24 +100,23 @@ export default withHybridAuth(async function bulkDeleteHandler(req: ExtendedApiR
             console.error(`Error deleting document ${id}:`, err)
             throw err
           }
-        })
+        }),
       )
     }
 
     // Delete folders in order of depth (deepest first)
     if (folderIds.length > 0) {
-      
       // Get depths for all folders
       const folderDepths = await Promise.all(
         folderIds.map(async id => ({
           id,
-          depth: await getFolderDepth(id)
-        }))
+          depth: await getFolderDepth(id),
+        })),
       )
 
       // Sort by depth (deepest first)
       const sortedFolders = folderDepths.sort((a, b) => b.depth - a.depth)
-      
+
       // Delete folders sequentially
       const deletedFolders = new Set<string>()
       for (const { id } of sortedFolders) {
@@ -133,9 +131,9 @@ export default withHybridAuth(async function bulkDeleteHandler(req: ExtendedApiR
     res.status(200).json({ success: true })
   } catch (error: any) {
     console.error('Bulk delete error:', error)
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to delete items',
-      details: error.message || 'Unknown error occurred'
+      details: error.message || 'Unknown error occurred',
     })
   }
-}) 
+})

@@ -121,15 +121,12 @@ const HeaderComponent = ({ id }: HeaderProps) => {
 
     try {
       await importFiles(files, user.sub, { post }, () => {
-        Promise.all([
-          mutate('/documents'),
-          mutateFolders()
-        ])
+        Promise.all([mutate('/documents'), mutateFolders()])
       })
     } catch (error: any) {
       console.error('Error importing files:', error)
     }
-    
+
     setMenuOpen(false)
     event.target.value = ''
   }
@@ -144,7 +141,7 @@ const HeaderComponent = ({ id }: HeaderProps) => {
         {...({
           webkitdirectory: '',
           directory: '',
-          multiple: true
+          multiple: true,
         } as DirectoryInputProps)}
       />
       <header
@@ -153,17 +150,11 @@ const HeaderComponent = ({ id }: HeaderProps) => {
         } fixed top-0 z-[39] flex w-[100vw] flex-row justify-between p-5 pb-[30px] transition-opacity duration-700 hover:opacity-100`}>
         <h1 className="lowercase">
           {user ? (
-            <button 
-              onClick={() => navigateTo('/documents')}
-              className="hover:opacity-80"
-            >
+            <button onClick={() => navigateTo('/documents')} className="hover:opacity-80">
               whetstone
             </button>
           ) : (
-            <button 
-              onClick={() => navigateTo('/')}
-              className="hover:opacity-80"
-            >
+            <button onClick={() => navigateTo('/')} className="hover:opacity-80">
               whetstone
             </button>
           )}

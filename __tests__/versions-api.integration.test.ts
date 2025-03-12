@@ -14,7 +14,7 @@ describe('Versions API Integration Tests', () => {
   beforeAll(async () => {
     await Promise.all([
       Doc.deleteMany({ userId: mockUser.sub }),
-      Version.deleteMany({ ownerId: mockUser.sub })
+      Version.deleteMany({ ownerId: mockUser.sub }),
     ])
   }, 10000)
 
@@ -29,7 +29,7 @@ describe('Versions API Integration Tests', () => {
     // Clean up only the documents and versions we created
     await Promise.all([
       Doc.deleteMany({ userId: mockUser.sub }),
-      Version.deleteMany({ ownerId: mockUser.sub })
+      Version.deleteMany({ ownerId: mockUser.sub }),
     ])
   }, 10000)
 
@@ -40,7 +40,7 @@ describe('Versions API Integration Tests', () => {
       // Clear all documents and versions for our test user
       await Promise.all([
         Doc.deleteMany({ userId: mockUser.sub }),
-        Version.deleteMany({ ownerId: mockUser.sub })
+        Version.deleteMany({ ownerId: mockUser.sub }),
       ])
       // Clear the tracking arrays
       testDocIds = []
@@ -51,9 +51,9 @@ describe('Versions API Integration Tests', () => {
         title: 'Test Document for Versions',
         content: JSON.stringify({
           type: 'doc',
-          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original content' }] }]
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original content' }] }],
         }),
-        userId: mockUser.sub
+        userId: mockUser.sub,
       })
       testDocIds.push(testDoc._id.toString())
     }, 10000)
@@ -62,13 +62,13 @@ describe('Versions API Integration Tests', () => {
       // Clean up only the documents and versions we created
       await Promise.all([
         Doc.deleteMany({ userId: mockUser.sub }),
-        Version.deleteMany({ ownerId: mockUser.sub })
+        Version.deleteMany({ ownerId: mockUser.sub }),
       ])
     }, 10000)
 
     it('should return an empty array when no versions exist', async () => {
       const response = await axios.get(`${API_URL}/documents/${testDoc._id}/versions`)
-      
+
       expect(response.status).toBe(200)
       expect(Array.isArray(response.data)).toBe(true)
       expect(response.data.length).toBe(0)
@@ -78,12 +78,12 @@ describe('Versions API Integration Tests', () => {
       // Create some versions for the test document
       const version1Content = {
         type: 'doc',
-        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Version 1 content' }] }]
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Version 1 content' }] }],
       }
-      
+
       const version2Content = {
         type: 'doc',
-        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Version 2 content' }] }]
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Version 2 content' }] }],
       }
 
       // Create versions directly in the database
@@ -94,7 +94,7 @@ describe('Versions API Integration Tests', () => {
           name: 'Version 1',
           content: JSON.stringify(version1Content),
           createdAt: Date.now() - 1000,
-          wordCount: 3
+          wordCount: 3,
         }),
         Version.create({
           documentId: testDoc._id.toString(),
@@ -102,29 +102,29 @@ describe('Versions API Integration Tests', () => {
           name: 'Version 2',
           content: JSON.stringify(version2Content),
           createdAt: Date.now(),
-          wordCount: 3
-        })
+          wordCount: 3,
+        }),
       ])
 
       const response = await axios.get(`${API_URL}/documents/${testDoc._id}/versions`)
-      
+
       expect(response.status).toBe(200)
       expect(Array.isArray(response.data)).toBe(true)
       expect(response.data.length).toBe(2)
-      
+
       // Find versions by name in the response
       const version1 = response.data.find((v: any) => v.name === 'Version 1')
       const version2 = response.data.find((v: any) => v.name === 'Version 2')
-      
+
       // Verify both versions exist
       expect(version1).toBeDefined()
       expect(version2).toBeDefined()
-      
+
       // Content should be parsed from JSON string to object
       expect(typeof version1.content).toBe('object')
       expect(version1.content.type).toBe('doc')
       expect(version1.content.content[0].content[0].text).toBe('Version 1 content')
-      
+
       expect(typeof version2.content).toBe('object')
       expect(version2.content.type).toBe('doc')
       expect(version2.content.content[0].content[0].text).toBe('Version 2 content')
@@ -132,9 +132,10 @@ describe('Versions API Integration Tests', () => {
 
     it('should return 404 for non-existent document', async () => {
       const nonExistentId = new mongoose.Types.ObjectId().toString()
-      const response = await axios.get(`${API_URL}/documents/${nonExistentId}/versions`)
+      const response = await axios
+        .get(`${API_URL}/documents/${nonExistentId}/versions`)
         .catch(error => error.response)
-      
+
       expect(response.status).toBe(404)
       expect(response.data.error).toBe('Document not found')
     }, 10000)
@@ -144,12 +145,13 @@ describe('Versions API Integration Tests', () => {
       const otherUserDoc = await Doc.create({
         title: 'Other User Document',
         content: JSON.stringify({ type: 'doc', content: [] }),
-        userId: 'different-user-id' // Not the mock user
+        userId: 'different-user-id', // Not the mock user
       })
 
-      const response = await axios.get(`${API_URL}/documents/${otherUserDoc._id}/versions`)
+      const response = await axios
+        .get(`${API_URL}/documents/${otherUserDoc._id}/versions`)
         .catch(error => error.response)
-      
+
       expect(response.status).toBe(403)
       expect(response.data.error).toBe('Not authorized to access this document')
     }, 10000)
@@ -162,7 +164,7 @@ describe('Versions API Integration Tests', () => {
       // Clear all documents and versions for our test user
       await Promise.all([
         Doc.deleteMany({ userId: mockUser.sub }),
-        Version.deleteMany({ ownerId: mockUser.sub })
+        Version.deleteMany({ ownerId: mockUser.sub }),
       ])
       // Clear the tracking arrays
       testDocIds = []
@@ -173,9 +175,9 @@ describe('Versions API Integration Tests', () => {
         title: 'Test Document for Creating Versions',
         content: JSON.stringify({
           type: 'doc',
-          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original content' }] }]
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original content' }] }],
         }),
-        userId: mockUser.sub
+        userId: mockUser.sub,
       })
       testDocIds.push(testDoc._id.toString())
     }, 10000)
@@ -184,7 +186,7 @@ describe('Versions API Integration Tests', () => {
       // Clean up only the documents and versions we created
       await Promise.all([
         Doc.deleteMany({ userId: mockUser.sub }),
-        Version.deleteMany({ ownerId: mockUser.sub })
+        Version.deleteMany({ ownerId: mockUser.sub }),
       ])
     }, 10000)
 
@@ -193,28 +195,28 @@ describe('Versions API Integration Tests', () => {
         name: 'New Version',
         content: {
           type: 'doc',
-          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'New version content' }] }]
-        }
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'New version content' }] }],
+        },
       }
 
       const response = await axios.post(`${API_URL}/documents/${testDoc._id}/versions`, versionData)
-      
+
       expect(response.status).toBe(200)
       expect(response.data).toHaveProperty('id')
       expect(response.data.name).toBe('New Version')
       expect(response.data.documentId).toBe(testDoc._id.toString())
       expect(response.data.ownerId).toBe(mockUser.sub)
-      
+
       // Content should be returned as an object
       expect(typeof response.data.content).toBe('object')
       expect(response.data.content.type).toBe('doc')
       expect(response.data.content.content[0].content[0].text).toBe('New version content')
-      
+
       // Verify version was saved in database
       const savedVersion = await Version.findById(response.data.id)
       expect(savedVersion).not.toBeNull()
       expect(savedVersion?.name).toBe('New Version')
-      
+
       // Content should be stored as a string in the database
       expect(typeof savedVersion?.content).toBe('string')
       const parsedContent = JSON.parse(savedVersion?.content as string)
@@ -224,27 +226,27 @@ describe('Versions API Integration Tests', () => {
     it('should create a new version with string content', async () => {
       const contentString = JSON.stringify({
         type: 'doc',
-        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'String content version' }] }]
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'String content version' }] }],
       })
 
       const versionData = {
         name: 'String Content Version',
-        content: contentString
+        content: contentString,
       }
 
       const response = await axios.post(`${API_URL}/documents/${testDoc._id}/versions`, versionData)
-      
+
       expect(response.status).toBe(200)
       expect(response.data.name).toBe('String Content Version')
-      
+
       // Content should be returned as an object
       expect(typeof response.data.content).toBe('object')
       expect(response.data.content.type).toBe('doc')
-      
+
       // Verify version was saved in database
       const savedVersion = await Version.findById(response.data.id)
       expect(savedVersion).not.toBeNull()
-      
+
       // Content should be stored as a string in the database
       expect(typeof savedVersion?.content).toBe('string')
       expect(() => JSON.parse(savedVersion?.content as string)).not.toThrow()
@@ -253,21 +255,21 @@ describe('Versions API Integration Tests', () => {
     it('should handle non-JSON string content', async () => {
       const versionData = {
         name: 'Plain Text Version',
-        content: 'This is plain text, not JSON'
+        content: 'This is plain text, not JSON',
       }
 
       const response = await axios.post(`${API_URL}/documents/${testDoc._id}/versions`, versionData)
-      
+
       expect(response.status).toBe(200)
       expect(response.data.name).toBe('Plain Text Version')
-      
+
       // Verify version was saved in database
       const savedVersion = await Version.findById(response.data.id)
       expect(savedVersion).not.toBeNull()
-      
+
       // Content should be stored as a string in the database
       expect(typeof savedVersion?.content).toBe('string')
-      
+
       // The string should be wrapped in JSON
       const parsedContent = JSON.parse(savedVersion?.content as string)
       expect(parsedContent).toBe('This is plain text, not JSON')
@@ -275,25 +277,27 @@ describe('Versions API Integration Tests', () => {
 
     it('should require content in the request', async () => {
       const versionData = {
-        name: 'Missing Content Version'
+        name: 'Missing Content Version',
         // content is missing
       }
 
-      const response = await axios.post(`${API_URL}/documents/${testDoc._id}/versions`, versionData)
+      const response = await axios
+        .post(`${API_URL}/documents/${testDoc._id}/versions`, versionData)
         .catch(error => error.response)
-      
+
       expect(response.status).toBe(400)
       expect(response.data.error).toBe('Content is required')
     }, 10000)
 
     it('should return 404 for non-existent document', async () => {
       const nonExistentId = new mongoose.Types.ObjectId().toString()
-      const response = await axios.post(`${API_URL}/documents/${nonExistentId}/versions`, {
-        name: 'Version for Non-existent Doc',
-        content: { type: 'doc', content: [] }
-      })
+      const response = await axios
+        .post(`${API_URL}/documents/${nonExistentId}/versions`, {
+          name: 'Version for Non-existent Doc',
+          content: { type: 'doc', content: [] },
+        })
         .catch(error => error.response)
-      
+
       expect(response.status).toBe(404)
       expect(response.data.error).toBe('Document not found')
     }, 10000)
@@ -307,7 +311,7 @@ describe('Versions API Integration Tests', () => {
       // Clear all documents and versions for our test user
       await Promise.all([
         Doc.deleteMany({ userId: mockUser.sub }),
-        Version.deleteMany({ ownerId: mockUser.sub })
+        Version.deleteMany({ ownerId: mockUser.sub }),
       ])
       // Clear the tracking arrays
       testDocIds = []
@@ -318,9 +322,9 @@ describe('Versions API Integration Tests', () => {
         title: 'Test Document for Deleting Versions',
         content: JSON.stringify({
           type: 'doc',
-          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original content' }] }]
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original content' }] }],
         }),
-        userId: mockUser.sub
+        userId: mockUser.sub,
       })
       testDocIds.push(testDoc._id.toString())
 
@@ -331,10 +335,10 @@ describe('Versions API Integration Tests', () => {
         name: 'Version to Delete',
         content: JSON.stringify({
           type: 'doc',
-          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Version content' }] }]
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Version content' }] }],
         }),
         createdAt: Date.now(),
-        wordCount: 2
+        wordCount: 2,
       })
       testVersionIds.push(testVersion._id.toString())
     }, 10000)
@@ -343,45 +347,51 @@ describe('Versions API Integration Tests', () => {
       // Clean up only the documents and versions we created
       await Promise.all([
         Doc.deleteMany({ userId: mockUser.sub }),
-        Version.deleteMany({ ownerId: mockUser.sub })
+        Version.deleteMany({ ownerId: mockUser.sub }),
       ])
     }, 10000)
 
     it('should delete a version by ID', async () => {
-      const response = await axios.delete(`${API_URL}/documents/${testDoc._id}/versions?versionId=${testVersion._id}`)
-      
+      const response = await axios.delete(
+        `${API_URL}/documents/${testDoc._id}/versions?versionId=${testVersion._id}`,
+      )
+
       expect(response.status).toBe(200)
       expect(response.data.success).toBe(true)
-      
+
       // Verify version was deleted from database
       const deletedVersion = await Version.findById(testVersion._id)
       expect(deletedVersion).toBeNull()
     }, 10000)
 
     it('should require a version ID', async () => {
-      const response = await axios.delete(`${API_URL}/documents/${testDoc._id}/versions`)
+      const response = await axios
+        .delete(`${API_URL}/documents/${testDoc._id}/versions`)
         .catch(error => error.response)
-      
+
       expect(response.status).toBe(400)
       expect(response.data.error).toBe('Version ID is required')
     }, 10000)
 
     it('should return 404 for non-existent document', async () => {
       const nonExistentId = new mongoose.Types.ObjectId().toString()
-      const response = await axios.delete(`${API_URL}/documents/${nonExistentId}/versions?versionId=${testVersion._id}`)
+      const response = await axios
+        .delete(`${API_URL}/documents/${nonExistentId}/versions?versionId=${testVersion._id}`)
         .catch(error => error.response)
-      
+
       expect(response.status).toBe(404)
       expect(response.data.error).toBe('Document not found')
     }, 10000)
 
     it('should handle deleting non-existent version gracefully', async () => {
       const nonExistentVersionId = new mongoose.Types.ObjectId().toString()
-      const response = await axios.delete(`${API_URL}/documents/${testDoc._id}/versions?versionId=${nonExistentVersionId}`)
-      
+      const response = await axios.delete(
+        `${API_URL}/documents/${testDoc._id}/versions?versionId=${nonExistentVersionId}`,
+      )
+
       // The API should still return success even if the version doesn't exist
       expect(response.status).toBe(200)
       expect(response.data.success).toBe(true)
     }, 10000)
   })
-}) 
+})

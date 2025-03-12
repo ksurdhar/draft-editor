@@ -11,10 +11,7 @@ describe('Folders API Integration Tests', () => {
 
   // Clean up any existing test folders before running any tests
   beforeAll(async () => {
-    await Promise.all([
-      Doc.deleteMany({ userId: mockUser.sub }),
-      Folder.deleteMany({ userId: mockUser.sub })
-    ])
+    await Promise.all([Doc.deleteMany({ userId: mockUser.sub }), Folder.deleteMany({ userId: mockUser.sub })])
   }, 10000)
 
   // Reset the tracking array before each test suite
@@ -25,10 +22,7 @@ describe('Folders API Integration Tests', () => {
   // Only clean up test data after all tests, don't stop the server
   afterAll(async () => {
     // Clean up only the folders and documents we created
-    await Promise.all([
-      Doc.deleteMany({ userId: mockUser.sub }),
-      Folder.deleteMany({ userId: mockUser.sub })
-    ])
+    await Promise.all([Doc.deleteMany({ userId: mockUser.sub }), Folder.deleteMany({ userId: mockUser.sub })])
   }, 10000)
 
   describe('GET /api/folders', () => {
@@ -51,7 +45,7 @@ describe('Folders API Integration Tests', () => {
         parentId: 'root',
         userId: mockUser.sub,
         lastUpdated: Date.now(),
-        folderIndex: 0
+        folderIndex: 0,
       })
       testFolderIds.push(folder1._id.toString())
 
@@ -60,30 +54,30 @@ describe('Folders API Integration Tests', () => {
         parentId: 'root',
         userId: mockUser.sub,
         lastUpdated: Date.now(),
-        folderIndex: 1
+        folderIndex: 1,
       })
       testFolderIds.push(folder2._id.toString())
 
       // Get only folders for our test user
       const response = await axios.get(`${API_URL}/folders?userId=${mockUser.sub}`)
-      
+
       expect(response.status).toBe(200)
       expect(Array.isArray(response.data)).toBe(true)
       expect(response.data.length).toBe(2)
-      
+
       // Find folders by title in the response
       const responseFolder1 = response.data.find((f: any) => f.title === 'Test Folder 1')
       const responseFolder2 = response.data.find((f: any) => f.title === 'Test Folder 2')
-      
+
       // Verify both folders exist in the response
       expect(responseFolder1).toBeDefined()
       expect(responseFolder2).toBeDefined()
-      
+
       // Verify folder properties
       expect(responseFolder1.parentId).toBe('root')
       expect(responseFolder1.userId).toBe(mockUser.sub)
       expect(responseFolder1.folderIndex).toBe(0)
-      
+
       expect(responseFolder2.parentId).toBe('root')
       expect(responseFolder2.userId).toBe(mockUser.sub)
       expect(responseFolder2.folderIndex).toBe(1)
@@ -107,11 +101,11 @@ describe('Folders API Integration Tests', () => {
       const folderData = {
         title: 'New Test Folder',
         parentId: 'root',
-        userId: mockUser.sub
+        userId: mockUser.sub,
       }
 
       const response = await axios.post(`${API_URL}/folders`, folderData)
-      
+
       expect(response.status).toBe(201)
       expect(response.data).toHaveProperty('_id')
       expect(response.data.title).toBe('New Test Folder')
@@ -119,7 +113,7 @@ describe('Folders API Integration Tests', () => {
       expect(response.data.userId).toBe(mockUser.sub)
       expect(response.data.folderIndex).toBe(0)
       expect(response.data).toHaveProperty('lastUpdated')
-      
+
       // Verify folder was saved in database
       const savedFolder = await Folder.findById(response.data._id)
       expect(savedFolder).not.toBeNull()
@@ -128,20 +122,24 @@ describe('Folders API Integration Tests', () => {
 
     it('should require title and userId', async () => {
       // Missing title
-      const response1 = await axios.post(`${API_URL}/folders`, {
-        userId: mockUser.sub,
-        parentId: 'root'
-      }).catch(error => error.response)
-      
+      const response1 = await axios
+        .post(`${API_URL}/folders`, {
+          userId: mockUser.sub,
+          parentId: 'root',
+        })
+        .catch(error => error.response)
+
       expect(response1.status).toBe(400)
       expect(response1.data.error).toBe('Missing required fields')
-      
+
       // Missing userId
-      const response2 = await axios.post(`${API_URL}/folders`, {
-        title: 'Test Folder',
-        parentId: 'root'
-      }).catch(error => error.response)
-      
+      const response2 = await axios
+        .post(`${API_URL}/folders`, {
+          title: 'Test Folder',
+          parentId: 'root',
+        })
+        .catch(error => error.response)
+
       expect(response2.status).toBe(400)
       expect(response2.data.error).toBe('Missing required fields')
     }, 10000)
@@ -155,14 +153,14 @@ describe('Folders API Integration Tests', () => {
       await Folder.deleteMany({ userId: mockUser.sub })
       // Clear the tracking array
       testFolderIds = []
-      
+
       // Create a test folder
       testFolder = await Folder.create({
         title: 'Test Folder for Update',
         parentId: 'root',
         userId: mockUser.sub,
         lastUpdated: Date.now() - 10000,
-        folderIndex: 0
+        folderIndex: 0,
       })
       testFolderIds.push(testFolder._id.toString())
     }, 10000)
@@ -175,18 +173,18 @@ describe('Folders API Integration Tests', () => {
     it('should update a folder', async () => {
       const updateData = {
         title: 'Updated Folder Title',
-        folderIndex: 5
+        folderIndex: 5,
       }
 
       const response = await axios.patch(`${API_URL}/folders/${testFolder._id}`, updateData)
-      
+
       expect(response.status).toBe(200)
       expect(response.data.title).toBe('Updated Folder Title')
       expect(response.data.folderIndex).toBe(5)
       expect(response.data.parentId).toBe('root') // Unchanged
       expect(response.data.userId).toBe(mockUser.sub) // Unchanged
       expect(response.data.lastUpdated).toBeGreaterThan(testFolder.lastUpdated)
-      
+
       // Verify folder was updated in database
       const updatedFolder = await Folder.findById(testFolder._id)
       expect(updatedFolder).not.toBeNull()
@@ -196,10 +194,12 @@ describe('Folders API Integration Tests', () => {
 
     it('should return 404 for non-existent folder', async () => {
       const nonExistentId = new mongoose.Types.ObjectId().toString()
-      const response = await axios.patch(`${API_URL}/folders/${nonExistentId}`, {
-        title: 'Updated Title'
-      }).catch(error => error.response)
-      
+      const response = await axios
+        .patch(`${API_URL}/folders/${nonExistentId}`, {
+          title: 'Updated Title',
+        })
+        .catch(error => error.response)
+
       expect(response.status).toBe(404)
       expect(response.data.error).toBe('Folder not found')
     }, 10000)
@@ -214,54 +214,54 @@ describe('Folders API Integration Tests', () => {
       // Clear all folders and documents for our test user
       await Promise.all([
         Doc.deleteMany({ userId: mockUser.sub }),
-        Folder.deleteMany({ userId: mockUser.sub })
+        Folder.deleteMany({ userId: mockUser.sub }),
       ])
       // Clear the tracking array
       testFolderIds = []
-      
+
       // Create test folders
       emptyFolder = await Folder.create({
         title: 'Empty Folder',
         parentId: 'root',
         userId: mockUser.sub,
         lastUpdated: Date.now(),
-        folderIndex: 0
+        folderIndex: 0,
       })
       testFolderIds.push(emptyFolder._id.toString())
-      
+
       folderWithDocs = await Folder.create({
         title: 'Folder With Documents',
         parentId: 'root',
         userId: mockUser.sub,
         lastUpdated: Date.now(),
-        folderIndex: 1
+        folderIndex: 1,
       })
       testFolderIds.push(folderWithDocs._id.toString())
-      
+
       folderWithSubfolders = await Folder.create({
         title: 'Folder With Subfolders',
         parentId: 'root',
         userId: mockUser.sub,
         lastUpdated: Date.now(),
-        folderIndex: 2
+        folderIndex: 2,
       })
       testFolderIds.push(folderWithSubfolders._id.toString())
-      
+
       // Create a document in folderWithDocs
       await Doc.create({
         title: 'Test Document',
         content: JSON.stringify({ type: 'doc', content: [] }),
         userId: mockUser.sub,
-        location: folderWithDocs._id.toString()
+        location: folderWithDocs._id.toString(),
       })
-      
+
       // Create a subfolder in folderWithSubfolders
       const subfolder = await Folder.create({
         title: 'Subfolder',
         parentId: folderWithSubfolders._id.toString(),
         userId: mockUser.sub,
         lastUpdated: Date.now(),
-        folderIndex: 0
+        folderIndex: 0,
       })
       testFolderIds.push(subfolder._id.toString())
     }, 10000)
@@ -270,15 +270,15 @@ describe('Folders API Integration Tests', () => {
       // Clean up only the folders and documents we created
       await Promise.all([
         Doc.deleteMany({ userId: mockUser.sub }),
-        Folder.deleteMany({ userId: mockUser.sub })
+        Folder.deleteMany({ userId: mockUser.sub }),
       ])
     }, 10000)
 
     it('should delete an empty folder', async () => {
       const response = await axios.delete(`${API_URL}/folders/${emptyFolder._id}`)
-      
+
       expect(response.status).toBe(204)
-      
+
       // Verify folder was deleted from database
       const deletedFolder = await Folder.findById(emptyFolder._id)
       expect(deletedFolder).toBeNull()
@@ -290,17 +290,17 @@ describe('Folders API Integration Tests', () => {
       // First verify that the document exists in the folder
       const docsInFolder = await Doc.find({ location: folderWithDocs._id.toString() })
       expect(docsInFolder.length).toBeGreaterThan(0)
-      
+
       const response = await axios.delete(`${API_URL}/folders/${folderWithDocs._id}`)
-      
+
       // Current behavior: API returns 204 even if folder has documents
       // TODO: This should be fixed to return 400 when folder has documents
       expect(response.status).toBe(204)
-      
+
       // Verify folder was deleted from database
       const folder = await Folder.findById(folderWithDocs._id)
       expect(folder).toBeNull()
-      
+
       // Documents with this location will be orphaned
       const orphanedDocs = await Doc.find({ location: folderWithDocs._id.toString() })
       expect(orphanedDocs.length).toBeGreaterThan(0)
@@ -310,13 +310,14 @@ describe('Folders API Integration Tests', () => {
       // First verify that subfolders exist
       const subfolders = await Folder.find({ parentId: folderWithSubfolders._id.toString() })
       expect(subfolders.length).toBeGreaterThan(0)
-      
-      const response = await axios.delete(`${API_URL}/folders/${folderWithSubfolders._id}`)
+
+      const response = await axios
+        .delete(`${API_URL}/folders/${folderWithSubfolders._id}`)
         .catch(error => error.response)
-      
+
       expect(response.status).toBe(400)
       expect(response.data.error).toBe('Cannot delete folder that contains documents or subfolders')
-      
+
       // Verify folder still exists in database
       const folder = await Folder.findById(folderWithSubfolders._id)
       expect(folder).not.toBeNull()
@@ -324,11 +325,12 @@ describe('Folders API Integration Tests', () => {
 
     it('should return 404 for non-existent folder', async () => {
       const nonExistentId = new mongoose.Types.ObjectId().toString()
-      const response = await axios.delete(`${API_URL}/folders/${nonExistentId}`)
+      const response = await axios
+        .delete(`${API_URL}/folders/${nonExistentId}`)
         .catch(error => error.response)
-      
+
       expect(response.status).toBe(404)
       expect(response.data.error).toBe('Folder not found')
     }, 10000)
   })
-}) 
+})

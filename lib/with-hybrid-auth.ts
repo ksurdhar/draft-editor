@@ -56,14 +56,14 @@ const extractBearerToken = async (req: ExtendedApiRequest): Promise<Claims | nul
     console.log('Authorization header validation failed:', {
       exists: !!authHeader,
       startsWith: authHeader ? authHeader.startsWith('Bearer ') : false,
-      value: authHeader ? `${authHeader.substring(0, 20)}...` : 'none'
+      value: authHeader ? `${authHeader.substring(0, 20)}...` : 'none',
     })
     return null
   }
 
   const token = authHeader.split(' ')[1]
   console.log('Successfully extracted token:', token.substring(0, 20) + '...')
-  
+
   const decodedHeader = jwt.decode(token, { complete: true })
   console.log('Decoded token header:', decodedHeader?.header)
 
@@ -71,7 +71,7 @@ const extractBearerToken = async (req: ExtendedApiRequest): Promise<Claims | nul
     console.log('Token decode failed:', {
       hasDecodedHeader: !!decodedHeader,
       isString: typeof decodedHeader === 'string',
-      hasKid: decodedHeader && typeof decodedHeader !== 'string' ? !!decodedHeader.header.kid : false
+      hasKid: decodedHeader && typeof decodedHeader !== 'string' ? !!decodedHeader.header.kid : false,
     })
     throw new Error('Invalid token format')
   }
@@ -89,7 +89,7 @@ const extractBearerToken = async (req: ExtendedApiRequest): Promise<Claims | nul
     console.log('Token verification successful')
     console.log('Verification options:', {
       audience: 'https://www.whetstone-writer.com/api',
-      issuer: `${process.env.AUTH0_ISSUER_BASE_URL}/`
+      issuer: `${process.env.AUTH0_ISSUER_BASE_URL}/`,
     })
 
     if (!decodedUser) {

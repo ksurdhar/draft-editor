@@ -35,4 +35,4 @@ export interface StorageAdapter {
   findById(collection: string, id: string): Promise<any>
   update(collection: string, id: string, data: any): Promise<any>
   delete(collection: string, query: Record<string, any>): Promise<boolean>
-} 
+}

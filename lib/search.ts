@@ -10,7 +10,11 @@ interface SearchOptions {
   wholeWord: boolean
 }
 
-export function findAllMatches(doc: Node, searchTerm: string, options: SearchOptions = { matchCase: false, wholeWord: false }): Match[] {
+export function findAllMatches(
+  doc: Node,
+  searchTerm: string,
+  options: SearchOptions = { matchCase: false, wholeWord: false },
+): Match[] {
   const matches: Match[] = []
   if (!searchTerm) return matches
 
@@ -35,4 +39,4 @@ export function findAllMatches(doc: Node, searchTerm: string, options: SearchOpt
   })
 
   return matches
-} 
+}

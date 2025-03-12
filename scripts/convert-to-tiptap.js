@@ -11,15 +11,17 @@ function isTipTapFormat(content) {
     if (parsed.type !== 'doc' || !Array.isArray(parsed.content)) {
       return false
     }
-    
+
     // Check that all paragraph nodes have correct structure
     return parsed.content.every(node => {
       if (node.type !== 'paragraph') return false
       // Empty paragraphs should not have content array
       if (!node.content) return true
       // Non-empty paragraphs should have text nodes
-      return Array.isArray(node.content) &&
+      return (
+        Array.isArray(node.content) &&
         node.content.every(textNode => textNode.type === 'text' && typeof textNode.text === 'string')
+      )
     })
   } catch (e) {
     return false
@@ -30,37 +32,43 @@ function convertSlateToTipTap(content) {
   try {
     // Parse content if it's a string, otherwise use as is
     const slateContent = typeof content === 'string' ? JSON.parse(content) : content
-    
+
     // Convert from Slate format
     const slateNodes = Array.isArray(slateContent) ? slateContent : [slateContent]
-    
+
     // Create TipTap document structure
     const tipTapDoc = {
       type: 'doc',
-      content: slateNodes.map(node => {
-        if (node.type === 'default' || node.type === 'paragraph') {
-          // For empty paragraphs or those without text content
-          if (!node.children?.length || node.children.every(child => !child.text)) {
-            return { type: 'paragraph' }
+      content: slateNodes
+        .map(node => {
+          if (node.type === 'default' || node.type === 'paragraph') {
+            // For empty paragraphs or those without text content
+            if (!node.children?.length || node.children.every(child => !child.text)) {
+              return { type: 'paragraph' }
+            }
+
+            // Convert Slate block to TipTap paragraph with content
+            return {
+              type: 'paragraph',
+              content: node.children.map(child => ({
+                type: 'text',
+                text: child.text,
+                ...(child.highlight && child.highlight !== 'none'
+                  ? {
+                      marks: [
+                        {
+                          type: 'highlight',
+                          attrs: { color: child.highlight },
+                        },
+                      ],
+                    }
+                  : {}),
+              })),
+            }
           }
-          
-          // Convert Slate block to TipTap paragraph with content
-          return {
-            type: 'paragraph',
-            content: node.children.map(child => ({
-              type: 'text',
-              text: child.text,
-              ...(child.highlight && child.highlight !== 'none' ? {
-                marks: [{
-                  type: 'highlight',
-                  attrs: { color: child.highlight }
-                }]
-              } : {})
-            }))
-          }
-        }
-        return null
-      }).filter(Boolean)
+          return null
+        })
+        .filter(Boolean),
     }
 
     return JSON.stringify(tipTapDoc)
@@ -86,7 +94,8 @@ const db = JSON.parse(fs.readFileSync(backupPath, 'utf8'))
 // Convert each document
 console.log(`Converting ${db.documents.length} documents from ${backupPath}...`)
 db.documents = db.documents.map((doc, index) => {
-  if (index === 0) { // Only log details for the first document
+  if (index === 0) {
+    // Only log details for the first document
     console.log('\n=== Detailed logging for first document ===')
     console.log('Document title:', doc.title)
     console.log('Original content:', doc.content)
@@ -109,7 +118,7 @@ db.documents = db.documents.map((doc, index) => {
     }
     return {
       ...doc,
-      content: convertedContent
+      content: convertedContent,
     }
   } else {
     console.log('Conversion failed, keeping original content')
@@ -120,4 +129,4 @@ db.documents = db.documents.map((doc, index) => {
 // Write to the new database file
 console.log(`\nWriting converted database to ${outputPath}...`)
 fs.writeFileSync(outputPath, JSON.stringify(db, null, 2))
-console.log('Conversion complete!') 
+console.log('Conversion complete!')

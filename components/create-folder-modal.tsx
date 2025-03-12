@@ -11,7 +11,7 @@ const CreateFolderModal = ({ open, onClose, onConfirm }: CreateFolderModalProps)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!open) return
-      
+
       if (e.key === 'Enter') {
         e.preventDefault()
         const input = document.getElementById('folder-name-input') as HTMLInputElement
@@ -43,8 +43,7 @@ const CreateFolderModal = ({ open, onClose, onConfirm }: CreateFolderModalProps)
       title="CREATE FOLDER"
       description="Enter a name for the new folder:"
       confirmText="CREATE"
-      onConfirm={handleCreate}
-    >
+      onConfirm={handleCreate}>
       <input
         id="folder-name-input"
         type="text"
@@ -56,4 +55,4 @@ const CreateFolderModal = ({ open, onClose, onConfirm }: CreateFolderModalProps)
   )
 }
 
-export default CreateFolderModal 
+export default CreateFolderModal

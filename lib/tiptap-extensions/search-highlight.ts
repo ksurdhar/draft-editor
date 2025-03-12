@@ -10,7 +10,7 @@ export interface SearchHighlightOptions {
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     searchHighlight: {
-      setSearchHighlight: (positions: { from: number, to: number }[], currentMatch: number) => ReturnType
+      setSearchHighlight: (positions: { from: number; to: number }[], currentMatch: number) => ReturnType
       unsetSearchHighlight: () => ReturnType
     }
   }
@@ -35,7 +35,7 @@ export const SearchHighlight = Extension.create<SearchHighlightOptions>({
             const decorations = positions.map((pos, index) =>
               Decoration.inline(pos.from, pos.to, {
                 class: index === currentMatch ? this.options.currentMatchClass : this.options.highlightClass,
-              })
+              }),
             )
             const decos = DecorationSet.create(tr.doc, decorations)
             tr.setMeta(searchHighlightPluginKey, { decorations: decos })
@@ -84,4 +84,4 @@ export const SearchHighlight = Extension.create<SearchHighlightOptions>({
   },
 })
 
-export const searchHighlightPluginKey = new PluginKey('search-highlight') 
+export const searchHighlightPluginKey = new PluginKey('search-highlight')

@@ -18,7 +18,7 @@ async function isPortInUse(port) {
 }
 
 async function killProcess(port) {
-  if (!await isPortInUse(port)) return
+  if (!(await isPortInUse(port))) return
 
   try {
     if (process.platform === 'win32') {
@@ -53,10 +53,10 @@ async function killProcess(port) {
 module.exports = async () => {
   // Kill any process on port 3000
   await killProcess(3000)
-  
+
   // Give time for processes to fully terminate
   await new Promise(resolve => setTimeout(resolve, 1000))
-  
+
   // Force exit after cleanup
   process.exit(0)
-} 
+}

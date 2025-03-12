@@ -1,10 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next'
 import { storage } from '@lib/storage'
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   switch (req.method) {
     case 'GET':
       try {
@@ -31,9 +28,9 @@ export default async function handler(
           parentId,
           userId,
           lastUpdated: Date.now(),
-          folderIndex: 0
+          folderIndex: 0,
         }
-        
+
         // If client supplied an _id, use it
         if (_id) {
           console.log('Using client-supplied ID for folder:', _id)
@@ -52,4 +49,4 @@ export default async function handler(
       res.setHeader('Allow', ['GET', 'POST'])
       res.status(405).end(`Method ${req.method} Not Allowed`)
   }
-} 
+}

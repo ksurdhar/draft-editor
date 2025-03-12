@@ -44,25 +44,24 @@ const RenameModal = ({ open, onClose, onConfirm, initialValue }: RenameModalProp
       actions={[
         {
           label: 'CANCEL',
-          onClick: onClose
+          onClick: onClose,
         },
         {
           label: 'RENAME',
-          onClick: handleSubmit
-        }
-      ]}
-    >
+          onClick: handleSubmit,
+        },
+      ]}>
       <input
         ref={inputRef}
         autoFocus
         value={value}
         onChange={e => setValue(e.target.value.toUpperCase())}
         onKeyDown={handleKeyDown}
-        className="mb-4 w-full rounded border border-black/[.10] bg-white/[.20] p-2 uppercase text-black/[.70] outline-none focus:ring-0 focus:border-black/[.10] focus:bg-white/[.25]"
+        className="mb-4 w-full rounded border border-black/[.10] bg-white/[.20] p-2 uppercase text-black/[.70] outline-none focus:border-black/[.10] focus:bg-white/[.25] focus:ring-0"
         placeholder="DOCUMENT NAME"
       />
     </BaseModal>
   )
 }
 
-export default RenameModal 
+export default RenameModal

@@ -15,19 +15,12 @@
     "jsx": "preserve",
     "incremental": true,
     "downlevelIteration": true,
-    "plugins": [{"name": "next"}],
+    "plugins": [{ "name": "next" }],
     "noImplicitAny": true,
     "sourceMap": true,
     "baseUrl": ".",
     "outDir": "dist"
   },
-  "include": [
-    "next-env.d.ts",
-    "types/globals.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    "electron"
-  ],
+  "include": ["next-env.d.ts", "types/globals.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "electron"],
   "exclude": ["node_modules"]
 }

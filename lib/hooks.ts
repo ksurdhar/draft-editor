@@ -27,28 +27,28 @@ export const useSyncHybridDoc = (
       id,
       hasDatabaseDoc: !!databaseDoc,
       databaseDoc,
-      hasContent: !!databaseDoc?.content
+      hasContent: !!databaseDoc?.content,
     })
-    
+
     // Skip setting hybrid doc if we don't have content yet
     if (databaseDoc && !databaseDoc.content) {
       console.log('Skipping hybrid doc update - no content in database doc')
       return
     }
-    
+
     // Function to get the latest state
     const getLatestState = () => {
       if (typeof window === 'undefined') {
         console.log('Server-side rendering, returning database doc')
         return databaseDoc
       }
-      
+
       const sessionDoc = sessionStorage.getItem(id)
       console.log('Session storage state:', {
         id,
         hasSessionDoc: !!sessionDoc,
         sessionDoc: sessionDoc ? JSON.parse(sessionDoc) : null,
-        hasSessionContent: sessionDoc ? !!JSON.parse(sessionDoc).content : false
+        hasSessionContent: sessionDoc ? !!JSON.parse(sessionDoc).content : false,
       })
 
       if (sessionDoc) {
@@ -57,7 +57,7 @@ export const useSyncHybridDoc = (
         if (parsedDoc.content && (!databaseDoc || parsedDoc.lastUpdated > databaseDoc.lastUpdated)) {
           console.log('Using session doc (newer with content):', {
             sessionLastUpdated: parsedDoc.lastUpdated,
-            dbLastUpdated: databaseDoc?.lastUpdated
+            dbLastUpdated: databaseDoc?.lastUpdated,
           })
           return parsedDoc
         }
@@ -75,13 +75,13 @@ export const useSyncHybridDoc = (
 
     // Update the hybrid doc with the latest state
     const latestDoc = getLatestState()
-    
+
     // Only update if we have a document with content
     if (latestDoc?.content) {
-      console.log('Setting hybrid doc:', { 
+      console.log('Setting hybrid doc:', {
         id,
         hasContent: !!latestDoc.content,
-        source: latestDoc === databaseDoc ? 'database' : 'session'
+        source: latestDoc === databaseDoc ? 'database' : 'session',
       })
       setHybridDoc(latestDoc)
     } else {
@@ -90,20 +90,20 @@ export const useSyncHybridDoc = (
 
     // Listen for storage events
     const handleStorageChange = (e: StorageEvent) => {
-      console.log('Storage event:', { 
-        key: e.key, 
+      console.log('Storage event:', {
+        key: e.key,
         hasNewValue: !!e.newValue,
         hasOldValue: !!e.oldValue,
-        matchesCurrentId: e.key === id 
+        matchesCurrentId: e.key === id,
       })
-      
+
       if (e.key === id) {
         const latestDoc = getLatestState()
         if (latestDoc?.content) {
-          console.log('Storage event update:', { 
+          console.log('Storage event update:', {
             id,
             hasContent: !!latestDoc.content,
-            source: latestDoc === databaseDoc ? 'database' : 'session'
+            source: latestDoc === databaseDoc ? 'database' : 'session',
           })
           setHybridDoc(latestDoc)
         }
@@ -149,9 +149,13 @@ export const useFolderSync = () => {
     [api],
   )
 
-  const { data: folders = [], mutate, isLoading } = useSWR<FolderData[]>('folders', fetcher, {
+  const {
+    data: folders = [],
+    mutate,
+    isLoading,
+  } = useSWR<FolderData[]>('folders', fetcher, {
     revalidateOnFocus: false,
-    dedupingInterval: 0 // Disable deduping to ensure we always fetch fresh data
+    dedupingInterval: 0, // Disable deduping to ensure we always fetch fresh data
   })
 
   return { folders, mutate, isLoading }

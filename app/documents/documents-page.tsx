@@ -7,16 +7,24 @@ import { DocumentData, FolderData } from '@typez/globals'
 
 export const NextDocumentsPage = () => {
   const { get } = useAPI()
-  const { data: documents, mutate: mutateDocuments, isLoading: docsLoading } = useSWR<DocumentData[]>('/documents', get)
-  const { data: folders, mutate: mutateFolders, isLoading: foldersLoading } = useSWR<FolderData[]>('/folders', get)
+  const {
+    data: documents,
+    mutate: mutateDocuments,
+    isLoading: docsLoading,
+  } = useSWR<DocumentData[]>('/documents', get)
+  const {
+    data: folders,
+    mutate: mutateFolders,
+    isLoading: foldersLoading,
+  } = useSWR<FolderData[]>('/folders', get)
 
   return (
-    <SharedDocumentsPage 
+    <SharedDocumentsPage
       documents={documents || []}
       folders={folders || []}
       isLoading={docsLoading || foldersLoading}
-      onDocumentsChange={(docs) => mutateDocuments(docs, { revalidate: false })}
-      onFoldersChange={(folders) => mutateFolders(folders, { revalidate: false })}
+      onDocumentsChange={docs => mutateDocuments(docs, { revalidate: false })}
+      onFoldersChange={folders => mutateFolders(folders, { revalidate: false })}
     />
   )
 }

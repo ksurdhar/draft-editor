@@ -10,7 +10,6 @@ const mockSession: Session = {
 // as well as handle redirects in the case of signout which relies on auth0 for navigation
 export const handleAuth = () => {
   return async (req: NextApiRequest, res: NextApiResponse) => {
-    
     if (req.url === '/api/auth/logout') {
       res.redirect('/')
     }
@@ -21,7 +20,9 @@ export const handleAuth = () => {
 
 export const getSession = (req: NextApiRequest, res: NextApiResponse): Session => ({ user: mockUser })
 
-export const withApiAuthRequired = (handler: NextApiHandler): NextApiHandler => (req, res) => {
-  (req as any).session = mockSession
-  return handler(req, res)
-}
+export const withApiAuthRequired =
+  (handler: NextApiHandler): NextApiHandler =>
+  (req, res) => {
+    ;(req as any).session = mockSession
+    return handler(req, res)
+  }
