@@ -381,11 +381,11 @@ const DocumentTree = ({
           ref={floatingInputRef}
           type="text"
           value={editValue}
-          className={`fixed z-50 block h-[20px] w-full cursor-text overflow-hidden whitespace-nowrap bg-transparent text-sm font-[600] font-semibold uppercase leading-[20px] tracking-wide outline-none ${
+          className={`fixed z-50 block h-[20px] w-full cursor-text overflow-hidden whitespace-nowrap border-none bg-transparent text-sm font-[600] font-semibold uppercase leading-[20px] tracking-wide outline-none ring-0 focus:border-none focus:outline-none focus:ring-0 ${
             theme === 'light' ? 'text-black/[.70]' : 'text-black/[.70]'
           }`}
           style={{
-            top: `${editPositionRef.current.top}px`,
+            top: `${editPositionRef.current.top + 2}px`,
             left: `${editPositionRef.current.left}px`,
             width: `${editPositionRef.current.width}px`,
             caretColor: theme === 'light' ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.7)',
@@ -400,6 +400,11 @@ const DocumentTree = ({
             textTransform: 'uppercase',
             minWidth: '0',
             maxWidth: '100%',
+            border: 'none',
+            outline: 'none',
+            boxShadow: 'none',
+            WebkitAppearance: 'none',
+            MozAppearance: 'none',
           }}
           onChange={e => setEditValue(e.target.value)}
           onKeyDown={e => {
