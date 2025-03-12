@@ -186,7 +186,6 @@ const DocumentTree = ({
   theme = 'light',
   showSelectedStyles = true,
 }: DocumentTreeProps) => {
-  const [internalSelectedItems, setInternalSelectedItems] = useState<TreeItemIndex[]>([])
   const [expandedItems, setExpandedItems] = useState<TreeItemIndex[]>(() => {
     if (persistExpanded) {
       try {
@@ -200,83 +199,64 @@ const DocumentTree = ({
     return []
   })
   const hasRecentDoubleClickRef = useRef(false)
-  const pendingSelectionRef = useRef<TreeItemIndex[]>()
-  const pendingActionRef = useRef<TreeItem>()
+  const pendingActionRef = useRef<{ item: TreeItem; timestamp: number } | null>(null)
 
-  // Use either external or internal selected items
-  const selectedItems = externalSelectedItems !== undefined ? externalSelectedItems : internalSelectedItems
+  // Use external selected items only
+  const selectedItems = externalSelectedItems || []
 
   const handleSelect = (items: TreeItemIndex[]) => {
     console.log('🎯 Selection requested:', items)
+    // Selection is now handled by the click handlers in ListItem
+  }
 
-    // Store the selection request
-    pendingSelectionRef.current = items
+  const executePrimaryAction = (item: TreeItem) => {
+    const selectedId = item.index.toString()
+    if (!selectedId || !items[selectedId]) return
 
-    // Wait to see if this was a double click
-    setTimeout(() => {
-      if (!hasRecentDoubleClickRef.current && pendingSelectionRef.current) {
-        console.log('✅ Applying delayed selection:', pendingSelectionRef.current)
-        if (onSelectedItemsChange) {
-          onSelectedItemsChange(pendingSelectionRef.current)
-        } else {
-          setInternalSelectedItems([...pendingSelectionRef.current])
-        }
+    const treeItem = items[selectedId]
+    if (!treeItem.isFolder) {
+      const currentUrl = window.location.pathname
+      const baseDocumentId = currentUrl.split('/').pop()
 
-        // If we have a pending action, execute it now
-        if (pendingActionRef.current) {
-          console.log('✅ Executing delayed primary action')
-          handlePrimaryAction(pendingActionRef.current)
-          pendingActionRef.current = undefined
-        }
+      if (baseDocumentId && currentUrl.includes('/documents/')) {
+        const newUrl = `/documents/${baseDocumentId}?documentId=${selectedId}`
+        window.dispatchEvent(
+          new CustomEvent('documentChanging', {
+            detail: { documentId: selectedId },
+          }),
+        )
+        window.history.pushState({}, '', newUrl)
+        setTimeout(() => {
+          window.dispatchEvent(new Event('documentChanged'))
+        }, 50)
+      } else {
+        console.log('Navigating to document:', selectedId)
+        onPrimaryAction?.(item)
       }
-      pendingSelectionRef.current = undefined
-    }, 300)
+    }
   }
 
   const handlePrimaryAction = (item: TreeItem) => {
     console.log('🎯 Primary action requested:', item.index)
 
-    // If we're in a double click state, ignore the action
-    if (hasRecentDoubleClickRef.current) {
-      console.log('❌ Primary action blocked by double click')
-      return
-    }
+    // Store the pending action with timestamp
+    pendingActionRef.current = { item, timestamp: Date.now() }
 
-    // Store the action request
-    pendingActionRef.current = item
-
-    // If we don't have a pending selection, execute immediately
-    if (!pendingSelectionRef.current) {
-      console.log('✅ Executing immediate primary action')
-      const selectedId = item.index.toString()
-      if (!selectedId || !items[selectedId]) return
-
-      const treeItem = items[selectedId]
-      if (!treeItem.isFolder) {
-        const currentUrl = window.location.pathname
-        const baseDocumentId = currentUrl.split('/').pop()
-
-        if (baseDocumentId && currentUrl.includes('/documents/')) {
-          const newUrl = `/documents/${baseDocumentId}?documentId=${selectedId}`
-
-          window.dispatchEvent(
-            new CustomEvent('documentChanging', {
-              detail: { documentId: selectedId },
-            }),
-          )
-
-          window.history.pushState({}, '', newUrl)
-
-          setTimeout(() => {
-            window.dispatchEvent(new Event('documentChanged'))
-          }, 50)
-        } else {
-          console.log('Navigating to document:', selectedId)
-          onPrimaryAction?.(item)
-        }
+    // Wait for potential double click
+    setTimeout(() => {
+      // Only execute if this is still the most recent pending action and no double click occurred
+      if (
+        pendingActionRef.current?.item.index === item.index &&
+        Date.now() - pendingActionRef.current.timestamp >= 200 &&
+        !hasRecentDoubleClickRef.current
+      ) {
+        console.log('✨ Executing primary action after delay')
+        executePrimaryAction(item)
+        pendingActionRef.current = null
+      } else {
+        console.log('❌ Primary action cancelled')
       }
-      pendingActionRef.current = undefined
-    }
+    }, 200)
   }
 
   const handleDrop = async (draggedItems: TreeItem[], position: DraggingPosition) => {
@@ -311,10 +291,9 @@ const DocumentTree = ({
     console.log('🔥 Double click detected:', item.index)
 
     // Clear any pending actions
-    pendingSelectionRef.current = undefined
-    pendingActionRef.current = undefined
+    pendingActionRef.current = null
 
-    // Set the double click flag
+    // Set the double click flag immediately
     hasRecentDoubleClickRef.current = true
 
     const selectedId = item.index.toString()
@@ -335,7 +314,7 @@ const DocumentTree = ({
     setTimeout(() => {
       console.log('🔄 Resetting double click state')
       hasRecentDoubleClickRef.current = false
-    }, 500)
+    }, 1000)
   }
 
   const handleRename = (item: TreeItem, newName: string) => {

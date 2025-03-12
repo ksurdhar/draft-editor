@@ -97,48 +97,55 @@ export const ListItem = ({
 
   // Handle single click
   const handleSingleClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+
     // If we're editing, don't handle clicks
     if (isEditing) {
-      e.stopPropagation()
       return
     }
 
-    // Clear any existing click timeout
+    // Clear any existing timeout
     if (clickTimeoutRef.current) {
       clearTimeout(clickTimeoutRef.current)
     }
 
-    // Set a timeout to handle the click after a brief delay
+    // Set a timeout to handle single click
     clickTimeoutRef.current = setTimeout(() => {
-      console.log('✅ Single click confirmed')
+      console.log('🖱️ Single click confirmed')
+      clickTimeoutRef.current = undefined
       if (onClick) onClick()
-    }, 250) // This needs to be less than the browser's double click threshold
+    }, 200) // Wait for potential double click
   }
 
   // Handle native double-click event
   const handleDoubleClick = (e: React.MouseEvent) => {
-    console.log('🔥 Double click intercepted')
-    e.stopPropagation()
     e.preventDefault()
+    e.stopPropagation()
 
-    // Clear any pending single click
+    console.log('🔥 Double click intercepted')
+
+    // Clear the single click timeout
     if (clickTimeoutRef.current) {
       clearTimeout(clickTimeoutRef.current)
+      clickTimeoutRef.current = undefined
     }
 
-    // Enter edit mode
-    setIsEditing(true)
-    setEditValue(label)
-
-    // Call the original onDoubleClick if provided
+    // Call the original onDoubleClick first to set flags
     if (onDoubleClick) {
       onDoubleClick()
     }
+
+    // Enter edit mode immediately
+    console.log('✏️ Entering edit mode')
+    setIsEditing(true)
+    setEditValue(label)
   }
 
   // Focus input when entering edit mode
   useEffect(() => {
     if (isEditing && inputRef.current) {
+      console.log('🔍 Focusing input')
       inputRef.current.focus()
       inputRef.current.select()
     }
@@ -184,6 +191,15 @@ export const ListItem = ({
   }
 
   const themeClasses = getThemeClasses()
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current)
+      }
+    }
+  }, [])
 
   return (
     <li className="group list-none" {...containerProps}>
