@@ -26,6 +26,7 @@ export interface DocumentTreeProps {
   items: Record<string, TreeItemData>
   onPrimaryAction?: (item: TreeItem) => void
   onMove?: (itemId: string, targetFolderId?: string, dropIndex?: number) => Promise<void>
+  onRename?: (itemId: string, newName: string) => Promise<void>
   showActionButton?: boolean
   onActionButtonClick?: (event: React.MouseEvent<HTMLElement>, itemId: string) => void
   className?: string
@@ -176,6 +177,7 @@ const DocumentTree = ({
   items,
   onPrimaryAction,
   onMove,
+  onRename,
   showActionButton = false,
   onActionButtonClick,
   className = '',
@@ -321,10 +323,16 @@ const DocumentTree = ({
     }, 1000)
   }
 
-  const handleRename = (item: TreeItem, newName: string) => {
+  const handleRename = async (item: TreeItem, newName: string) => {
     console.log('Renaming item:', item.index, 'to:', newName)
-    // Here you would typically make an API call to rename the item
-    // For now we'll just log it
+    if (onRename) {
+      try {
+        await onRename(item.index.toString(), newName)
+      } catch (error) {
+        console.error('Rename failed:', error)
+        // Optionally handle error (e.g., show toast)
+      }
+    }
   }
 
   const handleStartEdit = (itemId: string, element: HTMLElement) => {
@@ -357,9 +365,9 @@ const DocumentTree = ({
     }, 0)
   }
 
-  const handleEditComplete = (save: boolean) => {
+  const handleEditComplete = async (save: boolean) => {
     if (editingItem && save && editValue.trim() !== '') {
-      handleRename({ index: editingItem } as TreeItem, editValue.trim())
+      await handleRename({ index: editingItem } as TreeItem, editValue.trim())
     }
     setEditingItem(null)
     setEditValue('')

@@ -7,7 +7,7 @@ import { CloudIcon } from '@heroicons/react/solid'
 // Temporarily not using useSyncHybridDoc
 // import { useSyncHybridDoc } from '@lib/hooks'
 import DocumentTree, { createTreeItems } from '@components/document-tree'
-import { DocumentData, VersionData } from '@typez/globals'
+import { DocumentData, FolderData, VersionData } from '@typez/globals'
 import { useUser } from '@wrappers/auth-wrapper-client'
 import { useCallback, useEffect, useState } from 'react'
 import useSWR, { mutate } from 'swr'
@@ -322,6 +322,63 @@ export default function SharedDocumentPage() {
     setDiffContent(null)
   }, [documentId])
 
+  const handleRename = async (itemId: string, newName: string) => {
+    try {
+      // Check if this is a folder by looking in allFolders
+      const isFolder = allFolders?.some(folder => (folder._id || folder.id) === itemId)
+
+      // Update the title in the database
+      await patch(`/${isFolder ? 'folders' : 'documents'}/${itemId}`, { title: newName })
+
+      if (isFolder) {
+        // Update folders in SWR cache
+        mutate('/folders', (folders: FolderData[] | undefined) => {
+          if (!folders) return folders
+          return folders.map(folder =>
+            folder._id === itemId || folder.id === itemId ? { ...folder, title: newName } : folder,
+          )
+        })
+      } else {
+        // Update document caches
+        mutate(`/documents/${itemId}`, async (doc: DocumentData | undefined) => {
+          if (!doc) return doc
+          return { ...doc, title: newName }
+        })
+
+        // Update the document in the allDocs array
+        mutate('/documents', (docs: DocumentData[] | undefined) => {
+          if (!docs) return docs
+          return docs.map(doc => (doc._id === itemId ? { ...doc, title: newName } : doc))
+        })
+
+        // If this is the current document, update all relevant state
+        if (itemId === documentId) {
+          // Update hybrid doc state
+          setHybridDoc(prev => (prev ? { ...prev, title: newName } : prev))
+
+          // Update current content with new title
+          if (currentContent) {
+            const updatedContent =
+              typeof currentContent === 'string' ? JSON.parse(currentContent) : currentContent
+            setCurrentContent(updatedContent)
+          }
+
+          // Update session storage
+          const cachedDoc = JSON.parse(sessionStorage.getItem(itemId) || '{}')
+          if (Object.keys(cachedDoc).length > 0) {
+            sessionStorage.setItem(itemId, JSON.stringify({ ...cachedDoc, title: newName }))
+          }
+
+          // Force a revalidation of the document path to ensure consistency
+          mutate(documentPath)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to rename item:', error)
+      // Optionally show an error toast here
+    }
+  }
+
   return (
     <Layout documentId={id} onToggleGlobalSearch={handleToggleGlobalSearch}>
       {!skipAnimation && (
@@ -393,6 +450,7 @@ export default function SharedDocumentPage() {
                     key="document-tree"
                     items={createTreeItems(allDocs, allFolders)}
                     onPrimaryAction={handlePrimaryAction}
+                    onRename={handleRename}
                     showActionButton={false}
                     className="h-full"
                     persistExpanded={true}
