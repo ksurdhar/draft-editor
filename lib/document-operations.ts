@@ -4,7 +4,15 @@ export interface DocumentOperations {
   patchDocument: (id: string, data: any) => Promise<any>
   patchFolder: (id: string, data: any) => Promise<any>
   bulkDeleteItems: (documentIds: string[], folderIds: string[]) => Promise<any>
-  createDocument: (data: { userId: string, title: string }) => Promise<any>
+  createDocument: (data: any) => Promise<any>
+  renameItem: (
+    itemId: string,
+    newName: string,
+    docs: DocumentData[],
+    folders: FolderData[],
+    operations: DocumentOperations,
+    onUpdate: (updatedDocs: DocumentData[], updatedFolders: FolderData[]) => void,
+  ) => Promise<void>
 }
 
 export const calculateMoveUpdates = (
@@ -12,7 +20,7 @@ export const calculateMoveUpdates = (
   targetFolderId: string | undefined,
   targetIndex: number | undefined,
   docs: DocumentData[],
-  folders: FolderData[]
+  folders: FolderData[],
 ) => {
   // Get all items in the target folder
   const folderItems = [
@@ -23,33 +31,33 @@ export const calculateMoveUpdates = (
     ...folders.filter(f => {
       if (!targetFolderId) return !f.parentId || f.parentId === 'root'
       return f.parentId === targetFolderId
-    })
+    }),
   ].sort((a, b) => (a.folderIndex || 0) - (b.folderIndex || 0))
 
   // Remove the moved item from the list if it's already in this folder
   const filteredItems = folderItems.filter(item => item._id !== itemId)
-  
+
   // Get the moved item
   const movedDoc = docs.find(d => d._id === itemId)
   const movedItem = movedDoc || folders.find(f => f._id === itemId)
-  
+
   if (!movedItem) {
     throw new Error(`Could not find item to move: ${itemId}`)
   }
 
   // Insert the moved item at the target position
   filteredItems.splice(targetIndex || 0, 0, movedItem)
-  
+
   // Create updates with sequential indices
   const updates = filteredItems.map((item, index) => ({
     id: item._id,
     isDocument: 'content' in item,
-    folderIndex: index
+    folderIndex: index,
   }))
 
   return {
     movedDoc,
-    updates
+    updates,
   }
 }
 
@@ -60,16 +68,10 @@ export const moveItem = async (
   docs: DocumentData[],
   folders: FolderData[],
   operations: DocumentOperations,
-  onUpdateState: (updatedDocs: DocumentData[], updatedFolders: FolderData[]) => void
+  onUpdateState: (updatedDocs: DocumentData[], updatedFolders: FolderData[]) => void,
 ) => {
   try {
-    const { movedDoc, updates } = calculateMoveUpdates(
-      itemId,
-      targetFolderId,
-      targetIndex,
-      docs,
-      folders
-    )
+    const { movedDoc, updates } = calculateMoveUpdates(itemId, targetFolderId, targetIndex, docs, folders)
 
     // Apply optimistic updates
     const optimisticDocs = docs.map(doc => {
@@ -97,18 +99,20 @@ export const moveItem = async (
     await patchOperation(itemId, {
       parentId: targetFolderId || 'root',
       folderIndex: targetIndex || 0,
-      lastUpdated: Date.now()
+      lastUpdated: Date.now(),
     })
 
     // Then update all other items' positions
-    await Promise.all(updates.map(async ({ id, isDocument, folderIndex }) => {
-      if (id === itemId) return // Skip the moved item as we already updated it
-      const patchOperation = isDocument ? operations.patchDocument : operations.patchFolder
-      await patchOperation(id, {
-        folderIndex,
-        lastUpdated: Date.now()
-      })
-    }))
+    await Promise.all(
+      updates.map(async ({ id, isDocument, folderIndex }) => {
+        if (id === itemId) return // Skip the moved item as we already updated it
+        const patchOperation = isDocument ? operations.patchDocument : operations.patchFolder
+        await patchOperation(id, {
+          folderIndex,
+          lastUpdated: Date.now(),
+        })
+      }),
+    )
   } catch (error) {
     console.error('Error during move operation:', error)
     throw error
@@ -121,7 +125,7 @@ export const bulkDelete = async (
   docs: DocumentData[],
   folders: FolderData[],
   operations: DocumentOperations,
-  onUpdateState: (updatedDocs: DocumentData[], updatedFolders: FolderData[]) => void
+  onUpdateState: (updatedDocs: DocumentData[], updatedFolders: FolderData[]) => void,
 ) => {
   try {
     // Optimistically update UI
@@ -140,18 +144,18 @@ export const bulkDelete = async (
 export const createDocument = async (
   userId: string,
   operations: DocumentOperations,
-  onSuccess: (docId: string) => void
+  onSuccess: (docId: string) => void,
 ) => {
   try {
     console.log('\n=== Creating Document ===')
     console.log('Initial data:', { userId })
 
-    const response = await operations.createDocument({ 
+    const response = await operations.createDocument({
       userId,
       title: 'Untitled',
     })
     console.log('Create document response:', response)
-    
+
     // Handle both direct response and response.data patterns
     const data = response.data || response
     console.log('Processed response data:', data)
@@ -160,7 +164,7 @@ export const createDocument = async (
     if (!docId) {
       throw new Error('No document ID in response: ' + JSON.stringify(data))
     }
-    
+
     console.log('Successfully created document with ID:', docId)
     onSuccess(docId)
     return docId
@@ -168,4 +172,65 @@ export const createDocument = async (
     console.error('Error creating document:', error)
     throw error
   }
-} 
+}
+
+export async function renameItem(
+  itemId: string,
+  newName: string,
+  docs: DocumentData[],
+  folders: FolderData[],
+  operations: DocumentOperations,
+  onUpdate: (updatedDocs: DocumentData[], updatedFolders: FolderData[]) => void,
+  options?: {
+    currentDocumentId?: string
+    setHybridDoc?: (updater: (prev: any) => any) => void
+    setCurrentContent?: (content: any) => void
+  },
+): Promise<void> {
+  const isFolder = folders.some(folder => (folder._id || folder.id) === itemId)
+
+  try {
+    // Update the title in the database
+    if (isFolder) {
+      await operations.patchFolder(itemId, { title: newName, lastUpdated: Date.now() })
+      const updatedFolders = folders.map(folder =>
+        (folder._id || folder.id) === itemId
+          ? { ...folder, title: newName, lastUpdated: Date.now() }
+          : folder,
+      )
+      onUpdate(docs, updatedFolders)
+    } else {
+      await operations.patchDocument(itemId, { title: newName, lastUpdated: Date.now() })
+      const updatedDocs = docs.map(doc =>
+        (doc._id || doc.id) === itemId ? { ...doc, title: newName, lastUpdated: Date.now() } : doc,
+      )
+      onUpdate(updatedDocs, folders)
+
+      // If this is the current document, update all relevant state
+      if (options?.currentDocumentId === itemId) {
+        // Update hybrid doc state
+        if (options.setHybridDoc) {
+          options.setHybridDoc(prev => (prev ? { ...prev, title: newName } : prev))
+        }
+
+        // Update current content with new title
+        if (options.setCurrentContent) {
+          options.setCurrentContent((prev: any) => {
+            if (!prev) return prev
+            const content = typeof prev === 'string' ? JSON.parse(prev) : prev
+            return { ...content, title: newName }
+          })
+        }
+
+        // Update session storage
+        const cachedDoc = JSON.parse(sessionStorage.getItem(itemId) || '{}')
+        if (Object.keys(cachedDoc).length > 0) {
+          sessionStorage.setItem(itemId, JSON.stringify({ ...cachedDoc, title: newName }))
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Failed to rename item:', error)
+    throw error
+  }
+}

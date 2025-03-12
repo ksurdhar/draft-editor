@@ -7,15 +7,16 @@ import { CloudIcon } from '@heroicons/react/solid'
 // Temporarily not using useSyncHybridDoc
 // import { useSyncHybridDoc } from '@lib/hooks'
 import DocumentTree, { createTreeItems } from '@components/document-tree'
-import { DocumentData, FolderData, VersionData } from '@typez/globals'
+import { DocumentData, VersionData } from '@typez/globals'
 import { useUser } from '@wrappers/auth-wrapper-client'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useMemo } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useDebouncedCallback } from 'use-debounce'
 import { motion, AnimatePresence } from 'framer-motion'
 import { EyeIcon, EyeOffIcon, ClockIcon, SearchIcon } from '@heroicons/react/outline'
 import VersionList from '@components/version-list'
 import GlobalFind from '@components/global-find'
+import { renameItem, DocumentOperations } from '@lib/document-operations'
 
 const backdropStyles = `
   fixed top-0 left-0 h-screen w-screen z-[-1]
@@ -58,7 +59,7 @@ export default function SharedDocumentPage() {
   const { getLocation, navigateTo } = useNavigation()
   const location = getLocation()
   const id = location.split('/').pop()?.split('?')[0] || ''
-  const { get, patch } = useAPI()
+  const { get, patch, post } = useAPI()
   const save = useSave()
 
   const fetcher = useCallback(
@@ -324,60 +325,45 @@ export default function SharedDocumentPage() {
 
   const handleRename = async (itemId: string, newName: string) => {
     try {
-      // Check if this is a folder by looking in allFolders
-      const isFolder = allFolders?.some(folder => (folder._id || folder.id) === itemId)
-
-      // Update the title in the database
-      await patch(`/${isFolder ? 'folders' : 'documents'}/${itemId}`, { title: newName })
-
-      if (isFolder) {
-        // Update folders in SWR cache
-        mutate('/folders', (folders: FolderData[] | undefined) => {
-          if (!folders) return folders
-          return folders.map(folder =>
-            folder._id === itemId || folder.id === itemId ? { ...folder, title: newName } : folder,
-          )
-        })
-      } else {
-        // Update document caches
-        mutate(`/documents/${itemId}`, async (doc: DocumentData | undefined) => {
-          if (!doc) return doc
-          return { ...doc, title: newName }
-        })
-
-        // Update the document in the allDocs array
-        mutate('/documents', (docs: DocumentData[] | undefined) => {
-          if (!docs) return docs
-          return docs.map(doc => (doc._id === itemId ? { ...doc, title: newName } : doc))
-        })
-
-        // If this is the current document, update all relevant state
-        if (itemId === documentId) {
-          // Update hybrid doc state
-          setHybridDoc(prev => (prev ? { ...prev, title: newName } : prev))
-
-          // Update current content with new title
-          if (currentContent) {
-            const updatedContent =
-              typeof currentContent === 'string' ? JSON.parse(currentContent) : currentContent
-            setCurrentContent(updatedContent)
-          }
-
-          // Update session storage
-          const cachedDoc = JSON.parse(sessionStorage.getItem(itemId) || '{}')
-          if (Object.keys(cachedDoc).length > 0) {
-            sessionStorage.setItem(itemId, JSON.stringify({ ...cachedDoc, title: newName }))
-          }
-
-          // Force a revalidation of the document path to ensure consistency
+      await renameItem(
+        itemId,
+        newName,
+        allDocs || [],
+        allFolders || [],
+        operations,
+        (updatedDocs, updatedFolders) => {
+          mutate('/documents', updatedDocs)
+          mutate('/folders', updatedFolders)
+          mutate(`/documents/${itemId}`)
           mutate(documentPath)
-        }
-      }
+        },
+        {
+          currentDocumentId: documentId,
+          setHybridDoc,
+          setCurrentContent,
+        },
+      )
     } catch (error) {
       console.error('Failed to rename item:', error)
-      // Optionally show an error toast here
     }
   }
+
+  const operations = useMemo<DocumentOperations>(
+    () => ({
+      patchDocument: (id: string, data: any) => patch(`documents/${id}`, data),
+      patchFolder: (id: string, data: any) => patch(`folders/${id}`, data),
+      bulkDeleteItems: (documentIds: string[], folderIds: string[]) =>
+        post('documents/bulk-delete', { documentIds, folderIds }),
+      createDocument: async (data: any) => {
+        const response = await post('/documents', data)
+        return response
+      },
+      renameItem: async (itemId, newName, docs, folders, ops, onUpdate) => {
+        await renameItem(itemId, newName, docs, folders, ops, onUpdate)
+      },
+    }),
+    [patch, post],
+  )
 
   return (
     <Layout documentId={id} onToggleGlobalSearch={handleToggleGlobalSearch}>

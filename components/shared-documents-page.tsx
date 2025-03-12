@@ -14,16 +14,21 @@ import CreateFolderModal from './create-folder-modal'
 import DocumentTree, { createTreeItems } from './document-tree'
 import { useNavigation, useAPI } from '@components/providers'
 import { useUser } from '@wrappers/auth-wrapper-client'
-import { moveItem, bulkDelete, createDocument, DocumentOperations } from '@lib/document-operations'
+import {
+  moveItem,
+  bulkDelete,
+  createDocument,
+  DocumentOperations,
+  renameItem,
+} from '@lib/document-operations'
 import { mutate } from 'swr'
-
 
 const SharedDocumentsPage = ({
   documents,
   folders,
   isLoading,
   onDocumentsChange,
-  onFoldersChange
+  onFoldersChange,
 }: {
   documents: DocumentData[]
   folders: FolderData[]
@@ -44,29 +49,41 @@ const SharedDocumentsPage = ({
   const [initAnimate, setInitAnimate] = useState(false)
 
   // Wrap mutation functions in useCallback
-  const mutateDocs = useCallback((updatedDocs: DocumentData[] | ((current: DocumentData[]) => DocumentData[])) => {
-    const newDocs = typeof updatedDocs === 'function' ? updatedDocs(documents) : updatedDocs
-    onDocumentsChange(newDocs)
-  }, [documents, onDocumentsChange])
-  
-  const mutateFolders = useCallback((updatedFolders: FolderData[] | ((current: FolderData[]) => FolderData[])) => {
-    const newFolders = typeof updatedFolders === 'function' ? updatedFolders(folders) : updatedFolders
-    onFoldersChange(newFolders)
-  }, [folders, onFoldersChange])
+  const mutateDocs = useCallback(
+    (updatedDocs: DocumentData[] | ((current: DocumentData[]) => DocumentData[])) => {
+      const newDocs = typeof updatedDocs === 'function' ? updatedDocs(documents) : updatedDocs
+      onDocumentsChange(newDocs)
+    },
+    [documents, onDocumentsChange],
+  )
+
+  const mutateFolders = useCallback(
+    (updatedFolders: FolderData[] | ((current: FolderData[]) => FolderData[])) => {
+      const newFolders = typeof updatedFolders === 'function' ? updatedFolders(folders) : updatedFolders
+      onFoldersChange(newFolders)
+    },
+    [folders, onFoldersChange],
+  )
 
   const docsLoading = isLoading
   const foldersLoading = isLoading
 
-  const operations = useMemo<DocumentOperations>(() => ({
-    patchDocument: (id: string, data: any) => patch(`documents/${id}`, data),
-    patchFolder: (id: string, data: any) => patch(`folders/${id}`, data),
-    bulkDeleteItems: (documentIds: string[], folderIds: string[]) => 
-      post('documents/bulk-delete', { documentIds, folderIds }),
-    createDocument: async (data: any) => {
-      const response = await post('/documents', data)
-      return response
-    }
-  }), [patch, post])
+  const operations = useMemo<DocumentOperations>(
+    () => ({
+      patchDocument: (id: string, data: any) => patch(`documents/${id}`, data),
+      patchFolder: (id: string, data: any) => patch(`folders/${id}`, data),
+      bulkDeleteItems: (documentIds: string[], folderIds: string[]) =>
+        post('documents/bulk-delete', { documentIds, folderIds }),
+      createDocument: async (data: any) => {
+        const response = await post('/documents', data)
+        return response
+      },
+      renameItem: async (itemId, newName, docs, folders, ops, onUpdate) => {
+        await renameItem(itemId, newName, docs, folders, ops, onUpdate)
+      },
+    }),
+    [patch, post],
+  )
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -88,7 +105,7 @@ const SharedDocumentsPage = ({
           (updatedDocs, updatedFolders) => {
             mutateDocs(updatedDocs)
             mutateFolders(updatedFolders)
-          }
+          },
         )
       } catch (error) {
         console.error('Move failed:', error)
@@ -97,7 +114,7 @@ const SharedDocumentsPage = ({
         mutateFolders(folders)
       }
     },
-    [documents, folders, operations, mutateDocs, mutateFolders]
+    [documents, folders, operations, mutateDocs, mutateFolders],
   )
 
   const handleBulkDelete = useCallback(
@@ -112,7 +129,7 @@ const SharedDocumentsPage = ({
           (updatedDocs, updatedFolders) => {
             mutateDocs(updatedDocs)
             mutateFolders(updatedFolders)
-          }
+          },
         )
       } catch (error) {
         // Revert on error
@@ -120,37 +137,25 @@ const SharedDocumentsPage = ({
         mutateFolders(folders)
       }
     },
-    [documents, folders, operations, mutateDocs, mutateFolders]
+    [documents, folders, operations, mutateDocs, mutateFolders],
   )
 
-  const renameDocument = useCallback(
-    async (id: string, title: string) => {
-      // Update list view immediately
-      const updatedDocs = documents.map(doc => (doc._id === id ? { ...doc, title } : doc))
-      mutateDocs(updatedDocs)
-
+  const handleRename = useCallback(
+    async (itemId: string, newName: string) => {
       try {
-        // Update the document
-        const updatedDoc = await operations.patchDocument(id, {
-          title,
-          lastUpdated: Date.now(),
+        await renameItem(itemId, newName, documents, folders, operations, (updatedDocs, updatedFolders) => {
+          mutateDocs(updatedDocs)
+          mutateFolders(updatedFolders)
+          // Also update the individual document cache if it exists
+          mutate(`/documents/${itemId}`)
         })
-
-        // Update both the list and individual document cache
-        await Promise.all([
-          // Revalidate the documents list
-          mutateDocs(current => 
-            current?.map(doc => doc._id === id ? { ...doc, title } : doc)
-          ),
-          // Update/revalidate the individual document cache
-          mutate(`/documents/${id}`, { ...updatedDoc, title })
-        ])
-      } catch (e) {
-        console.log(e)
+      } catch (error) {
+        console.error('Failed to rename item:', error)
         mutateDocs(documents)
+        mutateFolders(folders)
       }
     },
-    [mutateDocs, documents, operations],
+    [documents, folders, operations, mutateDocs, mutateFolders],
   )
 
   const createFolder = useCallback(
@@ -161,7 +166,7 @@ const SharedDocumentsPage = ({
           parentId: parentId || 'root',
           userId: user?.sub || 'current',
           lastUpdated: Date.now(),
-          folderIndex: folders.length
+          folderIndex: folders.length,
         }
 
         const response = await post('folders', folderData)
@@ -171,36 +176,16 @@ const SharedDocumentsPage = ({
         mutateFolders(folders)
       }
     },
-    [folders, mutateFolders, post, user?.sub]
-  )
-
-  const renameFolder = useCallback(
-    async (id: string, title: string) => {
-      try {
-        const response = await operations.patchFolder(id, {
-          title,
-          lastUpdated: Date.now()
-        })
-        mutateFolders(folders.map(folder => folder._id === id ? response : folder))
-      } catch (error) {
-        console.error('Error renaming folder:', error)
-        mutateFolders(folders)
-      }
-    },
-    [folders, operations, mutateFolders]
+    [folders, mutateFolders, post, user?.sub],
   )
 
   const handleCreateDocument = useCallback(async () => {
     if (!user?.sub) return
-    
+
     try {
-      await createDocument(
-        user.sub,
-        operations,
-        (docId) => {
-          navigateTo(`/documents/${docId}?focus=title`)
-        }
-      )
+      await createDocument(user.sub, operations, docId => {
+        navigateTo(`/documents/${docId}?focus=title`)
+      })
     } catch (error) {
       console.error('Error creating document:', error)
     }
@@ -215,11 +200,6 @@ const SharedDocumentsPage = ({
 
   const handleMenuClose = () => {
     setAnchorEl(null)
-  }
-
-  const handleRename = () => {
-    setRenameModalOpen(true)
-    handleMenuClose()
   }
 
   const handleDelete = () => {
@@ -251,7 +231,7 @@ const SharedDocumentsPage = ({
         // Revert to previous state
         mutateDocs(prevDocs)
         mutateFolders(prevFolders)
-        
+
         // Show detailed error if available
         const errorMessage = error.response?.data?.details || error.message || 'Failed to delete items'
         console.error('Delete failed:', errorMessage)
@@ -295,20 +275,23 @@ const SharedDocumentsPage = ({
     </div>
   )
 
+  const handleMenuRename = () => {
+    setRenameModalOpen(true)
+    handleMenuClose()
+  }
+
   return (
     <Layout>
-      <div className="gradient-editor fixed top-0 left-0 h-screen w-screen z-[-1]" />
-      <div className={`gradient fixed top-0 left-0 h-screen w-screen z-[-1] transition-opacity ease-in-out duration-[3000ms] ${initAnimate ? 'opacity-100' : 'opacity-0'}`} />
+      <div className="gradient-editor fixed left-0 top-0 z-[-1] h-screen w-screen" />
+      <div
+        className={`gradient fixed left-0 top-0 z-[-1] h-screen w-screen transition-opacity duration-[3000ms] ease-in-out ${initAnimate ? 'opacity-100' : 'opacity-0'}`}
+      />
       <div className="relative top-[44px] flex h-[calc(100vh_-_44px)] justify-center pb-10">
         <div className="flex w-11/12 max-w-[740px] flex-col justify-center sm:w-9/12">
-          <div className="flex justify-end mb-4 gap-2">
-            <div className="flex gap-0.5 bg-white/[.05] rounded-lg">
+          <div className="mb-4 flex justify-end gap-2">
+            <div className="flex gap-0.5 rounded-lg bg-white/[.05]">
               <Tooltip title="Create new document">
-                <IconButton
-                  onClick={handleCreateDocument}
-                  className="hover:bg-black/[.10]"
-                  size="small"
-                >
+                <IconButton onClick={handleCreateDocument} className="hover:bg-black/[.10]" size="small">
                   <NoteAddIcon />
                 </IconButton>
               </Tooltip>
@@ -316,8 +299,7 @@ const SharedDocumentsPage = ({
                 <IconButton
                   onClick={() => setCreateFolderModalOpen(true)}
                   className="hover:bg-black/[.10]"
-                  size="small"
-                >
+                  size="small">
                   <CreateNewFolderIcon />
                 </IconButton>
               </Tooltip>
@@ -325,12 +307,13 @@ const SharedDocumentsPage = ({
           </div>
           <div className="max-h-[calc(100vh_-_100px)] overflow-y-auto rounded-lg bg-white/[.05] p-4">
             {showSpinner && <Loader />}
-            {!docsLoading && !foldersLoading && (!documents.length && !folders.length) && emptyMessage}
-            {(!docsLoading && !foldersLoading && (documents.length || folders.length)) && (
+            {!docsLoading && !foldersLoading && !documents.length && !folders.length && emptyMessage}
+            {!docsLoading && !foldersLoading && (documents.length || folders.length) && (
               <DocumentTree
                 items={items}
                 onPrimaryAction={item => navigateTo(`/documents/${item.index}`)}
                 onMove={handleMoveItem}
+                onRename={handleRename}
                 showActionButton={true}
                 onActionButtonClick={handleMenuClick}
                 selectedItems={selectedItems}
@@ -357,9 +340,9 @@ const SharedDocumentsPage = ({
         slotProps={{
           paper: {
             style: {
-              transformOrigin: 'top'
-            }
-          }
+              transformOrigin: 'top',
+            },
+          },
         }}
         sx={{
           '& .MuiPaper-root': {
@@ -379,9 +362,9 @@ const SharedDocumentsPage = ({
             '&:hover': {
               backgroundColor: 'rgba(255, 255, 255, 0.3)',
             },
-          }
+          },
         }}>
-        <MenuItem onClick={handleRename}>RENAME</MenuItem>
+        <MenuItem onClick={handleMenuRename}>RENAME</MenuItem>
         <MenuItem onClick={handleDelete}>DELETE</MenuItem>
       </Menu>
 
@@ -391,20 +374,14 @@ const SharedDocumentsPage = ({
           setRenameModalOpen(false)
           setSelectedDoc(null)
         }}
-        onConfirm={(newName) => {
+        onConfirm={newName => {
           if (selectedDocId) {
-            const item = items[selectedDocId]
-            if (item) {
-              if (item.isFolder) {
-                renameFolder(selectedDocId, newName)
-              } else {
-                renameDocument(selectedDocId, newName)
-              }
-            }
+            handleRename(selectedDocId, newName)
           }
           setSelectedDoc(null)
+          setRenameModalOpen(false)
         }}
-        initialValue={selectedDocId ? (items[selectedDocId]?.data || '') : ''}
+        initialValue={selectedDocId ? items[selectedDocId]?.data || '' : ''}
       />
 
       <DeleteModal
@@ -421,7 +398,7 @@ const SharedDocumentsPage = ({
       <CreateFolderModal
         open={createFolderModalOpen}
         onClose={() => setCreateFolderModalOpen(false)}
-        onConfirm={(folderName) => {
+        onConfirm={folderName => {
           createFolder(folderName, newFolderParentId)
           setCreateFolderModalOpen(false)
         }}
