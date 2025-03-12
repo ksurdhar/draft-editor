@@ -64,7 +64,7 @@ const EditorComponent = ({
 }: EditorProps) => {
   const [inputValue, setInputValue] = useState(title === 'Untitled' ? '' : title)
   const [showFindPanel, setShowFindPanel] = useState(false)
-  const titleRef = useRef<HTMLInputElement>(null)
+  const titleRef = useRef<HTMLTextAreaElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const { mouseMoved } = useMouse()
@@ -144,35 +144,51 @@ const EditorComponent = ({
   }, [shouldFocusTitle])
 
   return (
-    <div className="flex-grow animate-fadein normal-case">
+    <div className="flex h-full min-h-screen w-full animate-fadein flex-col overflow-x-hidden normal-case">
       <style>{editorStyles}</style>
-      <div className="mb-[20px] mt-[44px]">
-        <input
-          type="text"
-          ref={titleRef}
-          value={inputValue}
-          placeholder="Untitled"
-          className="editable mb-2 w-full border-b border-transparent bg-transparent text-3xl uppercase [-webkit-appearance:none] [appearance:none] placeholder:text-black/[.3] focus:border-transparent focus:outline-none focus:ring-0 focus:ring-offset-0 active:outline-none md:text-4xl"
-          style={{ outline: 'none', boxShadow: 'none' }}
-          spellCheck={false}
-          onKeyDown={e => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              editor?.commands.focus()
-            }
-          }}
-          onChange={e => {
-            const newValue = e.target.value
-            setInputValue(newValue)
-            onUpdate({ title: newValue || 'Untitled' })
-          }}
-        />
+      <div className="flex w-full justify-center">
+        <div className="w-full max-w-[740px] px-4 pt-[44px]">
+          <textarea
+            rows={1}
+            ref={titleRef}
+            value={inputValue}
+            placeholder="Untitled"
+            className="editable block w-full resize-none overflow-hidden border-b border-transparent bg-transparent text-3xl uppercase [-webkit-appearance:none] [appearance:none] placeholder:text-black/[.3] focus:border-transparent focus:outline-none focus:ring-0 focus:ring-offset-0 active:outline-none md:text-4xl"
+            style={{
+              outline: 'none',
+              boxShadow: 'none',
+              whiteSpace: 'pre-wrap',
+              overflowWrap: 'break-word',
+              lineHeight: '1.2',
+              width: '100%',
+              minWidth: '100%',
+            }}
+            spellCheck={false}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                editor?.commands.focus()
+              }
+            }}
+            onChange={e => {
+              const newValue = e.target.value
+              e.target.style.height = 'auto'
+              e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px'
+              setInputValue(newValue)
+              onUpdate({ title: newValue || 'Untitled' })
+            }}
+          />
+        </div>
       </div>
-      <div ref={containerRef} className="prose max-w-none">
-        <EditorContent
-          editor={editor}
-          className="static h-full min-h-[200px] w-full rounded-md p-4 text-[19px] focus:outline-none focus:ring-0 md:text-[22px] [&_*]:focus:outline-none [&_*]:focus:ring-0"
-        />
+      <div className="flex w-full flex-1 justify-center">
+        <div className="w-full max-w-[740px] px-4">
+          <div ref={containerRef} className="prose w-full max-w-none">
+            <EditorContent
+              editor={editor}
+              className="h-full min-h-[calc(100vh-200px)] w-[692px] rounded-md px-4 pb-4 text-[19px] focus:outline-none focus:ring-0 md:text-[22px] [&_*]:focus:outline-none [&_*]:focus:ring-0"
+            />
+          </div>
+        </div>
       </div>
       {showFindPanel && editor && <FindPanel editor={editor} onClose={() => setShowFindPanel(false)} />}
       {!hideFooter && <Footer editor={editor} initFadeIn={initFadeIn} fadeOut={fadeOut} />}
