@@ -1,6 +1,60 @@
 'use client'
-import { ReactNode, useEffect, useRef } from 'react'
+import { ReactNode, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+
+const TypewriterText = ({ text, className }: { text: string; className: string }) => {
+  const [displayText, setDisplayText] = useState(text) // Initialize with full text
+  const [key, setKey] = useState(0)
+  const isInitialRender = useRef(true)
+  const prevTextRef = useRef(text)
+
+  useEffect(() => {
+    // On initial render, show the full text immediately (no animation)
+    if (isInitialRender.current) {
+      isInitialRender.current = false
+      return
+    }
+
+    // Skip animation if it's just a document navigation (from tree)
+    // Only animate when the text actually changes from user edits
+    if (prevTextRef.current === text) {
+      return
+    }
+
+    // Save current text for future comparison
+    prevTextRef.current = text
+
+    // Reset and start new animation when text changes from edits
+    setDisplayText('')
+    setKey(prev => prev + 1)
+
+    let index = 0
+    const interval = setInterval(() => {
+      setDisplayText(text.substring(0, index + 1))
+      index++
+
+      if (index >= text.length) {
+        clearInterval(interval)
+      }
+    }, 20) // Character typing speed
+
+    return () => clearInterval(interval)
+  }, [text])
+
+  return (
+    <span key={key} className={className}>
+      {displayText}
+      {displayText.length < text.length && (
+        <motion.span
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ repeat: Infinity, duration: 0.5 }}>
+          |
+        </motion.span>
+      )}
+    </span>
+  )
+}
 
 interface ListItemProps {
   leftIcon?: ReactNode
@@ -135,10 +189,13 @@ export const ListItem = ({
           <div
             ref={labelRef}
             data-label-content
-            className={`${themeClasses.text} block h-[20px] w-full cursor-pointer overflow-hidden whitespace-nowrap bg-transparent text-sm font-[600] font-semibold uppercase leading-[20px] tracking-wide ${
+            className={`block h-[20px] w-full cursor-pointer overflow-hidden whitespace-nowrap bg-transparent ${
               isEditing ? 'opacity-0' : ''
             }`}>
-            {label}
+            <TypewriterText
+              text={label}
+              className={`${themeClasses.text} text-sm font-[600] font-semibold uppercase leading-[20px] tracking-wide`}
+            />
           </div>
         </div>
         {rightContent && <div className="ml-2 flex shrink-0 items-center">{rightContent}</div>}
