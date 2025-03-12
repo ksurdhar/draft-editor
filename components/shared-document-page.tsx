@@ -100,16 +100,16 @@ export default function SharedDocumentPage() {
   // Handle document content updates - split into two effects
   useEffect(() => {
     const loadDocument = async (docId: string) => {
-      console.log('Loading document:', {
-        docId,
-        currentDocId: documentId,
-        hasCurrentContent: !!currentContent,
-        isTransitioning,
-      })
+      // console.log('Loading document:', {
+      //   docId,
+      //   currentDocId: documentId,
+      //   hasCurrentContent: !!currentContent,
+      //   isTransitioning,
+      // })
 
       // Only skip if we have content for this specific document and we're not in transition
       if (currentContent && docId === documentId && !isTransitioning) {
-        console.log('Skipping load - already have content for this document')
+        // console.log('Skipping load - already have content for this document')
         return
       }
 
@@ -123,11 +123,11 @@ export default function SharedDocumentPage() {
 
         // Get document from API
         const doc = await get(`/documents/${docId}`)
-        console.log('Loaded document:', {
-          docId,
-          hasContent: !!doc.content,
-          contentLength: doc.content?.content?.length,
-        })
+        // console.log('Loaded document:', {
+        //   docId,
+        //   hasContent: !!doc.content,
+        //   contentLength: doc.content?.content?.length,
+        // })
 
         // Check if we're still on the same document
         const currentDocId = new URLSearchParams(window.location.search).get('documentId') || id
@@ -165,12 +165,12 @@ export default function SharedDocumentPage() {
       const newParams = new URLSearchParams(window.location.search)
       const newDocId = newParams.get('documentId') || id
 
-      console.log('Document change event:', {
-        newDocId,
-        currentDocId: documentId,
-        hasCurrentContent: !!currentContent,
-        isTransitioning,
-      })
+      // console.log('Document change event:', {
+      //   newDocId,
+      //   currentDocId: documentId,
+      //   hasCurrentContent: !!currentContent,
+      //   isTransitioning,
+      // })
 
       if (newDocId !== documentId) {
         // Reset state before loading new document
@@ -190,10 +190,10 @@ export default function SharedDocumentPage() {
         mutate(`/documents/${docId}`, undefined, false)
       }
 
-      console.log('Document changing event:', {
-        targetDocId: event.detail?.documentId,
-        currentDocId: documentId,
-      })
+      // console.log('Document changing event:', {
+      //   targetDocId: event.detail?.documentId,
+      //   currentDocId: documentId,
+      // })
     }
 
     window.addEventListener('documentChanged', handleDocumentChange)

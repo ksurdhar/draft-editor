@@ -1,5 +1,5 @@
 'use client'
-import { ReactNode, useEffect, useState, useRef } from 'react'
+import { ReactNode, useEffect, useState, useRef, KeyboardEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 // Custom TypewriterText component for the typewriter effect
@@ -65,6 +65,7 @@ interface ListItemProps {
   isSelected?: boolean
   onClick?: () => void
   onDoubleClick?: () => void
+  onRename?: (newName: string) => void
   children?: ReactNode
   isExpanded?: boolean
   theme?: 'light' | 'dark'
@@ -81,6 +82,7 @@ export const ListItem = ({
   isSelected = false,
   onClick,
   onDoubleClick,
+  onRename,
   children,
   isExpanded,
   theme = 'light',
@@ -88,39 +90,82 @@ export const ListItem = ({
   itemContainerProps = {},
   showSelectedStyles = true,
 }: ListItemProps) => {
-  const [hasRecentClick, setHasRecentClick] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editValue, setEditValue] = useState(label)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const clickTimeoutRef = useRef<NodeJS.Timeout>()
 
   // Handle single click
-  const handleSingleClick = () => {
-    console.log('CLICK EVENT DETECTED')
+  const handleSingleClick = (e: React.MouseEvent) => {
+    // If we're editing, don't handle clicks
+    if (isEditing) {
+      e.stopPropagation()
+      return
+    }
 
-    // If we've already handled a double-click recently, ignore this click
-    if (hasRecentClick) return
+    // Clear any existing click timeout
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current)
+    }
 
-    // If there's a double-click, the browser will call onDoubleClick instead
-    // and this will be canceled by setting hasRecentClick
-    setTimeout(() => {
-      if (!hasRecentClick) {
-        console.log('✅ SINGLE CLICK CONFIRMED')
-        if (onClick) onClick()
-      }
-      setHasRecentClick(false)
-    }, 10) // Very small delay to let double-click be detected first if it's coming
+    // Set a timeout to handle the click after a brief delay
+    clickTimeoutRef.current = setTimeout(() => {
+      console.log('✅ Single click confirmed')
+      if (onClick) onClick()
+    }, 250) // This needs to be less than the browser's double click threshold
   }
 
   // Handle native double-click event
-  const handleDoubleClick = () => {
-    console.log('🔥 NATIVE DOUBLE CLICK DETECTED')
-    setHasRecentClick(true)
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    console.log('🔥 Double click intercepted')
+    e.stopPropagation()
+    e.preventDefault()
 
+    // Clear any pending single click
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current)
+    }
+
+    // Enter edit mode
+    setIsEditing(true)
+    setEditValue(label)
+
+    // Call the original onDoubleClick if provided
     if (onDoubleClick) {
       onDoubleClick()
     }
+  }
 
-    // Reset after a short time
-    setTimeout(() => {
-      setHasRecentClick(false)
-    }, 300)
+  // Focus input when entering edit mode
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus()
+      inputRef.current.select()
+    }
+  }, [isEditing])
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      e.stopPropagation()
+      if (onRename && editValue.trim() !== '') {
+        onRename(editValue)
+      }
+      setIsEditing(false)
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      e.stopPropagation()
+      setIsEditing(false)
+      setEditValue(label)
+    }
+  }
+
+  const handleBlur = () => {
+    if (onRename && editValue.trim() !== '' && editValue !== label) {
+      onRename(editValue)
+    }
+    setIsEditing(false)
+    setEditValue(label)
   }
 
   const getThemeClasses = () => {
@@ -159,10 +204,22 @@ export const ListItem = ({
               <div className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">{leftIcon}</div>
             </div>
           )}
-          <TypewriterText
-            text={label}
-            className={`uppercase ${themeClasses.text} block h-[20px] truncate text-sm font-[600] font-semibold leading-[20px]`}
-          />
+          {isEditing ? (
+            <input
+              ref={inputRef}
+              type="text"
+              value={editValue}
+              onChange={e => setEditValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onBlur={handleBlur}
+              className={`${themeClasses.text} block h-[20px] w-full bg-transparent text-sm font-[600] font-semibold leading-[20px] outline-none`}
+            />
+          ) : (
+            <TypewriterText
+              text={label}
+              className={`uppercase ${themeClasses.text} block h-[20px] truncate text-sm font-[600] font-semibold leading-[20px]`}
+            />
+          )}
         </div>
         {rightContent && <div className="ml-2 flex shrink-0 items-center">{rightContent}</div>}
       </div>

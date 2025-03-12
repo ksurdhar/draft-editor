@@ -8,7 +8,7 @@ import {
 import 'react-complex-tree/lib/style.css'
 import { IconButton } from '@mui/material'
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { DocumentData, FolderData } from '@typez/globals'
 import { ListItem } from './list-item'
 
@@ -199,48 +199,83 @@ const DocumentTree = ({
     }
     return []
   })
+  const hasRecentDoubleClickRef = useRef(false)
+  const pendingSelectionRef = useRef<TreeItemIndex[]>()
+  const pendingActionRef = useRef<TreeItem>()
 
   // Use either external or internal selected items
   const selectedItems = externalSelectedItems !== undefined ? externalSelectedItems : internalSelectedItems
 
   const handleSelect = (items: TreeItemIndex[]) => {
-    if (onSelectedItemsChange) {
-      onSelectedItemsChange(items)
-    } else {
-      setInternalSelectedItems([...items])
-    }
+    console.log('🎯 Selection requested:', items)
+
+    // Store the selection request
+    pendingSelectionRef.current = items
+
+    // Wait to see if this was a double click
+    setTimeout(() => {
+      if (!hasRecentDoubleClickRef.current && pendingSelectionRef.current) {
+        console.log('✅ Applying delayed selection:', pendingSelectionRef.current)
+        if (onSelectedItemsChange) {
+          onSelectedItemsChange(pendingSelectionRef.current)
+        } else {
+          setInternalSelectedItems([...pendingSelectionRef.current])
+        }
+
+        // If we have a pending action, execute it now
+        if (pendingActionRef.current) {
+          console.log('✅ Executing delayed primary action')
+          handlePrimaryAction(pendingActionRef.current)
+          pendingActionRef.current = undefined
+        }
+      }
+      pendingSelectionRef.current = undefined
+    }, 300)
   }
 
   const handlePrimaryAction = (item: TreeItem) => {
-    const selectedId = item.index.toString()
-    if (!selectedId || !items[selectedId]) return
+    console.log('🎯 Primary action requested:', item.index)
 
-    const treeItem = items[selectedId]
-    if (!treeItem.isFolder) {
-      const currentUrl = window.location.pathname
-      const baseDocumentId = currentUrl.split('/').pop()
+    // If we're in a double click state, ignore the action
+    if (hasRecentDoubleClickRef.current) {
+      console.log('❌ Primary action blocked by double click')
+      return
+    }
 
-      if (baseDocumentId && currentUrl.includes('/documents/')) {
-        const newUrl = `/documents/${baseDocumentId}?documentId=${selectedId}`
+    // Store the action request
+    pendingActionRef.current = item
 
-        // First clear any cached state by triggering documentChanging
-        window.dispatchEvent(
-          new CustomEvent('documentChanging', {
-            detail: { documentId: selectedId },
-          }),
-        )
+    // If we don't have a pending selection, execute immediately
+    if (!pendingSelectionRef.current) {
+      console.log('✅ Executing immediate primary action')
+      const selectedId = item.index.toString()
+      if (!selectedId || !items[selectedId]) return
 
-        // Update URL
-        window.history.pushState({}, '', newUrl)
+      const treeItem = items[selectedId]
+      if (!treeItem.isFolder) {
+        const currentUrl = window.location.pathname
+        const baseDocumentId = currentUrl.split('/').pop()
 
-        // Dispatch document changed event after a brief delay
-        setTimeout(() => {
-          window.dispatchEvent(new Event('documentChanged'))
-        }, 50)
-      } else {
-        console.log('Navigating to document:', selectedId)
-        onPrimaryAction?.(item)
+        if (baseDocumentId && currentUrl.includes('/documents/')) {
+          const newUrl = `/documents/${baseDocumentId}?documentId=${selectedId}`
+
+          window.dispatchEvent(
+            new CustomEvent('documentChanging', {
+              detail: { documentId: selectedId },
+            }),
+          )
+
+          window.history.pushState({}, '', newUrl)
+
+          setTimeout(() => {
+            window.dispatchEvent(new Event('documentChanged'))
+          }, 50)
+        } else {
+          console.log('Navigating to document:', selectedId)
+          onPrimaryAction?.(item)
+        }
       }
+      pendingActionRef.current = undefined
     }
   }
 
@@ -255,7 +290,7 @@ const DocumentTree = ({
       try {
         localStorage.setItem('editor-tree-expanded', JSON.stringify(newExpandedItems))
       } catch (e) {
-        console.error('Error saving to localStorage:', e)
+        console.error('Error reading from localStorage:', e)
       }
     }
   }
@@ -273,32 +308,40 @@ const DocumentTree = ({
   }
 
   const handleDoubleClick = (item: TreeItem) => {
+    console.log('🔥 Double click detected:', item.index)
+
+    // Clear any pending actions
+    pendingSelectionRef.current = undefined
+    pendingActionRef.current = undefined
+
+    // Set the double click flag
+    hasRecentDoubleClickRef.current = true
+
     const selectedId = item.index.toString()
     if (!selectedId || !items[selectedId]) return
 
     const treeItem = items[selectedId]
 
-    // For folders, just toggle expansion for both single and double click
+    // For folders, just toggle expansion
     if (treeItem.isFolder) {
       if (expandedItems.includes(selectedId)) {
         handleCollapseItem(item)
       } else {
         handleExpandItem(item)
       }
-      return
     }
 
-    // For documents, let's show this is detected by console logging
-    console.log('🔥 Document tree detected DOUBLE CLICK on item:', selectedId)
+    // Reset the double click flag after a delay
+    setTimeout(() => {
+      console.log('🔄 Resetting double click state')
+      hasRecentDoubleClickRef.current = false
+    }, 500)
+  }
 
-    // Here you would typically implement rename or edit behavior
-    // For example, you could show a rename dialog for the document
-    alert(`You double-clicked on "${treeItem.data}". This could trigger rename functionality.`)
-
-    // You could trigger rename functionality:
-    // onActionButtonClick(event, selectedId); // If your action button opens rename dialog
-
-    // Or implement custom behavior here
+  const handleRename = (item: TreeItem, newName: string) => {
+    console.log('Renaming item:', item.index, 'to:', newName)
+    // Here you would typically make an API call to rename the item
+    // For now we'll just log it
   }
 
   return (
@@ -432,6 +475,7 @@ const DocumentTree = ({
                 }
               }}
               onDoubleClick={() => handleDoubleClick(item)}
+              onRename={newName => handleRename(item, newName)}
               rightContent={
                 showActionButton && item.index !== 'root' ? (
                   <IconButton
