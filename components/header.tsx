@@ -214,6 +214,15 @@ const HeaderComponent = ({ id }: HeaderProps) => {
                   </ListItemButton>
                 </ListItem>
                 <ListItem disablePadding>
+                  <ListItemButton
+                    onClick={() => {
+                      navigateTo('/characters')
+                      setMenuOpen(!menuOpen)
+                    }}>
+                    <ListItemText primary={'Characters'} />
+                  </ListItemButton>
+                </ListItem>
+                <ListItem disablePadding>
                   <ListItemButton onClick={() => signOut()}>
                     <ListItemText primary={'Sign Out'} />
                   </ListItemButton>

@@ -1,7 +1,7 @@
 import { DocumentData, VersionData } from '@typez/globals'
 import axios, { AxiosRequestConfig } from 'axios'
 import authService from './auth-service'
-import { documentStorage, folderStorage, versionStorage } from './storage-adapter'
+import { documentStorage, folderStorage, versionStorage, characterStorage } from './storage-adapter'
 import { DEFAULT_DOCUMENT_CONTENT } from '../lib/constants'
 import { isOnline } from './network-detector'
 import { BrowserWindow } from 'electron'
@@ -10,6 +10,7 @@ import { BrowserWindow } from 'electron'
 const BASE_URL = 'https://www.whetstone-writer.com/api'
 const DOCUMENTS_COLLECTION = 'documents'
 const FOLDERS_COLLECTION = 'folders'
+const CHARACTERS_COLLECTION = 'characters'
 
 // Reference to the network detector
 let networkDetector: {
@@ -89,6 +90,32 @@ const apiService = {
     return result.data
   },
 
+  // Character-related methods
+  getCharacters: async () => {
+    const result = await makeRequest('get', '/characters')
+    return result.data
+  },
+
+  getCharacter: async (id: string) => {
+    const result = await makeRequest('get', `/characters/${id}`)
+    return result.data
+  },
+
+  createCharacter: async (data: any) => {
+    const result = await makeRequest('post', '/characters', data)
+    return result.data
+  },
+
+  updateCharacter: async (id: string, data: any) => {
+    const result = await makeRequest('patch', `/characters/${id}`, data)
+    return result.data
+  },
+
+  deleteCharacter: async (id: string) => {
+    const result = await makeRequest('delete', `/characters/${id}`)
+    return result.data
+  },
+
   post: async (url: string, body: any) => {
     const result = await makeRequest('post', url, body)
     return result.data
@@ -147,6 +174,7 @@ const makeRequest = async (
 let syncInProgress = {
   documents: false,
   folders: false,
+  characters: false,
 }
 
 // Handles all local storage operations
@@ -192,6 +220,25 @@ async function performLocalOperation(
       })
       console.log('Created folder:', newFolder)
       return { data: newFolder }
+    }
+    return { data: null }
+  }
+
+  // Handle character collection operations
+  if (endpoint === 'characters') {
+    console.log('Handling collection-level characters request')
+    if (method === 'get') {
+      return { data: await characterStorage.find(CHARACTERS_COLLECTION, {}) }
+    }
+    if (method === 'post') {
+      console.log('Creating new character:', data)
+      const now = Date.now()
+      const newCharacter = await characterStorage.create(CHARACTERS_COLLECTION, {
+        ...data,
+        lastUpdated: now,
+      })
+      console.log('Created character:', newCharacter)
+      return { data: newCharacter }
     }
     return { data: null }
   }
@@ -386,6 +433,39 @@ async function performLocalOperation(
           if (!data) return { data: null }
           return { data: await versionStorage.create('versions', data) }
       }
+    }
+  }
+
+  // Handle character operations
+  const characterMatch = endpoint.match(/^characters\/([^\/]+)$/)
+  if (characterMatch) {
+    const [, id] = characterMatch
+    console.log('Character operation:', { id, collection: CHARACTERS_COLLECTION })
+    if (!id) {
+      console.log('No character ID found in endpoint')
+      return { data: null }
+    }
+
+    switch (method) {
+      case 'get':
+        console.log(`Finding character by ID: ${id} in collection: ${CHARACTERS_COLLECTION}`)
+        const character = await characterStorage.findById(CHARACTERS_COLLECTION, id)
+        console.log('Character found:', character ? 'yes' : 'no')
+        return { data: character }
+      case 'patch':
+        if (!data) return { data: null }
+        console.log(`Updating character ${id} in collection ${CHARACTERS_COLLECTION}:`, data)
+        const updateResult = await characterStorage.update(CHARACTERS_COLLECTION, id, data)
+        console.log('Character update result:', updateResult)
+        return { data: updateResult }
+      case 'delete':
+        console.log('Attempting to delete character with ID:', id)
+        const deleteResult = await characterStorage.delete(CHARACTERS_COLLECTION, { _id: id })
+        console.log('Delete operation result:', deleteResult)
+        return { data: { success: deleteResult } }
+      case 'post':
+        if (!data) return { data: null }
+        return { data: await characterStorage.create(CHARACTERS_COLLECTION, data) }
     }
   }
 
@@ -734,6 +814,136 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
     } finally {
       // Always release the sync flag when done
       syncInProgress.folders = false
+    }
+  }
+
+  if (endpoint === 'characters' && Array.isArray(cloudData)) {
+    // Skip if a sync is already in progress for this collection
+    if (syncInProgress.characters) {
+      console.log('Skipping characters sync - another sync already in progress')
+      return
+    }
+
+    try {
+      // Set sync flag
+      syncInProgress.characters = true
+
+      console.log('Syncing cloud characters to local storage')
+      console.log(`Cloud characters count: ${cloudData.length}`)
+
+      // Get local characters
+      const localCharacters = await characterStorage.find(CHARACTERS_COLLECTION, {})
+      console.log(`Local characters count before sync: ${localCharacters.length}`)
+
+      // Create maps for efficient lookups
+      const localCharsById = new Map(localCharacters.map(char => [normalizeId(char._id), char]))
+      const cloudCharsById = new Map(cloudData.map(char => [normalizeId(char._id), char]))
+
+      // Keep track of characters we process
+      let updatedCount = 0
+      let createdCount = 0
+      let skippedCount = 0
+      let cloudCreatedCount = 0
+      const newCharacters: any[] = []
+
+      // First sync cloud characters to local
+      for (const cloudChar of cloudData) {
+        if (!cloudChar._id) {
+          console.warn('Skipping cloud character without ID:', cloudChar)
+          continue
+        }
+
+        const normalizedId = normalizeId(cloudChar._id)
+        const localChar = localCharsById.get(normalizedId)
+
+        if (localChar) {
+          // Character exists locally - check if cloud version is newer
+          if (
+            cloudChar.updatedAt &&
+            localChar.updatedAt &&
+            new Date(cloudChar.updatedAt).getTime() > new Date(localChar.updatedAt).getTime()
+          ) {
+            console.log(`Updating character ${cloudChar._id} with newer cloud version`)
+            await characterStorage.update(CHARACTERS_COLLECTION, cloudChar._id, cloudChar)
+            newCharacters.push(cloudChar)
+            updatedCount++
+          } else {
+            console.log(`Skipping character ${cloudChar._id}, local version is current or newer`)
+            skippedCount++
+          }
+        } else {
+          // Character doesn't exist locally - create it with the SAME ID
+          console.log(`Creating new local character from cloud with ID: ${cloudChar._id}`)
+          try {
+            const newChar = await characterStorage.create(CHARACTERS_COLLECTION, {
+              ...cloudChar,
+              // Use the same ID as the cloud version
+              _id: cloudChar._id,
+            })
+            newCharacters.push(newChar)
+            createdCount++
+          } catch (error) {
+            console.error(`Error creating character ${cloudChar._id}:`, error)
+          }
+        }
+      }
+
+      // Then sync local characters to cloud
+      for (const localChar of localCharacters) {
+        if (!localChar._id) {
+          console.warn('Skipping local character without ID:', localChar)
+          continue
+        }
+
+        const normalizedId = normalizeId(localChar._id)
+        const cloudChar = cloudCharsById.get(normalizedId)
+
+        if (!cloudChar) {
+          // Character exists locally but not in cloud - create it in cloud
+          console.log(`Creating character in cloud with local ID: ${localChar._id}`)
+          try {
+            await performCloudOperation('post', '/characters', {
+              ...localChar,
+              _id: localChar._id, // Ensure we use the same ID
+            })
+            cloudCreatedCount++
+          } catch (error) {
+            console.error(`Error creating character ${localChar._id} in cloud:`, error)
+          }
+        } else {
+          // Character exists in both local and cloud - check if local version is newer
+          if (
+            localChar.updatedAt &&
+            cloudChar.updatedAt &&
+            new Date(localChar.updatedAt).getTime() > new Date(cloudChar.updatedAt).getTime()
+          ) {
+            // Local character is newer, update cloud version
+            console.log(`Updating cloud character ${localChar._id} with newer local version`)
+            try {
+              await performCloudOperation('patch', `/characters/${localChar._id}`, localChar)
+              cloudCreatedCount++ // Reuse this counter for updates too
+            } catch (error) {
+              console.error(`Error updating character ${localChar._id} in cloud:`, error)
+            }
+          }
+        }
+      }
+
+      console.log(
+        `Character sync complete. Updated locally: ${updatedCount}, Created locally: ${createdCount}, Created/Updated in cloud: ${cloudCreatedCount}, Skipped: ${skippedCount}`,
+      )
+
+      // If we have new or updated characters, notify all windows
+      if (newCharacters.length > 0) {
+        BrowserWindow.getAllWindows().forEach(window => {
+          if (!window.isDestroyed()) {
+            window.webContents.send('sync:updates', { characters: newCharacters })
+          }
+        })
+      }
+    } finally {
+      // Always release the sync flag when done
+      syncInProgress.characters = false
     }
   }
 }

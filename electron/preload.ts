@@ -21,7 +21,7 @@ const electronAPI = {
       ipcRenderer.removeListener('network:status-changed', listener)
     }
   },
-  onSyncUpdate: (callback: (updates: { documents?: any[]; folders?: any[] }) => void) => {
+  onSyncUpdate: (callback: (updates: { documents?: any[]; folders?: any[]; characters?: any[] }) => void) => {
     const listener = (_: any, updates: any) => callback(updates)
     ipcRenderer.on('sync:updates', listener)
     return () => {

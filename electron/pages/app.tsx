@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useLocation } from 'wouter'
 import LandingPage from './landing-page'
 import ElectronDocumentsPage from './documents-page'
+import ElectronCharactersPage from './characters-page'
 
 interface Profile {
   name: string
@@ -97,6 +98,11 @@ function ElectronApp() {
     return regex.test(location)
   }, [location])
 
+  const isCharacterLocation = useCallback(() => {
+    const regex = /^\/characters\/([^\/]+)$/
+    return regex.test(location)
+  }, [location])
+
   const signOut = useCallback(() => {
     window.electronAPI.logOut()
   }, [])
@@ -113,7 +119,9 @@ function ElectronApp() {
           <Providers>
             {location === '/' && <LandingPage />}
             {location === '/documents' && <ElectronDocumentsPage />}
+            {location === '/characters' && <ElectronCharactersPage />}
             {isDocumentLocation() && <SharedDocumentPage />}
+            {isCharacterLocation() && <ElectronCharactersPage />} {/* TODO: Create character detail page */}
             {/* Network status indicator */}
             <NetworkStatus />
           </Providers>
