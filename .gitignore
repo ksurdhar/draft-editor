@@ -5,6 +5,7 @@
 /.pnp
 .pnp.js
 /websocket/node_modules
+/scripts/node_modules
 
 # testing
 /coverage

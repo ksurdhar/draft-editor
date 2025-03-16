@@ -247,3 +247,189 @@ export interface IFolderDocument extends Document, IFolder {}
 export interface IFolderModel extends Model<IFolderDocument> {}
 export const Folder =
   (Mongoose.models && Mongoose.models.Folder) || Mongoose.model<IFolderDocument>('Folder', FolderSchema)
+
+// Add a new schema for dialogue entries
+const DialogueEntrySchema = new Mongoose.Schema({
+  _id: {
+    type: Mongoose.Schema.Types.String,
+    required: true,
+  },
+  characterId: {
+    type: Mongoose.Schema.Types.String,
+    required: true,
+  },
+  characterName: {
+    type: Mongoose.Schema.Types.String,
+    required: true,
+  },
+  documentId: {
+    type: Mongoose.Schema.Types.String,
+    required: true,
+  },
+  documentTitle: {
+    type: Mongoose.Schema.Types.String,
+    default: '',
+  },
+  content: {
+    type: Mongoose.Schema.Types.String,
+    required: true,
+  },
+  location: {
+    paragraphIndex: {
+      type: Mongoose.Schema.Types.Number,
+      default: 0,
+    },
+    paragraphHash: {
+      type: Mongoose.Schema.Types.String,
+      default: '',
+    },
+  },
+  context: {
+    before: {
+      type: Mongoose.Schema.Types.String,
+      default: '',
+    },
+    after: {
+      type: Mongoose.Schema.Types.String,
+      default: '',
+    },
+  },
+  sceneInfo: {
+    sceneId: {
+      type: Mongoose.Schema.Types.String,
+      default: '',
+    },
+    sceneName: {
+      type: Mongoose.Schema.Types.String,
+      default: '',
+    },
+  },
+  lastUpdated: {
+    type: Mongoose.Schema.Types.Number,
+    default: Date.now(),
+  },
+  isValid: {
+    type: Mongoose.Schema.Types.Boolean,
+    default: true,
+  },
+})
+
+// Add toJSON for DialogueEntrySchema
+DialogueEntrySchema.set('toJSON', {
+  virtuals: true,
+  versionKey: false,
+  transform: function (doc, ret) {
+    ret.id = ret._id.toString()
+    delete ret._id
+  },
+})
+
+export interface IDialogueEntry {
+  characterId: string
+  characterName: string
+  documentId: string
+  documentTitle: string
+  content: string
+  location: {
+    paragraphIndex: number
+    paragraphHash: string
+  }
+  context: {
+    before: string
+    after: string
+  }
+  sceneInfo: {
+    sceneId: string
+    sceneName: string
+  }
+  lastUpdated: number
+  isValid: boolean
+}
+
+export interface IDialogueEntryDocument extends Document, IDialogueEntry {}
+export interface IDialogueEntryModel extends Model<IDialogueEntryDocument> {}
+export const DialogueEntry =
+  (Mongoose.models && Mongoose.models.DialogueEntry) ||
+  Mongoose.model<IDialogueEntryDocument>('DialogueEntry', DialogueEntrySchema)
+
+// Add a new schema for characters
+const CharacterSchema = new Mongoose.Schema({
+  _id: {
+    type: Mongoose.Schema.Types.String,
+    required: true,
+  },
+  name: {
+    type: Mongoose.Schema.Types.String,
+    required: true,
+  },
+  motivation: {
+    type: Mongoose.Schema.Types.String,
+    default: '',
+  },
+  description: {
+    type: Mongoose.Schema.Types.String,
+    default: '',
+  },
+  traits: {
+    type: [Mongoose.Schema.Types.String],
+    default: [],
+  },
+  relationships: {
+    type: [
+      {
+        characterId: Mongoose.Schema.Types.String,
+        relationshipType: Mongoose.Schema.Types.String,
+        description: Mongoose.Schema.Types.String,
+      },
+    ],
+    default: [],
+  },
+  userId: {
+    type: Mongoose.Schema.Types.String,
+    required: true,
+  },
+  documentIds: {
+    type: [Mongoose.Schema.Types.String],
+    default: [],
+  },
+  lastUpdated: {
+    type: Mongoose.Schema.Types.Number,
+    default: Date.now(),
+  },
+  isArchived: {
+    type: Mongoose.Schema.Types.Boolean,
+    default: false,
+  },
+})
+
+// Add toJSON for CharacterSchema
+CharacterSchema.set('toJSON', {
+  virtuals: true,
+  versionKey: false,
+  transform: function (doc, ret) {
+    ret.id = ret._id.toString()
+    delete ret._id
+  },
+})
+
+export interface ICharacter {
+  name: string
+  motivation: string
+  description: string
+  traits: string[]
+  relationships: Array<{
+    characterId: string
+    relationshipType: string
+    description: string
+  }>
+  userId: string
+  documentIds: string[]
+  lastUpdated: number
+  isArchived: boolean
+}
+
+export interface ICharacterDocument extends Document, ICharacter {}
+export interface ICharacterModel extends Model<ICharacterDocument> {}
+export const Character =
+  (Mongoose.models && Mongoose.models.Character) ||
+  Mongoose.model<ICharacterDocument>('Character', CharacterSchema)
