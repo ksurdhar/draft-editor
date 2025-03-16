@@ -24,6 +24,7 @@ import { useAPI } from '@components/providers'
 import { useUser } from '@wrappers/auth-wrapper-client'
 import { mutate } from 'swr'
 import CharacterModal from '@components/character-modal'
+import { useNavigation } from '@components/providers'
 
 // Character type definition
 interface CharacterData {
@@ -54,6 +55,7 @@ const SharedCharactersPage = ({
 }) => {
   const { post, patch, destroy } = useAPI()
   const { user, isLoading: userLoading } = useUser()
+  const { navigateTo } = useNavigation()
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null)
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [renameModalOpen, setRenameModalOpen] = useState(false)
@@ -206,10 +208,8 @@ const SharedCharactersPage = ({
   }
 
   const handleCharacterClick = (id: string) => {
-    const character = characters.find(char => char && char._id === id)
-    if (character) {
-      setEditingCharacter(character)
-    }
+    console.log('Character Click - Navigating to:', `/characters/${id}`)
+    navigateTo(`/characters/${id}`)
   }
 
   // Add keyboard shortcut for delete

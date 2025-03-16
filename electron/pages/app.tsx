@@ -1,10 +1,11 @@
 import Providers, { APIProvider, NavigationProvider } from '@components/providers'
 import SharedDocumentPage from '@components/shared-document-page'
 import { useCallback, useEffect, useState } from 'react'
-import { useLocation } from 'wouter'
+import { useLocation, Route, Switch } from 'wouter'
 import LandingPage from './landing-page'
 import ElectronDocumentsPage from './documents-page'
 import ElectronCharactersPage from './characters-page'
+import ElectronCharacterDetailPage from './character-detail-page'
 
 interface Profile {
   name: string
@@ -93,16 +94,6 @@ function ElectronApp() {
     return location
   }, [location])
 
-  const isDocumentLocation = useCallback(() => {
-    const regex = /^\/documents\/([^\/]+)$/
-    return regex.test(location)
-  }, [location])
-
-  const isCharacterLocation = useCallback(() => {
-    const regex = /^\/characters\/([^\/]+)$/
-    return regex.test(location)
-  }, [location])
-
   const signOut = useCallback(() => {
     window.electronAPI.logOut()
   }, [])
@@ -117,11 +108,13 @@ function ElectronApp() {
           post={window.electronAPI.post}
           delete={window.electronAPI.destroy}>
           <Providers>
-            {location === '/' && <LandingPage />}
-            {location === '/documents' && <ElectronDocumentsPage />}
-            {location === '/characters' && <ElectronCharactersPage />}
-            {isDocumentLocation() && <SharedDocumentPage />}
-            {isCharacterLocation() && <ElectronCharactersPage />} {/* TODO: Create character detail page */}
+            <Switch>
+              <Route path="/" component={LandingPage} />
+              <Route path="/documents" component={ElectronDocumentsPage} />
+              <Route path="/characters" component={ElectronCharactersPage} />
+              <Route path="/documents/:id" component={SharedDocumentPage} />
+              <Route path="/characters/:id" component={ElectronCharacterDetailPage} />
+            </Switch>
             {/* Network status indicator */}
             <NetworkStatus />
           </Providers>
