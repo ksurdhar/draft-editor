@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogTitle,
@@ -14,34 +14,59 @@ import {
 import CloseIcon from '@mui/icons-material/Close'
 
 interface CharacterData {
+  _id?: string
   name: string
   motivation: string
   description: string
   traits: string[]
 }
 
-interface CreateCharacterModalProps {
+interface CharacterModalProps {
   open: boolean
   onClose: () => void
   onConfirm: (characterData: CharacterData) => Promise<any>
+  initialData?: CharacterData | null
 }
 
-const CreateCharacterModal = ({ open, onClose, onConfirm }: CreateCharacterModalProps) => {
-  const [name, setName] = useState('John Doe')
-  const [motivation, setMotivation] = useState('To find the truth about their past')
-  const [description, setDescription] = useState('A determined character with a mysterious background')
+const CharacterModal = ({ open, onClose, onConfirm, initialData }: CharacterModalProps) => {
+  const [name, setName] = useState('')
+  const [motivation, setMotivation] = useState('')
+  const [description, setDescription] = useState('')
   const [trait, setTrait] = useState('')
-  const [traits, setTraits] = useState<string[]>(['brave', 'intelligent', 'resourceful'])
+  const [traits, setTraits] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [nameError, setNameError] = useState('')
   const [submitError, setSubmitError] = useState('')
 
+  const isEditMode = !!initialData?._id
+
+  // Initialize form with default values or data from the character being edited
+  useEffect(() => {
+    if (open) {
+      if (initialData) {
+        setName(initialData.name || '')
+        setMotivation(initialData.motivation || '')
+        setDescription(initialData.description || '')
+        setTraits(initialData.traits || [])
+      } else {
+        // Default values for new character
+        setName('John Doe')
+        setMotivation('To find the truth about their past')
+        setDescription('A determined character with a mysterious background')
+        setTraits(['brave', 'intelligent', 'resourceful'])
+      }
+      setTrait('')
+      setNameError('')
+      setSubmitError('')
+    }
+  }, [open, initialData])
+
   const resetForm = () => {
-    setName('John Doe')
-    setMotivation('To find the truth about their past')
-    setDescription('A determined character with a mysterious background')
+    setName('')
+    setMotivation('')
+    setDescription('')
     setTrait('')
-    setTraits(['brave', 'intelligent', 'resourceful'])
+    setTraits([])
     setNameError('')
     setSubmitError('')
     setIsSubmitting(false)
@@ -81,30 +106,28 @@ const CreateCharacterModal = ({ open, onClose, onConfirm }: CreateCharacterModal
     setSubmitError('')
 
     try {
-      console.log('Submitting character data:', {
+      const characterData = {
+        ...(initialData?._id ? { _id: initialData._id } : {}),
         name: name.trim(),
         motivation: motivation.trim(),
         description: description.trim(),
         traits,
-      })
+      }
 
-      const result = await onConfirm({
-        name: name.trim(),
-        motivation: motivation.trim(),
-        description: description.trim(),
-        traits,
-      })
+      console.log(`${isEditMode ? 'Updating' : 'Creating'} character data:`, characterData)
 
-      console.log('Character creation result:', result)
+      const result = await onConfirm(characterData)
+
+      console.log(`Character ${isEditMode ? 'update' : 'creation'} result:`, result)
 
       if (result) {
         handleClose()
       } else {
-        setSubmitError('Failed to create character. Please try again.')
+        setSubmitError(`Failed to ${isEditMode ? 'update' : 'create'} character. Please try again.`)
       }
     } catch (error) {
-      console.error('Error creating character:', error)
-      setSubmitError('An error occurred while creating the character.')
+      console.error(`Error ${isEditMode ? 'updating' : 'creating'} character:`, error)
+      setSubmitError(`An error occurred while ${isEditMode ? 'updating' : 'creating'} the character.`)
     } finally {
       setIsSubmitting(false)
     }
@@ -125,7 +148,7 @@ const CreateCharacterModal = ({ open, onClose, onConfirm }: CreateCharacterModal
       }}>
       <DialogTitle className="flex items-center justify-between">
         <Typography variant="h6" className="font-semibold">
-          Create New Character
+          {isEditMode ? 'Edit Character' : 'Create New Character'}
         </Typography>
         <IconButton onClick={handleClose} size="small">
           <CloseIcon />
@@ -219,12 +242,18 @@ const CreateCharacterModal = ({ open, onClose, onConfirm }: CreateCharacterModal
           variant="contained"
           color="primary"
           disabled={!name.trim() || isSubmitting}>
-          {isSubmitting ? 'Creating...' : 'Create Character'}
+          {isSubmitting
+            ? isEditMode
+              ? 'Updating...'
+              : 'Creating...'
+            : isEditMode
+              ? 'Update Character'
+              : 'Create Character'}
         </Button>
       </DialogActions>
     </Dialog>
   )
 }
 
-export default CreateCharacterModal
+export default CharacterModal
 export type { CharacterData }

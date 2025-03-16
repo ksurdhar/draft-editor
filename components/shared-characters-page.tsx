@@ -5,6 +5,7 @@ import { Loader } from '@components/loader'
 import { useSpinner } from '@lib/hooks'
 import { useState, useEffect, useCallback } from 'react'
 import PersonAddIcon from '@mui/icons-material/PersonAdd'
+import MoreVertIcon from '@mui/icons-material/MoreVert'
 import {
   IconButton,
   Menu,
@@ -13,18 +14,16 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemAvatar,
-  Avatar,
   ListItemSecondaryAction,
   Paper,
   Typography,
 } from '@mui/material'
 import RenameModal from './rename-modal'
 import DeleteModal from './delete-modal'
-import { useNavigation, useAPI } from '@components/providers'
+import { useAPI } from '@components/providers'
 import { useUser } from '@wrappers/auth-wrapper-client'
 import { mutate } from 'swr'
-import CreateCharacterModal from '@components/character-modal'
+import CharacterModal from '@components/character-modal'
 
 // Character type definition
 interface CharacterData {
@@ -53,7 +52,6 @@ const SharedCharactersPage = ({
   isLoading?: boolean
   onCharactersChange: (characters: CharacterData[]) => void
 }) => {
-  const { navigateTo } = useNavigation()
   const { post, patch, destroy } = useAPI()
   const { user, isLoading: userLoading } = useUser()
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null)
@@ -61,6 +59,7 @@ const SharedCharactersPage = ({
   const [renameModalOpen, setRenameModalOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [createCharacterModalOpen, setCreateCharacterModalOpen] = useState(false)
+  const [editingCharacter, setEditingCharacter] = useState<CharacterData | null>(null)
   const [initAnimate, setInitAnimate] = useState(false)
 
   // Wrap mutation functions in useCallback
@@ -207,8 +206,9 @@ const SharedCharactersPage = ({
   }
 
   const handleCharacterClick = (id: string) => {
-    if (id) {
-      navigateTo(`/characters/${id}`)
+    const character = characters.find(char => char && char._id === id)
+    if (character) {
+      setEditingCharacter(character)
     }
   }
 
@@ -268,11 +268,14 @@ const SharedCharactersPage = ({
                     <Paper
                       key={character._id}
                       elevation={0}
-                      className="mb-3 overflow-hidden rounded-lg bg-white/[.1] transition-all duration-200 hover:bg-white/[.15]">
+                      className="mb-3 overflow-hidden rounded-lg transition-all duration-200"
+                      sx={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                        '&:hover': {
+                          backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                        },
+                      }}>
                       <ListItem button onClick={() => handleCharacterClick(character._id)} className="py-3">
-                        <ListItemAvatar>
-                          <Avatar className="bg-purple-500">{character.name.charAt(0).toUpperCase()}</Avatar>
-                        </ListItemAvatar>
                         <ListItemText
                           primary={
                             <Typography variant="subtitle1" className="font-semibold">
@@ -291,7 +294,7 @@ const SharedCharactersPage = ({
                             onClick={e => handleMenuClick(e, character._id)}
                             size="small"
                             className="opacity-50 hover:opacity-100">
-                            <span className="material-icons">more_vert</span>
+                            <MoreVertIcon />
                           </IconButton>
                         </ListItemSecondaryAction>
                       </ListItem>
@@ -374,10 +377,18 @@ const SharedCharactersPage = ({
         itemCount={1}
       />
 
-      <CreateCharacterModal
+      <CharacterModal
         open={createCharacterModalOpen}
         onClose={() => setCreateCharacterModalOpen(false)}
         onConfirm={handleCreateCharacter}
+        initialData={null}
+      />
+
+      <CharacterModal
+        open={!!editingCharacter}
+        onClose={() => setEditingCharacter(null)}
+        onConfirm={characterData => handleUpdateCharacter(characterData._id!, characterData)}
+        initialData={editingCharacter}
       />
     </Layout>
   )
