@@ -12,6 +12,10 @@ import Box from '@mui/material/Box'
 import Drawer from '@mui/material/Drawer'
 import ShareModal from './share-modal'
 
+// Direct detection method for Electron environment
+const isBrowser = typeof window !== 'undefined'
+const isElectron = isBrowser && window.hasOwnProperty('electronAPI')
+
 interface DirectoryInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   webkitdirectory?: string
   directory?: string
@@ -131,6 +135,12 @@ const HeaderComponent = ({ id }: HeaderProps) => {
     event.target.value = ''
   }
 
+  // Determine the padding based on whether we're in Electron or not
+  const headerPadding = isElectron ? 'pt-8 p-5 pb-[30px]' : 'p-5 pb-[30px]'
+
+  // Adjust the hamburger menu position for Electron
+  const hamburgerTopPosition = isElectron ? 'top-[28px]' : 'top-[20px]'
+
   return (
     <>
       <input
@@ -147,7 +157,7 @@ const HeaderComponent = ({ id }: HeaderProps) => {
       <header
         className={`${initFadeIn ? 'header-gradient' : 'bg-transparent'} ${
           fadeOut && !menuOpen ? 'opacity-0' : 'opacity-100'
-        } fixed top-0 z-[39] flex w-[100vw] flex-row justify-between p-5 pb-[30px] transition-opacity duration-700 hover:opacity-100`}>
+        } fixed top-0 z-[39] flex w-[100vw] flex-row justify-between ${headerPadding} transition-opacity duration-700 hover:opacity-100`}>
         <h1 className="lowercase">
           {user ? (
             <button onClick={() => navigateTo('/documents')} className="hover:opacity-80">
@@ -164,7 +174,7 @@ const HeaderComponent = ({ id }: HeaderProps) => {
       <div
         className={`${
           fadeOut && !hoveringOverMenu && !menuOpen ? 'opacity-0' : 'opacity-100'
-        } fixed right-[20px] top-[20px] z-50 flex flex-row-reverse transition-opacity duration-700`}>
+        } fixed right-[20px] ${hamburgerTopPosition} z-50 flex flex-row-reverse transition-opacity duration-700`}>
         <Fragment>
           <div
             onClick={toggleDrawer(true)}

@@ -20,3 +20,13 @@
   --font-ibarra: 'Ibarra Real Nova', serif;
   --font-mukta: 'Mukta', sans-serif;
 }
+
+/* Add styles for the transparent title bar */
+body {
+  background-color: #fffce8; /* Match the backgroundColor in BrowserWindow */
+}
+
+/* Add padding to account for the transparent title bar on macOS */
+#root {
+  padding-top: 28px; /* Adjust this value as needed for your title bar height */
+}

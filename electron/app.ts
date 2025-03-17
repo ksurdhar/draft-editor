@@ -11,6 +11,8 @@ export const createAppWindow = async () => {
     height: 800,
     minWidth: 1000,
     minHeight: 600,
+    titleBarStyle: 'hiddenInset',
+    backgroundColor: '#fffce8',
     webPreferences: {
       nodeIntegration: true,
       nodeIntegrationInWorker: true,

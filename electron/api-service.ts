@@ -83,6 +83,13 @@ interface CollectionConfig {
   specialEndpoints?: Record<string, (method: string, match: RegExpMatchArray, data?: any) => Promise<any>>
 }
 
+// Define a basic interface for collection items
+interface CollectionItem {
+  _id: string | number
+  updatedAt?: string | number | Date
+  [key: string]: any
+}
+
 // Define configurations for each collection
 const collections: Record<string, CollectionConfig> = {
   documents: {
@@ -224,7 +231,7 @@ const collections: Record<string, CollectionConfig> = {
     }),
     specialEndpoints: {
       // Handle dialogue entries by character
-      '^dialogue/character/(.+)$': async (method, match, data) => {
+      '^dialogue/character/(.+)$': async (method, match, _data) => {
         const characterId = match[1]
         console.log('Getting dialogue entries for character:', characterId)
         if (method === 'get') {
@@ -233,7 +240,7 @@ const collections: Record<string, CollectionConfig> = {
         return { data: null }
       },
       // Handle dialogue entries by document
-      '^dialogue/document/(.+)$': async (method, match, data) => {
+      '^dialogue/document/(.+)$': async (method, match, _data) => {
         const documentId = match[1]
         console.log('Getting dialogue entries for document:', documentId)
         if (method === 'get') {
@@ -304,7 +311,7 @@ async function routeLocalOperation(
   console.log('Routing local operation:', { method, endpoint })
 
   // Handle collection-level operations
-  for (const [key, config] of Object.entries(collections)) {
+  for (const config of Object.values(collections)) {
     // Check for special endpoints first
     if (config.specialEndpoints) {
       for (const [pattern, handler] of Object.entries(config.specialEndpoints)) {
@@ -379,7 +386,7 @@ async function routeLocalOperation(
 }
 
 // Generic function to sync cloud data to local for any collection
-async function syncCollectionToLocal(config: CollectionConfig, cloudData: any[]) {
+async function syncCollectionToLocal(config: CollectionConfig, cloudData: CollectionItem[]) {
   // Skip if a sync is already in progress for this collection
   if (syncInProgress[config.name]) {
     console.log(`Skipping ${config.name} sync - another sync already in progress`)
@@ -398,8 +405,8 @@ async function syncCollectionToLocal(config: CollectionConfig, cloudData: any[])
     console.log(`Local ${config.name} count before sync: ${localItems.length}`)
 
     // Create maps for efficient lookups
-    const localItemsById = new Map(localItems.map(item => [normalizeId(item._id), item]))
-    const cloudItemsById = new Map(cloudData.map(item => [normalizeId(item._id), item]))
+    const localItemsById = new Map(localItems.map((item: CollectionItem) => [normalizeId(item._id), item]))
+    const cloudItemsById = new Map(cloudData.map((item: CollectionItem) => [normalizeId(item._id), item]))
 
     // Keep track of items we process
     let updatedCount = 0
@@ -422,8 +429,9 @@ async function syncCollectionToLocal(config: CollectionConfig, cloudData: any[])
         // Item exists locally - check if cloud version is newer
         if (
           cloudItem.updatedAt &&
-          localItem.updatedAt &&
-          new Date(cloudItem.updatedAt).getTime() > new Date(localItem.updatedAt).getTime()
+          (localItem as CollectionItem).updatedAt &&
+          new Date(cloudItem.updatedAt).getTime() >
+            new Date((localItem as CollectionItem).updatedAt as string).getTime()
         ) {
           console.log(`Updating ${getSingular(config.name)} ${cloudItem._id} with newer cloud version`)
           await config.storage.update(config.collectionName, cloudItem._id, cloudItem)
@@ -476,9 +484,10 @@ async function syncCollectionToLocal(config: CollectionConfig, cloudData: any[])
       } else {
         // Item exists in both local and cloud - check if local version is newer
         if (
-          localItem.updatedAt &&
+          (localItem as CollectionItem).updatedAt &&
           cloudItem.updatedAt &&
-          new Date(localItem.updatedAt).getTime() > new Date(cloudItem.updatedAt).getTime()
+          new Date((localItem as CollectionItem).updatedAt as string).getTime() >
+            new Date(cloudItem.updatedAt).getTime()
         ) {
           // Local item is newer, update cloud version
           console.log(`Updating cloud ${getSingular(config.name)} ${localItem._id} with newer local version`)

@@ -3,10 +3,6 @@ import { contextBridge, ipcRenderer } from 'electron'
 // API Definition
 const electronAPI = {
   getProfile: () => ipcRenderer.invoke('auth:get-profile'),
-  getDocuments: () => ipcRenderer.invoke('api:get-documents'),
-  deleteDocument: (id: string) => ipcRenderer.invoke('api:delete-document', id),
-  renameDocument: (id: string, data: any) => ipcRenderer.invoke('api:rename-document', id, data),
-  createDocument: (data: any) => ipcRenderer.invoke('api:create-document', data),
   post: (url: string, body: any) => ipcRenderer.invoke('api:post', url, body),
   patch: (url: string, body: any) => ipcRenderer.invoke('api:patch', url, body),
   get: (url: string) => ipcRenderer.invoke('api:get', url),
