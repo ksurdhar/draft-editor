@@ -31,10 +31,26 @@ interface CharacterData {
 
 // Dialogue type definition
 interface DialogueEntry {
-  id: string
+  _id?: string
+  characterId: string
+  characterName: string
+  documentId?: string
+  documentTitle?: string
   content: string
-  context: string
-  timestamp: number
+  context?: {
+    before?: string
+    after?: string
+  }
+  location?: {
+    paragraphIndex?: number
+    paragraphHash?: string
+  }
+  sceneInfo?: {
+    sceneId?: string
+    sceneName?: string
+  }
+  lastUpdated?: number
+  isValid?: boolean
 }
 
 const CharacterDetailPage = ({
@@ -46,29 +62,11 @@ const CharacterDetailPage = ({
   isLoading?: boolean
   onCharacterChange: (character: CharacterData) => void
 }) => {
-  const { patch } = useAPI()
+  const { patch, get, post } = useAPI()
   const { isLoading: userLoading } = useUser()
   const [editingCharacter, setEditingCharacter] = useState<CharacterData | null>(null)
-  const [dialogueEntries, setDialogueEntries] = useState<DialogueEntry[]>([
-    {
-      id: '1',
-      content: "I don't understand why you would do such a thing. After all we've been through.",
-      context: 'Confronting the antagonist',
-      timestamp: Date.now() - 86400000, // 1 day ago
-    },
-    {
-      id: '2',
-      content: "There's more to this story than meets the eye. Trust me, I'm doing this for all of us.",
-      context: 'Explaining motives',
-      timestamp: Date.now() - 43200000, // 12 hours ago
-    },
-    {
-      id: '3',
-      content: "Sometimes the hardest choices require the strongest wills. I didn't want it to be this way.",
-      context: 'Philosophical moment',
-      timestamp: Date.now() - 3600000, // 1 hour ago
-    },
-  ])
+  const [dialogue, setDialogue] = useState<DialogueEntry[]>([])
+  const [loadingDialogue, setLoadingDialogue] = useState(false)
   const [newDialogue, setNewDialogue] = useState('')
   const [newContext, setNewContext] = useState('')
   const [initAnimate, setInitAnimate] = useState(false)
@@ -79,6 +77,26 @@ const CharacterDetailPage = ({
     }, 50)
     return () => clearTimeout(timer)
   }, [])
+
+  // Load dialogue entries when character changes
+  useEffect(() => {
+    if (character?._id) {
+      loadDialogueEntries(character._id)
+    }
+  }, [character?._id])
+
+  const loadDialogueEntries = async (characterId: string) => {
+    try {
+      setLoadingDialogue(true)
+      const entries = await get(`/dialogue/character/${characterId}`)
+      setDialogue(entries || [])
+    } catch (error) {
+      console.error('Error loading dialogue entries:', error)
+      setDialogue([])
+    } finally {
+      setLoadingDialogue(false)
+    }
+  }
 
   const handleUpdateCharacter = async (characterData: CharacterData) => {
     try {
@@ -96,22 +114,35 @@ const CharacterDetailPage = ({
     }
   }
 
-  const handleAddDialogue = () => {
-    if (!newDialogue.trim()) return
+  const handleAddDialogue = async () => {
+    if (!newDialogue.trim() || !character?._id) return
 
-    const newEntry: DialogueEntry = {
-      id: Date.now().toString(),
-      content: newDialogue,
-      context: newContext || 'General dialogue',
-      timestamp: Date.now(),
+    try {
+      const newEntry: DialogueEntry = {
+        characterId: character._id,
+        characterName: character.name,
+        content: newDialogue,
+        context: {
+          before: newContext || '',
+        },
+        lastUpdated: Date.now(),
+        isValid: true,
+      }
+
+      const createdEntry = await post('/dialogue', newEntry)
+
+      if (createdEntry) {
+        setDialogue([...dialogue, createdEntry])
+        setNewDialogue('')
+        setNewContext('')
+      }
+    } catch (error) {
+      console.error('Error adding dialogue entry:', error)
     }
-
-    setDialogueEntries([...dialogueEntries, newEntry])
-    setNewDialogue('')
-    setNewContext('')
   }
 
-  const formatDate = (timestamp: number) => {
+  const formatDate = (timestamp?: number) => {
+    if (!timestamp) return 'Unknown date'
     return new Date(timestamp).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -254,14 +285,18 @@ const CharacterDetailPage = ({
 
           {/* Dialogue Entries */}
           <div className="max-h-[calc(100vh_-_400px)] overflow-y-auto">
-            {dialogueEntries.length === 0 ? (
+            {loadingDialogue ? (
+              <div className="flex justify-center p-4">
+                <Loader />
+              </div>
+            ) : dialogue.length === 0 ? (
               <Typography variant="body2" className="text-center text-black/[.6]">
                 No dialogue entries yet
               </Typography>
             ) : (
-              dialogueEntries.map(entry => (
+              dialogue.map((entry: DialogueEntry) => (
                 <Paper
-                  key={entry.id}
+                  key={entry._id}
                   elevation={0}
                   className="mb-4 overflow-hidden rounded-lg p-4"
                   sx={{
@@ -272,15 +307,20 @@ const CharacterDetailPage = ({
                   }}>
                   <div className="flex justify-between">
                     <Typography variant="caption" className="text-black/[.5]">
-                      {entry.context}
+                      {entry.context?.before || 'No context'}
                     </Typography>
                     <Typography variant="caption" className="text-black/[.5]">
-                      {formatDate(entry.timestamp)}
+                      {formatDate(entry.lastUpdated)}
                     </Typography>
                   </div>
                   <Typography variant="body1" className="mt-2 italic">
                     &ldquo;{entry.content}&rdquo;
                   </Typography>
+                  {entry.documentTitle && (
+                    <Typography variant="caption" className="mt-1 block text-black/[.5]">
+                      From: {entry.documentTitle}
+                    </Typography>
+                  )}
                 </Paper>
               ))
             )}

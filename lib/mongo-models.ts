@@ -264,7 +264,7 @@ const DialogueEntrySchema = new Mongoose.Schema({
   },
   documentId: {
     type: Mongoose.Schema.Types.String,
-    required: true,
+    default: '',
   },
   documentTitle: {
     type: Mongoose.Schema.Types.String,
@@ -327,7 +327,7 @@ DialogueEntrySchema.set('toJSON', {
 export interface IDialogueEntry {
   characterId: string
   characterName: string
-  documentId: string
+  documentId?: string
   documentTitle: string
   content: string
   location: {

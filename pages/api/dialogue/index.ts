@@ -30,9 +30,10 @@ const handlers = {
       return res.status(400).json({ error: 'Character ID is required' })
     }
 
-    if (!dialogueData.documentId) {
-      return res.status(400).json({ error: 'Document ID is required' })
-    }
+    // Document ID is now optional
+    // if (!dialogueData.documentId) {
+    //   return res.status(400).json({ error: 'Document ID is required' })
+    // }
 
     if (!dialogueData.content) {
       return res.status(400).json({ error: 'Dialogue content is required' })
@@ -48,21 +49,24 @@ const handlers = {
       return res.status(403).json({ error: 'Access denied to this character' })
     }
 
-    // Verify the document exists and belongs to the user
-    const document = await storage.findById('documents', dialogueData.documentId)
-    if (!document) {
-      return res.status(404).json({ error: 'Document not found' })
-    }
+    // Only verify the document if a documentId is provided
+    if (dialogueData.documentId) {
+      // Verify the document exists and belongs to the user
+      const document = await storage.findById('documents', dialogueData.documentId)
+      if (!document) {
+        return res.status(404).json({ error: 'Document not found' })
+      }
 
-    if (document.userId !== req.user!.sub) {
-      return res.status(403).json({ error: 'Access denied to this document' })
+      if (document.userId !== req.user!.sub) {
+        return res.status(403).json({ error: 'Access denied to this document' })
+      }
+
+      // Set document title from the document record
+      dialogueData.documentTitle = document.title
     }
 
     // Set character name from the character record
     dialogueData.characterName = character.name
-
-    // Set document title from the document record
-    dialogueData.documentTitle = document.title
 
     // Generate a hash for the paragraph content if provided
     if (dialogueData.location && dialogueData.location.paragraphContent) {
@@ -75,18 +79,20 @@ const handlers = {
       delete dialogueData.location.paragraphContent
     }
 
-    const newDialogueEntry = await storage.create('dialogueEntries', dialogueData)
+    const newDialogueEntry = await storage.create('dialogue', dialogueData)
 
     console.log('Dialogue entry created:', newDialogueEntry._id)
 
-    // Update the character's documentIds array if not already included
-    const documentIds = Array.isArray(character.documentIds) ? character.documentIds : []
-    const docId = dialogueData.documentId as string // We've already checked it exists above
-    if (!documentIds.includes(docId)) {
-      const updatedDocumentIds = [...documentIds, docId]
-      const characterId = character._id as string
-      await storage.update('characters', characterId, { documentIds: updatedDocumentIds })
-      console.log('Updated character document IDs')
+    // Update the character's documentIds array if a documentId is provided and not already included
+    if (dialogueData.documentId) {
+      const documentIds = Array.isArray(character.documentIds) ? character.documentIds : []
+      const docId = dialogueData.documentId as string
+      if (!documentIds.includes(docId)) {
+        const updatedDocumentIds = [...documentIds, docId]
+        const characterId = character._id as string
+        await storage.update('characters', characterId, { documentIds: updatedDocumentIds })
+        console.log('Updated character document IDs')
+      }
     }
 
     res.status(200).json({
@@ -127,7 +133,7 @@ const handlers = {
     // Ensure we only return dialogue for characters owned by the user
     query.characterId = { $in: userCharacterIds }
 
-    const dialogueEntries = await storage.find('dialogueEntries', query)
+    const dialogueEntries = await storage.find('dialogue', query)
     console.log('Found dialogue entries:', dialogueEntries.length)
 
     // Process dialogue entries

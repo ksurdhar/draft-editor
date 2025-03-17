@@ -1,7 +1,13 @@
 import { DocumentData, VersionData } from '@typez/globals'
 import axios, { AxiosRequestConfig } from 'axios'
 import authService from './auth-service'
-import { documentStorage, folderStorage, versionStorage, characterStorage } from './storage-adapter'
+import {
+  documentStorage,
+  folderStorage,
+  versionStorage,
+  characterStorage,
+  dialogueStorage,
+} from './storage-adapter'
 import { DEFAULT_DOCUMENT_CONTENT } from '../lib/constants'
 import { isOnline } from './network-detector'
 import { BrowserWindow } from 'electron'
@@ -11,6 +17,7 @@ const BASE_URL = 'https://www.whetstone-writer.com/api'
 const DOCUMENTS_COLLECTION = 'documents'
 const FOLDERS_COLLECTION = 'folders'
 const CHARACTERS_COLLECTION = 'characters'
+const DIALOGUE_ENTRIES_COLLECTION = 'dialogue'
 
 // Reference to the network detector
 let networkDetector: {
@@ -116,6 +123,42 @@ const apiService = {
     return result.data
   },
 
+  // Dialogue entry-related methods
+  getDialogueEntries: async () => {
+    const result = await makeRequest('get', '/dialogue')
+    return result.data
+  },
+
+  getDialogueEntry: async (id: string) => {
+    const result = await makeRequest('get', `/dialogue/${id}`)
+    return result.data
+  },
+
+  createDialogueEntry: async (data: any) => {
+    const result = await makeRequest('post', '/dialogue', data)
+    return result.data
+  },
+
+  updateDialogueEntry: async (id: string, data: any) => {
+    const result = await makeRequest('patch', `/dialogue/${id}`, data)
+    return result.data
+  },
+
+  deleteDialogueEntry: async (id: string) => {
+    const result = await makeRequest('delete', `/dialogue/${id}`)
+    return result.data
+  },
+
+  getDialogueEntriesByCharacter: async (characterId: string) => {
+    const result = await makeRequest('get', `/dialogue/character/${characterId}`)
+    return result.data
+  },
+
+  getDialogueEntriesByDocument: async (documentId: string) => {
+    const result = await makeRequest('get', `/dialogue/document/${documentId}`)
+    return result.data
+  },
+
   post: async (url: string, body: any) => {
     const result = await makeRequest('post', url, body)
     return result.data
@@ -175,6 +218,7 @@ let syncInProgress = {
   documents: false,
   folders: false,
   characters: false,
+  dialogue: false,
 }
 
 // Handles all local storage operations
@@ -239,6 +283,45 @@ async function performLocalOperation(
       })
       console.log('Created character:', newCharacter)
       return { data: newCharacter }
+    }
+    return { data: null }
+  }
+
+  // Handle dialogue entry collection operations
+  if (endpoint === 'dialogue') {
+    console.log('Handling collection-level dialogue entries request')
+    if (method === 'get') {
+      return { data: await dialogueStorage.find(DIALOGUE_ENTRIES_COLLECTION, {}) }
+    }
+    if (method === 'post') {
+      console.log('Creating new dialogue entry:', data)
+      const now = Date.now()
+      const newDialogueEntry = await dialogueStorage.create(DIALOGUE_ENTRIES_COLLECTION, {
+        ...data,
+        lastUpdated: now,
+      })
+      console.log('Created dialogue entry:', newDialogueEntry)
+      return { data: newDialogueEntry }
+    }
+    return { data: null }
+  }
+
+  // Handle dialogue entries by character
+  if (endpoint.startsWith('dialogue/character/')) {
+    const characterId = endpoint.split('dialogue/character/')[1]
+    console.log('Getting dialogue entries for character:', characterId)
+    if (method === 'get') {
+      return { data: await dialogueStorage.find(DIALOGUE_ENTRIES_COLLECTION, { characterId }) }
+    }
+    return { data: null }
+  }
+
+  // Handle dialogue entries by document
+  if (endpoint.startsWith('dialogue/document/')) {
+    const documentId = endpoint.split('dialogue/document/')[1]
+    console.log('Getting dialogue entries for document:', documentId)
+    if (method === 'get') {
+      return { data: await dialogueStorage.find(DIALOGUE_ENTRIES_COLLECTION, { documentId }) }
     }
     return { data: null }
   }
@@ -466,6 +549,39 @@ async function performLocalOperation(
       case 'post':
         if (!data) return { data: null }
         return { data: await characterStorage.create(CHARACTERS_COLLECTION, data) }
+    }
+  }
+
+  // Handle dialogue entry operations
+  const dialogueEntryMatch = endpoint.match(/^dialogue\/([^\/]+)$/)
+  if (dialogueEntryMatch) {
+    const [, id] = dialogueEntryMatch
+    console.log('Dialogue entry operation:', { id, collection: DIALOGUE_ENTRIES_COLLECTION })
+    if (!id) {
+      console.log('No dialogue entry ID found in endpoint')
+      return { data: null }
+    }
+
+    switch (method) {
+      case 'get':
+        console.log(`Finding dialogue entry by ID: ${id} in collection: ${DIALOGUE_ENTRIES_COLLECTION}`)
+        const dialogueEntry = await dialogueStorage.findById(DIALOGUE_ENTRIES_COLLECTION, id)
+        console.log('Dialogue entry found:', dialogueEntry ? 'yes' : 'no')
+        return { data: dialogueEntry }
+      case 'patch':
+        if (!data) return { data: null }
+        console.log(`Updating dialogue entry ${id} in collection ${DIALOGUE_ENTRIES_COLLECTION}:`, data)
+        const updateResult = await dialogueStorage.update(DIALOGUE_ENTRIES_COLLECTION, id, data)
+        console.log('Dialogue entry update result:', updateResult)
+        return { data: updateResult }
+      case 'delete':
+        console.log('Attempting to delete dialogue entry with ID:', id)
+        const deleteResult = await dialogueStorage.delete(DIALOGUE_ENTRIES_COLLECTION, { _id: id })
+        console.log('Delete operation result:', deleteResult)
+        return { data: { success: deleteResult } }
+      case 'post':
+        if (!data) return { data: null }
+        return { data: await dialogueStorage.create(DIALOGUE_ENTRIES_COLLECTION, data) }
     }
   }
 
@@ -946,6 +1062,136 @@ async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
       syncInProgress.characters = false
     }
   }
+
+  if (endpoint === 'dialogue' && Array.isArray(cloudData)) {
+    // Skip if a sync is already in progress for this collection
+    if (syncInProgress.dialogue) {
+      console.log('Skipping dialogue entries sync - another sync already in progress')
+      return
+    }
+
+    try {
+      // Set sync flag
+      syncInProgress.dialogue = true
+
+      console.log('Syncing cloud dialogue entries to local storage')
+      console.log(`Cloud dialogue entries count: ${cloudData.length}`)
+
+      // Get local dialogue entries
+      const localDialogueEntries = await dialogueStorage.find(DIALOGUE_ENTRIES_COLLECTION, {})
+      console.log(`Local dialogue entries count before sync: ${localDialogueEntries.length}`)
+
+      // Create maps for efficient lookups
+      const localEntriesById = new Map(localDialogueEntries.map(entry => [normalizeId(entry._id), entry]))
+      const cloudEntriesById = new Map(cloudData.map(entry => [normalizeId(entry._id), entry]))
+
+      // Keep track of dialogue entries we process
+      let updatedCount = 0
+      let createdCount = 0
+      let skippedCount = 0
+      let cloudCreatedCount = 0
+      const newDialogueEntries: any[] = []
+
+      // First sync cloud dialogue entries to local
+      for (const cloudEntry of cloudData) {
+        if (!cloudEntry._id) {
+          console.warn('Skipping cloud dialogue entry without ID:', cloudEntry)
+          continue
+        }
+
+        const normalizedId = normalizeId(cloudEntry._id)
+        const localEntry = localEntriesById.get(normalizedId)
+
+        if (localEntry) {
+          // Dialogue entry exists locally - check if cloud version is newer
+          if (
+            cloudEntry.updatedAt &&
+            localEntry.updatedAt &&
+            new Date(cloudEntry.updatedAt).getTime() > new Date(localEntry.updatedAt).getTime()
+          ) {
+            console.log(`Updating dialogue entry ${cloudEntry._id} with newer cloud version`)
+            await dialogueStorage.update(DIALOGUE_ENTRIES_COLLECTION, cloudEntry._id, cloudEntry)
+            newDialogueEntries.push(cloudEntry)
+            updatedCount++
+          } else {
+            console.log(`Skipping dialogue entry ${cloudEntry._id}, local version is current or newer`)
+            skippedCount++
+          }
+        } else {
+          // Dialogue entry doesn't exist locally - create it with the SAME ID
+          console.log(`Creating new local dialogue entry from cloud with ID: ${cloudEntry._id}`)
+          try {
+            const newEntry = await dialogueStorage.create(DIALOGUE_ENTRIES_COLLECTION, {
+              ...cloudEntry,
+              // Use the same ID as the cloud version
+              _id: cloudEntry._id,
+            })
+            newDialogueEntries.push(newEntry)
+            createdCount++
+          } catch (error) {
+            console.error(`Error creating dialogue entry ${cloudEntry._id}:`, error)
+          }
+        }
+      }
+
+      // Then sync local dialogue entries to cloud
+      for (const localEntry of localDialogueEntries) {
+        if (!localEntry._id) {
+          console.warn('Skipping local dialogue entry without ID:', localEntry)
+          continue
+        }
+
+        const normalizedId = normalizeId(localEntry._id)
+        const cloudEntry = cloudEntriesById.get(normalizedId)
+
+        if (!cloudEntry) {
+          // Dialogue entry exists locally but not in cloud - create it in cloud
+          console.log(`Creating dialogue entry in cloud with local ID: ${localEntry._id}`)
+          try {
+            await performCloudOperation('post', '/dialogue', {
+              ...localEntry,
+              _id: localEntry._id, // Ensure we use the same ID
+            })
+            cloudCreatedCount++
+          } catch (error) {
+            console.error(`Error creating dialogue entry ${localEntry._id} in cloud:`, error)
+          }
+        } else {
+          // Dialogue entry exists in both local and cloud - check if local version is newer
+          if (
+            localEntry.updatedAt &&
+            cloudEntry.updatedAt &&
+            new Date(localEntry.updatedAt).getTime() > new Date(cloudEntry.updatedAt).getTime()
+          ) {
+            // Local dialogue entry is newer, update cloud version
+            console.log(`Updating cloud dialogue entry ${localEntry._id} with newer local version`)
+            try {
+              await performCloudOperation('patch', `/dialogue/${localEntry._id}`, localEntry)
+              cloudCreatedCount++ // Reuse this counter for updates too
+            } catch (error) {
+              console.error(`Error updating dialogue entry ${localEntry._id} in cloud:`, error)
+            }
+          }
+        }
+      }
+
+      console.log(
+        `Dialogue entry sync complete. Updated locally: ${updatedCount}, Created locally: ${createdCount}, Created/Updated in cloud: ${cloudCreatedCount}, Skipped: ${skippedCount}`,
+      )
+
+      // If we have new or updated dialogue entries, notify all windows
+      if (newDialogueEntries.length > 0) {
+        BrowserWindow.getAllWindows().forEach(window => {
+          if (!window.isDestroyed()) {
+            window.webContents.send('sync:updates', { dialogue: newDialogueEntries })
+          }
+        })
+      }
+    } finally {
+      // Always release the sync flag when done
+      syncInProgress.dialogue = false
+    }
+  }
 }
 
 // Performs cloud operations asynchronously without blocking
@@ -976,7 +1222,12 @@ async function performCloudOperationAsync(
     // But we need to be careful not to create duplicates
     if (method === 'get' && cloudResult && cloudResult.data && cleanEndpoint) {
       // Handle bulk syncing more carefully depending on the endpoint
-      if (cleanEndpoint === 'documents' || cleanEndpoint === 'folders') {
+      if (
+        cleanEndpoint === 'documents' ||
+        cleanEndpoint === 'folders' ||
+        cleanEndpoint === 'characters' ||
+        cleanEndpoint === 'dialogue'
+      ) {
         console.log('Background sync: carefully updating local storage with cloud data')
         await syncCloudDataToLocal(cleanEndpoint, cloudResult.data)
       }

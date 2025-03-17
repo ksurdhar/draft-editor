@@ -21,10 +21,35 @@ interface CharacterData {
   isArchived?: boolean
 }
 
+// Dialogue entry type definition
+interface DialogueEntry {
+  _id?: string
+  characterId: string
+  characterName: string
+  documentId?: string
+  documentTitle?: string
+  content: string
+  context?: {
+    before?: string
+    after?: string
+  }
+  location?: {
+    paragraphIndex?: number
+    paragraphHash?: string
+  }
+  sceneInfo?: {
+    sceneId?: string
+    sceneName?: string
+  }
+  lastUpdated?: number
+  isValid?: boolean
+}
+
 interface SyncUpdates {
   documents?: any[]
   folders?: any[]
   characters?: CharacterData[]
+  dialogue?: DialogueEntry[]
 }
 
 const ElectronCharacterDetailPage = (props: { params: { id: string } }) => {
@@ -51,6 +76,7 @@ const ElectronCharacterDetailPage = (props: { params: { id: string } }) => {
     if (!characterId) return
 
     const removeListener = window.electronAPI.onSyncUpdate((updates: SyncUpdates) => {
+      // Handle character updates
       if (updates.characters && updates.characters.length > 0) {
         // Check if our current character is in the updates
         const updatedCharacter = updates.characters.find(
@@ -59,6 +85,19 @@ const ElectronCharacterDetailPage = (props: { params: { id: string } }) => {
 
         if (updatedCharacter) {
           mutateCharacter(updatedCharacter, false)
+        }
+      }
+
+      // Handle dialogue entry updates
+      if (updates.dialogue && updates.dialogue.length > 0) {
+        console.log('Received dialogue updates:', updates.dialogue.length)
+        const updatedEntries = updates.dialogue.filter(
+          entry => entry && typeof entry === 'object' && entry.characterId === characterId,
+        )
+
+        if (updatedEntries.length > 0) {
+          // Trigger a revalidation of dialogue entries
+          window.electronAPI.get(`/dialogue/character/${characterId}`)
         }
       }
     })

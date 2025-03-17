@@ -26,6 +26,7 @@ fs.ensureDirSync(path.join(storagePath, 'documents'))
 fs.ensureDirSync(path.join(storagePath, 'folders'))
 fs.ensureDirSync(path.join(storagePath, 'versions'))
 fs.ensureDirSync(path.join(storagePath, 'characters'))
+fs.ensureDirSync(path.join(storagePath, 'dialogue'))
 
 console.log('\n=== Storage Adapter Initialization ===')
 console.log('Project or app storage:', useAppStorage ? 'app' : 'project')
@@ -34,6 +35,7 @@ console.log('Documents path:', path.join(storagePath, 'documents'))
 console.log('Folders path:', path.join(storagePath, 'folders'))
 console.log('Versions path:', path.join(storagePath, 'versions'))
 console.log('Characters path:', path.join(storagePath, 'characters'))
+console.log('Dialogue path:', path.join(storagePath, 'dialogue'))
 
 // For documents, folders, and versions, we'll use the file-based storage
 class ElectronFileStorageAdapter extends FileStorageAdapter {
@@ -150,5 +152,6 @@ export const documentStorage = storage
 export const folderStorage = storage
 export const versionStorage = storage
 export const characterStorage = storage
+export const dialogueStorage = storage
 
 export default documentStorage

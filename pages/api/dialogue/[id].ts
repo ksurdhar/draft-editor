@@ -20,7 +20,7 @@ export default withHybridAuth(async function dialogueEntryHandler(
       console.log('\n=== Getting Dialogue Entry ===')
       console.log('Dialogue ID:', dialogueId)
 
-      const dialogueEntry = await storage.findById('dialogueEntries', dialogueId)
+      const dialogueEntry = await storage.findById('dialogue', dialogueId)
       if (!dialogueEntry) {
         return res.status(404).json({ error: 'Dialogue entry not found' })
       }
@@ -47,7 +47,7 @@ export default withHybridAuth(async function dialogueEntryHandler(
       console.log('\n=== Updating Dialogue Entry ===')
       console.log('Dialogue ID:', dialogueId)
 
-      const dialogueEntry = await storage.findById('dialogueEntries', dialogueId)
+      const dialogueEntry = await storage.findById('dialogue', dialogueId)
       if (!dialogueEntry) {
         return res.status(404).json({ error: 'Dialogue entry not found' })
       }
@@ -75,7 +75,7 @@ export default withHybridAuth(async function dialogueEntryHandler(
         return res.status(400).json({ error: 'Dialogue content cannot be empty' })
       }
 
-      const updatedDialogueEntry = await storage.update('dialogueEntries', dialogueId, updateData)
+      const updatedDialogueEntry = await storage.update('dialogue', dialogueId, updateData)
 
       if (!updatedDialogueEntry) {
         return res.status(500).json({ error: 'Failed to update dialogue entry' })
@@ -91,7 +91,7 @@ export default withHybridAuth(async function dialogueEntryHandler(
       console.log('\n=== Deleting Dialogue Entry ===')
       console.log('Dialogue ID:', dialogueId)
 
-      const dialogueEntry = await storage.findById('dialogueEntries', dialogueId)
+      const dialogueEntry = await storage.findById('dialogue', dialogueId)
       if (!dialogueEntry) {
         return res.status(404).json({ error: 'Dialogue entry not found' })
       }
@@ -108,7 +108,7 @@ export default withHybridAuth(async function dialogueEntryHandler(
         return res.status(403).json({ error: 'Access denied' })
       }
 
-      await storage.delete('dialogueEntries', { _id: dialogueId })
+      await storage.delete('dialogue', { _id: dialogueId })
       console.log('Dialogue entry deleted successfully')
       res.status(200).json({ success: true })
       break
