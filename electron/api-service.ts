@@ -18,6 +18,7 @@ const DOCUMENTS_COLLECTION = 'documents'
 const FOLDERS_COLLECTION = 'folders'
 const CHARACTERS_COLLECTION = 'characters'
 const DIALOGUE_ENTRIES_COLLECTION = 'dialogue'
+const VERSIONS_COLLECTION = 'versions'
 
 // Reference to the network detector
 let networkDetector: {
@@ -52,9 +53,501 @@ function normalizeId(id: any): string {
   return id.toString ? id.toString() : String(id)
 }
 
-// Expose the CRUD methods to the renderer
-export const electronAPI = {
-  create: async (url: string, body: any) => {
+// Helper function to capitalize first letter
+function capitalize(str: string): string {
+  return str.charAt(0).toUpperCase() + str.slice(1)
+}
+
+// Helper function to get singular form of a collection name
+function getSingular(collectionName: string): string {
+  // Handle special cases
+  if (collectionName === 'dialogue') return 'dialogueEntry'
+  // Default case: remove trailing 's'
+  return collectionName.endsWith('s') ? collectionName.slice(0, -1) : collectionName
+}
+
+// Track if a sync operation is in progress
+let syncInProgress: Record<string, boolean> = {
+  documents: false,
+  folders: false,
+  characters: false,
+  dialogue: false,
+}
+
+// Define collection configuration interface
+interface CollectionConfig {
+  name: string // API endpoint name (e.g., 'documents')
+  storage: any // Storage adapter reference
+  collectionName: string // Storage collection name
+  defaultValues?: (data: any) => any // Function to add default values on creation
+  specialEndpoints?: Record<string, (method: string, match: RegExpMatchArray, data?: any) => Promise<any>>
+}
+
+// Define configurations for each collection
+const collections: Record<string, CollectionConfig> = {
+  documents: {
+    name: 'documents',
+    storage: documentStorage,
+    collectionName: DOCUMENTS_COLLECTION,
+    defaultValues: data => ({
+      ...data,
+      content: data?.content || DEFAULT_DOCUMENT_CONTENT,
+      comments: [],
+      lastUpdated: Date.now(),
+    }),
+    specialEndpoints: {
+      // Handle bulk delete operation
+      '^documents/bulk-delete$': async (method, match, data) => {
+        if (method !== 'post' || !data) return { data: null }
+
+        const { documentIds = [], folderIds = [] } = data as { documentIds: string[]; folderIds: string[] }
+        console.log('Bulk deleting:', { documentIds, folderIds })
+
+        // Helper function to recursively delete a folder and its contents
+        async function deleteFolder(folderId: string) {
+          console.log(`Starting to delete folder ${folderId}`)
+
+          // Get all documents and subfolders in this folder
+          const [docs, subfolders] = await Promise.all([
+            documentStorage.find(DOCUMENTS_COLLECTION, { parentId: folderId }),
+            documentStorage.find(FOLDERS_COLLECTION, { parentId: folderId }),
+          ])
+
+          console.log(`Found in folder ${folderId}:`, {
+            documentsCount: docs.length,
+            subfoldersCount: subfolders.length,
+            documents: docs.map(d => d._id),
+            subfolders: subfolders.map(f => f._id),
+          })
+
+          // Recursively delete all subfolders
+          if (subfolders.length > 0) {
+            console.log(`Deleting ${subfolders.length} subfolders of ${folderId}`)
+            await Promise.all(
+              subfolders.map(folder => (folder._id ? deleteFolder(folder._id) : Promise.resolve())),
+            )
+          }
+
+          // Delete all documents in this folder
+          if (docs.length > 0) {
+            console.log(`Deleting ${docs.length} documents from folder ${folderId}`)
+            await Promise.all(
+              docs.map(doc =>
+                doc._id ? documentStorage.delete(DOCUMENTS_COLLECTION, { _id: doc._id }) : Promise.resolve(),
+              ),
+            )
+          }
+
+          // Finally delete the folder itself
+          console.log(`Deleting folder ${folderId}`)
+          const result = await documentStorage.delete(FOLDERS_COLLECTION, { _id: folderId })
+          if (!result) {
+            throw new Error(`Failed to delete folder ${folderId}`)
+          }
+          return result
+        }
+
+        try {
+          // Delete all documents
+          if (documentIds.length > 0) {
+            console.log(`Starting to delete ${documentIds.length} documents`)
+            await Promise.all(
+              documentIds.map(id => documentStorage.delete(DOCUMENTS_COLLECTION, { _id: id })),
+            )
+          }
+
+          // Delete all folders recursively
+          if (folderIds.length > 0) {
+            console.log(`Starting to delete ${folderIds.length} folders`)
+            await Promise.all(folderIds.map(id => deleteFolder(id)))
+          }
+
+          console.log('Bulk delete operation completed successfully')
+          return { data: { success: true } }
+        } catch (error: any) {
+          console.error('Error during bulk delete:', error)
+          return { data: { success: false, error: error.message || 'Unknown error occurred' } }
+        }
+      },
+      // Handle document versions
+      '^documents/([^/]+)/versions(?:\\?versionId=(.+))?$': async (method, match, data) => {
+        const [, documentId, versionId] = match
+        console.log('Version operation:', { documentId, versionId })
+
+        switch (method) {
+          case 'get':
+            console.log('Getting versions for document:', documentId)
+            return { data: await versionStorage.find(VERSIONS_COLLECTION, { documentId }) }
+          case 'post':
+            if (!data) return { data: null }
+            console.log('Creating version:', data)
+            return { data: await versionStorage.create(VERSIONS_COLLECTION, data) }
+          case 'delete':
+            if (!versionId) {
+              console.log('No version ID provided for deletion')
+              return { data: { success: false, error: 'No version ID provided' } }
+            }
+            console.log('Deleting version:', { documentId, versionId })
+            const success = await versionStorage.delete(VERSIONS_COLLECTION, { _id: versionId })
+            return { data: { success } }
+          default:
+            return { data: null }
+        }
+      },
+    },
+  },
+  folders: {
+    name: 'folders',
+    storage: folderStorage,
+    collectionName: FOLDERS_COLLECTION,
+    defaultValues: data => ({
+      ...data,
+      lastUpdated: Date.now(),
+    }),
+  },
+  characters: {
+    name: 'characters',
+    storage: characterStorage,
+    collectionName: CHARACTERS_COLLECTION,
+    defaultValues: data => ({
+      ...data,
+      lastUpdated: Date.now(),
+    }),
+  },
+  dialogue: {
+    name: 'dialogue',
+    storage: dialogueStorage,
+    collectionName: DIALOGUE_ENTRIES_COLLECTION,
+    defaultValues: data => ({
+      ...data,
+      lastUpdated: Date.now(),
+    }),
+    specialEndpoints: {
+      // Handle dialogue entries by character
+      '^dialogue/character/(.+)$': async (method, match, data) => {
+        const characterId = match[1]
+        console.log('Getting dialogue entries for character:', characterId)
+        if (method === 'get') {
+          return { data: await dialogueStorage.find(DIALOGUE_ENTRIES_COLLECTION, { characterId }) }
+        }
+        return { data: null }
+      },
+      // Handle dialogue entries by document
+      '^dialogue/document/(.+)$': async (method, match, data) => {
+        const documentId = match[1]
+        console.log('Getting dialogue entries for document:', documentId)
+        if (method === 'get') {
+          return { data: await dialogueStorage.find(DIALOGUE_ENTRIES_COLLECTION, { documentId }) }
+        }
+        return { data: null }
+      },
+    },
+  },
+  versions: {
+    name: 'versions',
+    storage: versionStorage,
+    collectionName: VERSIONS_COLLECTION,
+    defaultValues: data => ({
+      ...data,
+      lastUpdated: Date.now(),
+    }),
+  },
+}
+
+// Generic function to handle collection-level GET
+async function handleCollectionGet(config: CollectionConfig) {
+  return { data: await config.storage.find(config.collectionName, {}) }
+}
+
+// Generic function to handle collection-level POST (create)
+async function handleCollectionCreate(config: CollectionConfig, data: any) {
+  const processedData = config.defaultValues
+    ? config.defaultValues(data)
+    : { ...data, lastUpdated: Date.now() }
+
+  const newItem = await config.storage.create(config.collectionName, processedData)
+  console.log(`Created ${config.name.slice(0, -1)}:`, newItem)
+  return { data: newItem }
+}
+
+// Generic function to handle entity-level GET
+async function handleEntityGet(config: CollectionConfig, id: string) {
+  console.log(`Finding ${getSingular(config.name)} by ID: ${id} in collection: ${config.collectionName}`)
+  const item = await config.storage.findById(config.collectionName, id)
+  console.log(`${capitalize(getSingular(config.name))} found:`, item ? 'yes' : 'no')
+  return { data: item }
+}
+
+// Generic function to handle entity-level PATCH (update)
+async function handleEntityUpdate(config: CollectionConfig, id: string, data: any) {
+  if (!data) return { data: null }
+  console.log(`Updating ${getSingular(config.name)} ${id} in collection ${config.collectionName}:`, data)
+  const updateResult = await config.storage.update(config.collectionName, id, data)
+  console.log(`${capitalize(getSingular(config.name))} update result:`, updateResult)
+  return { data: updateResult }
+}
+
+// Generic function to handle entity-level DELETE
+async function handleEntityDelete(config: CollectionConfig, id: string) {
+  console.log(`Attempting to delete ${getSingular(config.name)} with ID:`, id)
+  const deleteResult = await config.storage.delete(config.collectionName, { _id: id })
+  console.log('Delete operation result:', deleteResult)
+  return { data: { success: deleteResult } }
+}
+
+// Router to map endpoints to handlers
+async function routeLocalOperation(
+  method: 'get' | 'delete' | 'patch' | 'post',
+  endpoint: string,
+  data?: any,
+) {
+  console.log('Routing local operation:', { method, endpoint })
+
+  // Handle collection-level operations
+  for (const [key, config] of Object.entries(collections)) {
+    // Check for special endpoints first
+    if (config.specialEndpoints) {
+      for (const [pattern, handler] of Object.entries(config.specialEndpoints)) {
+        const specialMatch = endpoint.match(new RegExp(pattern))
+        if (specialMatch) {
+          return handler(method, specialMatch, data)
+        }
+      }
+    }
+
+    // Handle collection-level operations
+    if (endpoint === config.name) {
+      // Collection-level operations
+      if (method === 'get') {
+        return handleCollectionGet(config)
+      }
+      if (method === 'post') {
+        return handleCollectionCreate(config, data)
+      }
+      return { data: null }
+    }
+
+    // Handle entity-level operations
+    const entityMatch = endpoint.match(new RegExp(`^${config.name}/([^/]+)$`))
+    if (entityMatch) {
+      const [, id] = entityMatch
+      if (!id) {
+        console.log(`No ${getSingular(config.name)} ID found in endpoint`)
+        return { data: null }
+      }
+
+      switch (method) {
+        case 'get':
+          return handleEntityGet(config, id)
+        case 'patch':
+          return handleEntityUpdate(config, id, data)
+        case 'delete':
+          return handleEntityDelete(config, id)
+        case 'post':
+          if (!data) return { data: null }
+          return handleCollectionCreate(config, { ...data, _id: id })
+      }
+    }
+  }
+
+  // Handle version operations
+  if (endpoint.startsWith('versions/')) {
+    const config = collections.versions
+    const parts = endpoint.split('versions/')[1].split('/')
+    console.log('Version parts:', parts)
+    if (parts.length === 2) {
+      const [, versionId] = parts
+      switch (method) {
+        case 'get':
+          return { data: await config.storage.findById(config.collectionName, versionId) }
+        case 'delete':
+          return { data: await config.storage.delete(config.collectionName, { _id: versionId }) }
+      }
+    } else if (parts.length === 1) {
+      switch (method) {
+        case 'get':
+          return { data: await config.storage.find(config.collectionName, { documentId: parts[0] }) }
+        case 'post':
+          if (!data) return { data: null }
+          return { data: await config.storage.create(config.collectionName, data) }
+      }
+    }
+  }
+
+  console.log('No matching local operation found')
+  return { data: null }
+}
+
+// Generic function to sync cloud data to local for any collection
+async function syncCollectionToLocal(config: CollectionConfig, cloudData: any[]) {
+  // Skip if a sync is already in progress for this collection
+  if (syncInProgress[config.name]) {
+    console.log(`Skipping ${config.name} sync - another sync already in progress`)
+    return
+  }
+
+  try {
+    // Set sync flag
+    syncInProgress[config.name] = true
+
+    console.log(`Syncing cloud ${config.name} to local storage`)
+    console.log(`Cloud ${config.name} count: ${cloudData.length}`)
+
+    // Get local items
+    const localItems = await config.storage.find(config.collectionName, {})
+    console.log(`Local ${config.name} count before sync: ${localItems.length}`)
+
+    // Create maps for efficient lookups
+    const localItemsById = new Map(localItems.map(item => [normalizeId(item._id), item]))
+    const cloudItemsById = new Map(cloudData.map(item => [normalizeId(item._id), item]))
+
+    // Keep track of items we process
+    let updatedCount = 0
+    let createdCount = 0
+    let skippedCount = 0
+    let cloudCreatedCount = 0
+    const newItems: any[] = []
+
+    // First sync cloud items to local
+    for (const cloudItem of cloudData) {
+      if (!cloudItem._id) {
+        console.warn(`Skipping cloud ${getSingular(config.name)} without ID:`, cloudItem)
+        continue
+      }
+
+      const normalizedId = normalizeId(cloudItem._id)
+      const localItem = localItemsById.get(normalizedId)
+
+      if (localItem) {
+        // Item exists locally - check if cloud version is newer
+        if (
+          cloudItem.updatedAt &&
+          localItem.updatedAt &&
+          new Date(cloudItem.updatedAt).getTime() > new Date(localItem.updatedAt).getTime()
+        ) {
+          console.log(`Updating ${getSingular(config.name)} ${cloudItem._id} with newer cloud version`)
+          await config.storage.update(config.collectionName, cloudItem._id, cloudItem)
+          newItems.push(cloudItem)
+          updatedCount++
+        } else {
+          console.log(
+            `Skipping ${getSingular(config.name)} ${cloudItem._id}, local version is current or newer`,
+          )
+          skippedCount++
+        }
+      } else {
+        // Item doesn't exist locally - create it with the SAME ID
+        console.log(`Creating new local ${getSingular(config.name)} from cloud with ID: ${cloudItem._id}`)
+        try {
+          const newItem = await config.storage.create(config.collectionName, {
+            ...cloudItem,
+            _id: cloudItem._id,
+          })
+          newItems.push(newItem)
+          createdCount++
+        } catch (error) {
+          console.error(`Error creating ${getSingular(config.name)} ${cloudItem._id}:`, error)
+        }
+      }
+    }
+
+    // Then sync local items to cloud
+    for (const localItem of localItems) {
+      if (!localItem._id) {
+        console.warn(`Skipping local ${getSingular(config.name)} without ID:`, localItem)
+        continue
+      }
+
+      const normalizedId = normalizeId(localItem._id)
+      const cloudItem = cloudItemsById.get(normalizedId)
+
+      if (!cloudItem) {
+        // Item exists locally but not in cloud - create it in cloud
+        console.log(`Creating ${getSingular(config.name)} in cloud with local ID: ${localItem._id}`)
+        try {
+          await performCloudOperation('post', `/${config.name}`, {
+            ...localItem,
+            _id: localItem._id,
+          })
+          cloudCreatedCount++
+        } catch (error) {
+          console.error(`Error creating ${getSingular(config.name)} ${localItem._id} in cloud:`, error)
+        }
+      } else {
+        // Item exists in both local and cloud - check if local version is newer
+        if (
+          localItem.updatedAt &&
+          cloudItem.updatedAt &&
+          new Date(localItem.updatedAt).getTime() > new Date(cloudItem.updatedAt).getTime()
+        ) {
+          // Local item is newer, update cloud version
+          console.log(`Updating cloud ${getSingular(config.name)} ${localItem._id} with newer local version`)
+          try {
+            await performCloudOperation('patch', `/${config.name}/${localItem._id}`, localItem)
+            cloudCreatedCount++ // Reuse this counter for updates too
+          } catch (error) {
+            console.error(`Error updating ${getSingular(config.name)} ${localItem._id} in cloud:`, error)
+          }
+        }
+      }
+    }
+
+    console.log(
+      `${capitalize(config.name)} sync complete. Updated locally: ${updatedCount}, Created locally: ${createdCount}, Created/Updated in cloud: ${cloudCreatedCount}, Skipped: ${skippedCount}`,
+    )
+
+    // If we have new or updated items, notify all windows
+    if (newItems.length > 0) {
+      BrowserWindow.getAllWindows().forEach(window => {
+        if (!window.isDestroyed()) {
+          window.webContents.send('sync:updates', { [config.name]: newItems })
+        }
+      })
+    }
+  } finally {
+    // Always release the sync flag when done
+    syncInProgress[config.name] = false
+  }
+}
+
+// Function to create standard CRUD methods for a collection
+function createCollectionMethods(config: CollectionConfig) {
+  const singularName = getSingular(config.name)
+  const capitalizedName = capitalize(config.name)
+  const capitalizedSingular = capitalize(singularName)
+
+  return {
+    [`get${capitalizedName}`]: async () => {
+      const result = await makeRequest('get', `/${config.name}`)
+      return result.data
+    },
+
+    [`get${capitalizedSingular}`]: async (id: string) => {
+      const result = await makeRequest('get', `/${config.name}/${id}`)
+      return result.data
+    },
+
+    [`create${capitalizedSingular}`]: async (data: any) => {
+      const result = await makeRequest('post', `/${config.name}`, data)
+      return result.data
+    },
+
+    [`update${capitalizedSingular}`]: async (id: string, data: any) => {
+      const result = await makeRequest('patch', `/${config.name}/${id}`, data)
+      return result.data
+    },
+
+    [`delete${capitalizedSingular}`]: async (id: string) => {
+      const result = await makeRequest('delete', `/${config.name}/${id}`)
+      return result.data
+    },
+  }
+}
+
+// Generate the apiService object dynamically
+const apiService = {
+  // Add the generic CRUD methods
+  post: async (url: string, body: any) => {
     const result = await makeRequest('post', url, body)
     return result.data
   },
@@ -73,82 +566,13 @@ export const electronAPI = {
     const result = await makeRequest('delete', url)
     return result.data
   },
-}
 
-// Export original apiService interface for backward compatibility
-const apiService = {
-  getDocuments: async () => {
-    const result = await makeRequest('get', '/documents')
-    return result.data
-  },
+  // Add collection-specific methods
+  ...Object.values(collections).reduce((acc, config) => {
+    return { ...acc, ...createCollectionMethods(config) }
+  }, {}),
 
-  getFolders: async () => {
-    const result = await makeRequest('get', '/folders')
-    return result.data
-  },
-
-  deleteDocument: async (id: string) => {
-    const result = await makeRequest('delete', `/documents/${id}`)
-    return result.data
-  },
-
-  updateDocument: async (id: string, data: Partial<DocumentData>) => {
-    const result = await makeRequest('patch', `/documents/${id}`, data)
-    return result.data
-  },
-
-  // Character-related methods
-  getCharacters: async () => {
-    const result = await makeRequest('get', '/characters')
-    return result.data
-  },
-
-  getCharacter: async (id: string) => {
-    const result = await makeRequest('get', `/characters/${id}`)
-    return result.data
-  },
-
-  createCharacter: async (data: any) => {
-    const result = await makeRequest('post', '/characters', data)
-    return result.data
-  },
-
-  updateCharacter: async (id: string, data: any) => {
-    const result = await makeRequest('patch', `/characters/${id}`, data)
-    return result.data
-  },
-
-  deleteCharacter: async (id: string) => {
-    const result = await makeRequest('delete', `/characters/${id}`)
-    return result.data
-  },
-
-  // Dialogue entry-related methods
-  getDialogueEntries: async () => {
-    const result = await makeRequest('get', '/dialogue')
-    return result.data
-  },
-
-  getDialogueEntry: async (id: string) => {
-    const result = await makeRequest('get', `/dialogue/${id}`)
-    return result.data
-  },
-
-  createDialogueEntry: async (data: any) => {
-    const result = await makeRequest('post', '/dialogue', data)
-    return result.data
-  },
-
-  updateDialogueEntry: async (id: string, data: any) => {
-    const result = await makeRequest('patch', `/dialogue/${id}`, data)
-    return result.data
-  },
-
-  deleteDialogueEntry: async (id: string) => {
-    const result = await makeRequest('delete', `/dialogue/${id}`)
-    return result.data
-  },
-
+  // Add special methods for dialogue entries by character/document
   getDialogueEntriesByCharacter: async (characterId: string) => {
     const result = await makeRequest('get', `/dialogue/character/${characterId}`)
     return result.data
@@ -158,8 +582,11 @@ const apiService = {
     const result = await makeRequest('get', `/dialogue/document/${documentId}`)
     return result.data
   },
+}
 
-  post: async (url: string, body: any) => {
+// Expose the CRUD methods to the renderer
+export const electronAPI = {
+  create: async (url: string, body: any) => {
     const result = await makeRequest('post', url, body)
     return result.data
   },
@@ -193,7 +620,7 @@ const makeRequest = async (
 
   try {
     // Always execute local operation first
-    let localResult = await performLocalOperation(method, cleanEndpoint, data)
+    let localResult = await routeLocalOperation(method, cleanEndpoint, data)
     console.log('Local operation result:', localResult?.data ? 'success' : 'no data')
 
     // If we're online, perform cloud operation in the background without blocking
@@ -211,382 +638,6 @@ const makeRequest = async (
     console.error(`Error in makeRequest:`, error)
     throw error
   }
-}
-
-// Track if a sync operation is in progress
-let syncInProgress = {
-  documents: false,
-  folders: false,
-  characters: false,
-  dialogue: false,
-}
-
-// Handles all local storage operations
-async function performLocalOperation(
-  method: 'get' | 'delete' | 'patch' | 'post',
-  endpoint: string,
-  data?: any,
-) {
-  console.log('Performing local operation:', { method, endpoint })
-
-  // Handle collection-level operations
-  if (endpoint === 'documents') {
-    console.log('Handling collection-level documents request')
-    if (method === 'get') {
-      return { data: await documentStorage.find(DOCUMENTS_COLLECTION, {}) }
-    }
-    if (method === 'post') {
-      console.log('Creating new document:', data)
-      const now = Date.now()
-      const newDocument = await documentStorage.create(DOCUMENTS_COLLECTION, {
-        ...data,
-        content: data?.content || DEFAULT_DOCUMENT_CONTENT,
-        comments: [],
-        lastUpdated: now,
-      })
-      console.log('Created document:', newDocument)
-      return { data: newDocument }
-    }
-    return { data: null }
-  }
-
-  if (endpoint === 'folders') {
-    console.log('Handling collection-level folders request')
-    if (method === 'get') {
-      return { data: await folderStorage.find(FOLDERS_COLLECTION, {}) }
-    }
-    if (method === 'post') {
-      console.log('Creating new folder:', data)
-      const now = Date.now()
-      const newFolder = await folderStorage.create(FOLDERS_COLLECTION, {
-        ...data,
-        lastUpdated: now,
-      })
-      console.log('Created folder:', newFolder)
-      return { data: newFolder }
-    }
-    return { data: null }
-  }
-
-  // Handle character collection operations
-  if (endpoint === 'characters') {
-    console.log('Handling collection-level characters request')
-    if (method === 'get') {
-      return { data: await characterStorage.find(CHARACTERS_COLLECTION, {}) }
-    }
-    if (method === 'post') {
-      console.log('Creating new character:', data)
-      const now = Date.now()
-      const newCharacter = await characterStorage.create(CHARACTERS_COLLECTION, {
-        ...data,
-        lastUpdated: now,
-      })
-      console.log('Created character:', newCharacter)
-      return { data: newCharacter }
-    }
-    return { data: null }
-  }
-
-  // Handle dialogue entry collection operations
-  if (endpoint === 'dialogue') {
-    console.log('Handling collection-level dialogue entries request')
-    if (method === 'get') {
-      return { data: await dialogueStorage.find(DIALOGUE_ENTRIES_COLLECTION, {}) }
-    }
-    if (method === 'post') {
-      console.log('Creating new dialogue entry:', data)
-      const now = Date.now()
-      const newDialogueEntry = await dialogueStorage.create(DIALOGUE_ENTRIES_COLLECTION, {
-        ...data,
-        lastUpdated: now,
-      })
-      console.log('Created dialogue entry:', newDialogueEntry)
-      return { data: newDialogueEntry }
-    }
-    return { data: null }
-  }
-
-  // Handle dialogue entries by character
-  if (endpoint.startsWith('dialogue/character/')) {
-    const characterId = endpoint.split('dialogue/character/')[1]
-    console.log('Getting dialogue entries for character:', characterId)
-    if (method === 'get') {
-      return { data: await dialogueStorage.find(DIALOGUE_ENTRIES_COLLECTION, { characterId }) }
-    }
-    return { data: null }
-  }
-
-  // Handle dialogue entries by document
-  if (endpoint.startsWith('dialogue/document/')) {
-    const documentId = endpoint.split('dialogue/document/')[1]
-    console.log('Getting dialogue entries for document:', documentId)
-    if (method === 'get') {
-      return { data: await dialogueStorage.find(DIALOGUE_ENTRIES_COLLECTION, { documentId }) }
-    }
-    return { data: null }
-  }
-
-  // Handle bulk delete operation
-  if (endpoint === 'documents/bulk-delete') {
-    console.log('Handling bulk delete request')
-    if (method === 'post' && data) {
-      const { documentIds = [], folderIds = [] } = data as { documentIds: string[]; folderIds: string[] }
-      console.log('Bulk deleting:', { documentIds, folderIds })
-
-      // Helper function to recursively delete a folder and its contents
-      async function deleteFolder(folderId: string) {
-        console.log(`Starting to delete folder ${folderId}`)
-
-        // Get all documents and subfolders in this folder
-        const [docs, subfolders] = await Promise.all([
-          documentStorage.find(DOCUMENTS_COLLECTION, { parentId: folderId }),
-          documentStorage.find(FOLDERS_COLLECTION, { parentId: folderId }),
-        ])
-
-        console.log(`Found in folder ${folderId}:`, {
-          documentsCount: docs.length,
-          subfoldersCount: subfolders.length,
-          documents: docs.map(d => d._id),
-          subfolders: subfolders.map(f => f._id),
-        })
-
-        // Recursively delete all subfolders
-        if (subfolders.length > 0) {
-          console.log(`Deleting ${subfolders.length} subfolders of ${folderId}`)
-          await Promise.all(
-            subfolders.map(folder => (folder._id ? deleteFolder(folder._id) : Promise.resolve())),
-          )
-        }
-
-        // Delete all documents in this folder
-        if (docs.length > 0) {
-          console.log(`Deleting ${docs.length} documents from folder ${folderId}`)
-          await Promise.all(
-            docs.map(doc =>
-              doc._id ? documentStorage.delete(DOCUMENTS_COLLECTION, { _id: doc._id }) : Promise.resolve(),
-            ),
-          )
-        }
-
-        // Finally delete the folder itself
-        console.log(`Deleting folder ${folderId}`)
-        const result = await documentStorage.delete(FOLDERS_COLLECTION, { _id: folderId })
-        if (!result) {
-          throw new Error(`Failed to delete folder ${folderId}`)
-        }
-        return result
-      }
-
-      try {
-        // Delete all documents
-        if (documentIds.length > 0) {
-          console.log(`Starting to delete ${documentIds.length} documents`)
-          await Promise.all(documentIds.map(id => documentStorage.delete(DOCUMENTS_COLLECTION, { _id: id })))
-        }
-
-        // Delete all folders recursively
-        if (folderIds.length > 0) {
-          console.log(`Starting to delete ${folderIds.length} folders`)
-          await Promise.all(folderIds.map(id => deleteFolder(id)))
-        }
-
-        console.log('Bulk delete operation completed successfully')
-        return { data: { success: true } }
-      } catch (error: any) {
-        console.error('Error during bulk delete:', error)
-        return { data: { success: false, error: error.message || 'Unknown error occurred' } }
-      }
-    }
-    return { data: null }
-  }
-
-  // Handle version operations - check this before document operations
-  const versionMatch = endpoint.match(/^documents\/([^\/]+)\/versions(?:\?versionId=(.+))?$/)
-  if (versionMatch) {
-    const [, documentId, versionId] = versionMatch
-    console.log('Version operation:', { documentId, versionId })
-
-    switch (method) {
-      case 'get':
-        console.log('Getting versions for document:', documentId)
-        return { data: await versionStorage.find('versions', { documentId }) }
-      case 'post':
-        if (!data) return { data: null }
-        console.log('Creating version:', data)
-        return { data: await versionStorage.create('versions', data) }
-      case 'delete':
-        if (!versionId) {
-          console.log('No version ID provided for deletion')
-          return { data: { success: false, error: 'No version ID provided' } }
-        }
-        console.log('Deleting version:', { documentId, versionId })
-        const success = await versionStorage.delete('versions', { _id: versionId })
-        return { data: { success } }
-    }
-  }
-
-  // Handle document operations
-  const documentMatch = endpoint.match(/^documents\/([^\/]+)$/)
-  if (documentMatch) {
-    const [, id] = documentMatch
-    console.log('Document operation:', { id, collection: DOCUMENTS_COLLECTION })
-    if (!id) {
-      console.log('No document ID found in endpoint')
-      return { data: null }
-    }
-
-    switch (method) {
-      case 'get':
-        console.log(`Finding document by ID: ${id} in collection: ${DOCUMENTS_COLLECTION}`)
-        const doc = await documentStorage.findById(DOCUMENTS_COLLECTION, id)
-        console.log('Document found:', doc ? 'yes' : 'no')
-        return { data: doc }
-      case 'patch':
-        if (!data) return { data: null }
-        console.log(`Updating document ${id} in collection ${DOCUMENTS_COLLECTION}:`, data)
-        const updateResult = await documentStorage.update(DOCUMENTS_COLLECTION, id, data as Partial<Document>)
-        console.log('Document update result:', updateResult)
-        return { data: updateResult }
-      case 'delete':
-        console.log('Attempting to delete document with ID:', id)
-        const deleteResult = await documentStorage.delete(DOCUMENTS_COLLECTION, { _id: id })
-        console.log('Delete operation result:', deleteResult)
-        return { data: { success: deleteResult } }
-      case 'post':
-        if (!data) return { data: null }
-        return { data: await documentStorage.create(DOCUMENTS_COLLECTION, data as Omit<Document, '_id'>) }
-    }
-  }
-
-  // Handle folder operations
-  const folderMatch = endpoint.match(/^folders\/([^\/]+)$/)
-  if (folderMatch) {
-    const [, id] = folderMatch
-    console.log('Folder operation:', { id, collection: FOLDERS_COLLECTION })
-    if (!id) {
-      console.log('No folder ID found in endpoint')
-      return { data: null }
-    }
-
-    switch (method) {
-      case 'get':
-        console.log(`Finding folder by ID: ${id} in collection: ${FOLDERS_COLLECTION}`)
-        const folder = await folderStorage.findById(FOLDERS_COLLECTION, id)
-        console.log('Folder found:', folder ? 'yes' : 'no')
-        return { data: folder }
-      case 'patch':
-        if (!data) return { data: null }
-        console.log(`Updating folder ${id} in collection ${FOLDERS_COLLECTION}:`, data)
-        const folderUpdateResult = await folderStorage.update(
-          FOLDERS_COLLECTION,
-          id,
-          data as Partial<Document>,
-        )
-        console.log('Folder update result:', folderUpdateResult)
-        return { data: folderUpdateResult }
-      case 'delete':
-        console.log('Attempting to delete folder with ID:', id)
-        const deleteResult = await folderStorage.delete(FOLDERS_COLLECTION, { _id: id })
-        console.log('Delete operation result:', deleteResult)
-        return { data: { success: deleteResult } }
-      case 'post':
-        if (!data) return { data: null }
-        return { data: await folderStorage.create(FOLDERS_COLLECTION, data as Omit<Document, '_id'>) }
-    }
-  }
-
-  // Handle version operations
-  if (endpoint.startsWith('versions/')) {
-    console.log('Version operation detected')
-    const parts = endpoint.split('versions/')[1].split('/')
-    console.log('Version parts:', parts)
-    if (parts.length === 2) {
-      const [, versionId] = parts
-      switch (method) {
-        case 'get':
-          return { data: await versionStorage.findById('versions', versionId) }
-        case 'delete':
-          return { data: await versionStorage.delete('versions', { _id: versionId }) }
-      }
-    } else if (parts.length === 1) {
-      switch (method) {
-        case 'get':
-          return { data: await versionStorage.find('versions', { documentId: parts[0] }) }
-        case 'post':
-          if (!data) return { data: null }
-          return { data: await versionStorage.create('versions', data) }
-      }
-    }
-  }
-
-  // Handle character operations
-  const characterMatch = endpoint.match(/^characters\/([^\/]+)$/)
-  if (characterMatch) {
-    const [, id] = characterMatch
-    console.log('Character operation:', { id, collection: CHARACTERS_COLLECTION })
-    if (!id) {
-      console.log('No character ID found in endpoint')
-      return { data: null }
-    }
-
-    switch (method) {
-      case 'get':
-        console.log(`Finding character by ID: ${id} in collection: ${CHARACTERS_COLLECTION}`)
-        const character = await characterStorage.findById(CHARACTERS_COLLECTION, id)
-        console.log('Character found:', character ? 'yes' : 'no')
-        return { data: character }
-      case 'patch':
-        if (!data) return { data: null }
-        console.log(`Updating character ${id} in collection ${CHARACTERS_COLLECTION}:`, data)
-        const updateResult = await characterStorage.update(CHARACTERS_COLLECTION, id, data)
-        console.log('Character update result:', updateResult)
-        return { data: updateResult }
-      case 'delete':
-        console.log('Attempting to delete character with ID:', id)
-        const deleteResult = await characterStorage.delete(CHARACTERS_COLLECTION, { _id: id })
-        console.log('Delete operation result:', deleteResult)
-        return { data: { success: deleteResult } }
-      case 'post':
-        if (!data) return { data: null }
-        return { data: await characterStorage.create(CHARACTERS_COLLECTION, data) }
-    }
-  }
-
-  // Handle dialogue entry operations
-  const dialogueEntryMatch = endpoint.match(/^dialogue\/([^\/]+)$/)
-  if (dialogueEntryMatch) {
-    const [, id] = dialogueEntryMatch
-    console.log('Dialogue entry operation:', { id, collection: DIALOGUE_ENTRIES_COLLECTION })
-    if (!id) {
-      console.log('No dialogue entry ID found in endpoint')
-      return { data: null }
-    }
-
-    switch (method) {
-      case 'get':
-        console.log(`Finding dialogue entry by ID: ${id} in collection: ${DIALOGUE_ENTRIES_COLLECTION}`)
-        const dialogueEntry = await dialogueStorage.findById(DIALOGUE_ENTRIES_COLLECTION, id)
-        console.log('Dialogue entry found:', dialogueEntry ? 'yes' : 'no')
-        return { data: dialogueEntry }
-      case 'patch':
-        if (!data) return { data: null }
-        console.log(`Updating dialogue entry ${id} in collection ${DIALOGUE_ENTRIES_COLLECTION}:`, data)
-        const updateResult = await dialogueStorage.update(DIALOGUE_ENTRIES_COLLECTION, id, data)
-        console.log('Dialogue entry update result:', updateResult)
-        return { data: updateResult }
-      case 'delete':
-        console.log('Attempting to delete dialogue entry with ID:', id)
-        const deleteResult = await dialogueStorage.delete(DIALOGUE_ENTRIES_COLLECTION, { _id: id })
-        console.log('Delete operation result:', deleteResult)
-        return { data: { success: deleteResult } }
-      case 'post':
-        if (!data) return { data: null }
-        return { data: await dialogueStorage.create(DIALOGUE_ENTRIES_COLLECTION, data) }
-    }
-  }
-
-  console.log('No matching local operation found')
-  return { data: null }
 }
 
 // Handles all cloud API operations
@@ -673,524 +724,10 @@ async function performCloudOperation(
 // In the syncCloudDataToLocal function - simplify to use same IDs
 async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
   // Only sync collection-level data for now
-  if (endpoint === 'documents' && Array.isArray(cloudData)) {
-    // Skip if a sync is already in progress for this collection
-    if (syncInProgress.documents) {
-      console.log('Skipping documents sync - another sync already in progress')
-      return
-    }
+  const collectionConfig = Object.values(collections).find(config => config.name === endpoint)
 
-    try {
-      // Set sync flag
-      syncInProgress.documents = true
-
-      console.log('Syncing cloud documents to local storage')
-      console.log(`Cloud documents count: ${cloudData.length}`)
-
-      // Get local documents
-      const localDocs = await documentStorage.find(DOCUMENTS_COLLECTION, {})
-      console.log(`Local documents count before sync: ${localDocs.length}`)
-
-      // Create maps for efficient lookups
-      const localDocsById = new Map(localDocs.map(doc => [normalizeId(doc._id), doc]))
-      const cloudDocsById = new Map(cloudData.map(doc => [normalizeId(doc._id), doc]))
-
-      // Keep track of documents we process
-      let updatedCount = 0
-      let createdCount = 0
-      let skippedCount = 0
-      let cloudCreatedCount = 0
-      const newDocuments: DocumentData[] = []
-
-      // First sync cloud documents to local
-      for (const cloudDoc of cloudData) {
-        if (!cloudDoc._id) {
-          console.warn('Skipping cloud document without ID:', cloudDoc)
-          continue
-        }
-
-        const normalizedId = normalizeId(cloudDoc._id)
-        const localDoc = localDocsById.get(normalizedId)
-
-        if (localDoc) {
-          // Document exists locally - check if cloud version is newer
-          if (
-            cloudDoc.updatedAt &&
-            localDoc.updatedAt &&
-            new Date(cloudDoc.updatedAt).getTime() > new Date(localDoc.updatedAt).getTime()
-          ) {
-            console.log(`Updating document ${cloudDoc._id} with newer cloud version`)
-            await documentStorage.update(DOCUMENTS_COLLECTION, cloudDoc._id, cloudDoc)
-            newDocuments.push(cloudDoc)
-            updatedCount++
-          } else {
-            console.log(`Skipping document ${cloudDoc._id}, local version is current or newer`)
-            skippedCount++
-          }
-        } else {
-          // Document doesn't exist locally - create it with the SAME ID
-          console.log(`Creating new local document from cloud with ID: ${cloudDoc._id}`)
-          try {
-            const newDoc = await documentStorage.create(DOCUMENTS_COLLECTION, {
-              ...cloudDoc,
-              // Use the same ID as the cloud version
-              _id: cloudDoc._id,
-            })
-            newDocuments.push(newDoc)
-            createdCount++
-          } catch (error) {
-            console.error(`Error creating document ${cloudDoc._id}:`, error)
-          }
-        }
-      }
-
-      // Then sync local documents to cloud
-      for (const localDoc of localDocs) {
-        if (!localDoc._id) {
-          console.warn('Skipping local document without ID:', localDoc)
-          continue
-        }
-
-        const normalizedId = normalizeId(localDoc._id)
-        const cloudDoc = cloudDocsById.get(normalizedId)
-
-        if (!cloudDoc) {
-          // Document exists locally but not in cloud - create it in cloud
-          console.log(`Creating document in cloud with local ID: ${localDoc._id}`)
-          try {
-            await performCloudOperation('post', '/documents', {
-              ...localDoc,
-              _id: localDoc._id, // Ensure we use the same ID
-            })
-            cloudCreatedCount++
-          } catch (error) {
-            console.error(`Error creating document ${localDoc._id} in cloud:`, error)
-          }
-        } else {
-          // Document exists in both local and cloud - check if local version is newer
-          if (
-            localDoc.updatedAt &&
-            cloudDoc.updatedAt &&
-            new Date(localDoc.updatedAt).getTime() > new Date(cloudDoc.updatedAt).getTime()
-          ) {
-            // Local document is newer, update cloud version
-            console.log(`Updating cloud document ${localDoc._id} with newer local version`)
-            try {
-              await performCloudOperation('patch', `/documents/${localDoc._id}`, localDoc)
-              cloudCreatedCount++ // Reuse this counter for updates too
-            } catch (error) {
-              console.error(`Error updating document ${localDoc._id} in cloud:`, error)
-            }
-          }
-        }
-      }
-
-      console.log(
-        `Document sync complete. Updated locally: ${updatedCount}, Created locally: ${createdCount}, Created/Updated in cloud: ${cloudCreatedCount}, Skipped: ${skippedCount}`,
-      )
-
-      // If we have new or updated documents, notify all windows
-      if (newDocuments.length > 0) {
-        BrowserWindow.getAllWindows().forEach(window => {
-          if (!window.isDestroyed()) {
-            window.webContents.send('sync:updates', { documents: newDocuments })
-          }
-        })
-      }
-    } finally {
-      // Always release the sync flag when done
-      syncInProgress.documents = false
-    }
-  }
-
-  if (endpoint === 'folders' && Array.isArray(cloudData)) {
-    // Skip if a sync is already in progress for this collection
-    if (syncInProgress.folders) {
-      console.log('Skipping folders sync - another sync already in progress')
-      return
-    }
-
-    try {
-      // Set sync flag
-      syncInProgress.folders = true
-
-      console.log('Syncing cloud folders to local storage')
-      console.log(`Cloud folders count: ${cloudData.length}`)
-
-      // Get local folders
-      const localFolders = await folderStorage.find(FOLDERS_COLLECTION, {})
-      console.log(`Local folders count before sync: ${localFolders.length}`)
-
-      // Create maps for efficient lookups
-      const localFoldersById = new Map(localFolders.map(folder => [normalizeId(folder._id), folder]))
-      const cloudFoldersById = new Map(cloudData.map(folder => [normalizeId(folder._id), folder]))
-
-      // Keep track of folders we process
-      let updatedCount = 0
-      let createdCount = 0
-      let skippedCount = 0
-      let cloudCreatedCount = 0
-      const newFolders: any[] = []
-
-      // First sync cloud folders to local
-      for (const cloudFolder of cloudData) {
-        if (!cloudFolder._id) {
-          console.warn('Skipping cloud folder without ID:', cloudFolder)
-          continue
-        }
-
-        const normalizedId = normalizeId(cloudFolder._id)
-        const localFolder = localFoldersById.get(normalizedId)
-
-        if (localFolder) {
-          // Folder exists locally - check if cloud version is newer
-          if (
-            cloudFolder.updatedAt &&
-            localFolder.updatedAt &&
-            new Date(cloudFolder.updatedAt).getTime() > new Date(localFolder.updatedAt).getTime()
-          ) {
-            console.log(`Updating folder ${cloudFolder._id} with newer cloud version`)
-            await folderStorage.update(FOLDERS_COLLECTION, cloudFolder._id, cloudFolder)
-            newFolders.push(cloudFolder)
-            updatedCount++
-          } else {
-            console.log(`Skipping folder ${cloudFolder._id}, local version is current or newer`)
-            skippedCount++
-          }
-        } else {
-          // Folder doesn't exist locally - create it with the SAME ID
-          console.log(`Creating new local folder from cloud with ID: ${cloudFolder._id}`)
-          try {
-            const newFolder = await folderStorage.create(FOLDERS_COLLECTION, {
-              ...cloudFolder,
-              // Use the same ID as the cloud version
-              _id: cloudFolder._id,
-            })
-            newFolders.push(newFolder)
-            createdCount++
-          } catch (error) {
-            console.error(`Error creating folder ${cloudFolder._id}:`, error)
-          }
-        }
-      }
-
-      // Then sync local folders to cloud
-      for (const localFolder of localFolders) {
-        if (!localFolder._id) {
-          console.warn('Skipping local folder without ID:', localFolder)
-          continue
-        }
-
-        const normalizedId = normalizeId(localFolder._id)
-        const cloudFolder = cloudFoldersById.get(normalizedId)
-
-        if (!cloudFolder) {
-          // Folder exists locally but not in cloud - create it in cloud
-          console.log(`Creating folder in cloud with local ID: ${localFolder._id}`)
-          try {
-            await performCloudOperation('post', '/folders', {
-              ...localFolder,
-              _id: localFolder._id, // Ensure we use the same ID
-            })
-            cloudCreatedCount++
-          } catch (error) {
-            console.error(`Error creating folder ${localFolder._id} in cloud:`, error)
-          }
-        } else {
-          // Folder exists in both local and cloud - check if local version is newer
-          if (
-            localFolder.updatedAt &&
-            cloudFolder.updatedAt &&
-            new Date(localFolder.updatedAt).getTime() > new Date(cloudFolder.updatedAt).getTime()
-          ) {
-            // Local folder is newer, update cloud version
-            console.log(`Updating cloud folder ${localFolder._id} with newer local version`)
-            try {
-              await performCloudOperation('patch', `/folders/${localFolder._id}`, localFolder)
-              cloudCreatedCount++ // Reuse this counter for updates too
-            } catch (error) {
-              console.error(`Error updating folder ${localFolder._id} in cloud:`, error)
-            }
-          }
-        }
-      }
-
-      console.log(
-        `Folder sync complete. Updated locally: ${updatedCount}, Created locally: ${createdCount}, Created/Updated in cloud: ${cloudCreatedCount}, Skipped: ${skippedCount}`,
-      )
-
-      // If we have new or updated folders, notify all windows
-      if (newFolders.length > 0) {
-        BrowserWindow.getAllWindows().forEach(window => {
-          if (!window.isDestroyed()) {
-            window.webContents.send('sync:updates', { folders: newFolders })
-          }
-        })
-      }
-    } finally {
-      // Always release the sync flag when done
-      syncInProgress.folders = false
-    }
-  }
-
-  if (endpoint === 'characters' && Array.isArray(cloudData)) {
-    // Skip if a sync is already in progress for this collection
-    if (syncInProgress.characters) {
-      console.log('Skipping characters sync - another sync already in progress')
-      return
-    }
-
-    try {
-      // Set sync flag
-      syncInProgress.characters = true
-
-      console.log('Syncing cloud characters to local storage')
-      console.log(`Cloud characters count: ${cloudData.length}`)
-
-      // Get local characters
-      const localCharacters = await characterStorage.find(CHARACTERS_COLLECTION, {})
-      console.log(`Local characters count before sync: ${localCharacters.length}`)
-
-      // Create maps for efficient lookups
-      const localCharsById = new Map(localCharacters.map(char => [normalizeId(char._id), char]))
-      const cloudCharsById = new Map(cloudData.map(char => [normalizeId(char._id), char]))
-
-      // Keep track of characters we process
-      let updatedCount = 0
-      let createdCount = 0
-      let skippedCount = 0
-      let cloudCreatedCount = 0
-      const newCharacters: any[] = []
-
-      // First sync cloud characters to local
-      for (const cloudChar of cloudData) {
-        if (!cloudChar._id) {
-          console.warn('Skipping cloud character without ID:', cloudChar)
-          continue
-        }
-
-        const normalizedId = normalizeId(cloudChar._id)
-        const localChar = localCharsById.get(normalizedId)
-
-        if (localChar) {
-          // Character exists locally - check if cloud version is newer
-          if (
-            cloudChar.updatedAt &&
-            localChar.updatedAt &&
-            new Date(cloudChar.updatedAt).getTime() > new Date(localChar.updatedAt).getTime()
-          ) {
-            console.log(`Updating character ${cloudChar._id} with newer cloud version`)
-            await characterStorage.update(CHARACTERS_COLLECTION, cloudChar._id, cloudChar)
-            newCharacters.push(cloudChar)
-            updatedCount++
-          } else {
-            console.log(`Skipping character ${cloudChar._id}, local version is current or newer`)
-            skippedCount++
-          }
-        } else {
-          // Character doesn't exist locally - create it with the SAME ID
-          console.log(`Creating new local character from cloud with ID: ${cloudChar._id}`)
-          try {
-            const newChar = await characterStorage.create(CHARACTERS_COLLECTION, {
-              ...cloudChar,
-              // Use the same ID as the cloud version
-              _id: cloudChar._id,
-            })
-            newCharacters.push(newChar)
-            createdCount++
-          } catch (error) {
-            console.error(`Error creating character ${cloudChar._id}:`, error)
-          }
-        }
-      }
-
-      // Then sync local characters to cloud
-      for (const localChar of localCharacters) {
-        if (!localChar._id) {
-          console.warn('Skipping local character without ID:', localChar)
-          continue
-        }
-
-        const normalizedId = normalizeId(localChar._id)
-        const cloudChar = cloudCharsById.get(normalizedId)
-
-        if (!cloudChar) {
-          // Character exists locally but not in cloud - create it in cloud
-          console.log(`Creating character in cloud with local ID: ${localChar._id}`)
-          try {
-            await performCloudOperation('post', '/characters', {
-              ...localChar,
-              _id: localChar._id, // Ensure we use the same ID
-            })
-            cloudCreatedCount++
-          } catch (error) {
-            console.error(`Error creating character ${localChar._id} in cloud:`, error)
-          }
-        } else {
-          // Character exists in both local and cloud - check if local version is newer
-          if (
-            localChar.updatedAt &&
-            cloudChar.updatedAt &&
-            new Date(localChar.updatedAt).getTime() > new Date(cloudChar.updatedAt).getTime()
-          ) {
-            // Local character is newer, update cloud version
-            console.log(`Updating cloud character ${localChar._id} with newer local version`)
-            try {
-              await performCloudOperation('patch', `/characters/${localChar._id}`, localChar)
-              cloudCreatedCount++ // Reuse this counter for updates too
-            } catch (error) {
-              console.error(`Error updating character ${localChar._id} in cloud:`, error)
-            }
-          }
-        }
-      }
-
-      console.log(
-        `Character sync complete. Updated locally: ${updatedCount}, Created locally: ${createdCount}, Created/Updated in cloud: ${cloudCreatedCount}, Skipped: ${skippedCount}`,
-      )
-
-      // If we have new or updated characters, notify all windows
-      if (newCharacters.length > 0) {
-        BrowserWindow.getAllWindows().forEach(window => {
-          if (!window.isDestroyed()) {
-            window.webContents.send('sync:updates', { characters: newCharacters })
-          }
-        })
-      }
-    } finally {
-      // Always release the sync flag when done
-      syncInProgress.characters = false
-    }
-  }
-
-  if (endpoint === 'dialogue' && Array.isArray(cloudData)) {
-    // Skip if a sync is already in progress for this collection
-    if (syncInProgress.dialogue) {
-      console.log('Skipping dialogue entries sync - another sync already in progress')
-      return
-    }
-
-    try {
-      // Set sync flag
-      syncInProgress.dialogue = true
-
-      console.log('Syncing cloud dialogue entries to local storage')
-      console.log(`Cloud dialogue entries count: ${cloudData.length}`)
-
-      // Get local dialogue entries
-      const localDialogueEntries = await dialogueStorage.find(DIALOGUE_ENTRIES_COLLECTION, {})
-      console.log(`Local dialogue entries count before sync: ${localDialogueEntries.length}`)
-
-      // Create maps for efficient lookups
-      const localEntriesById = new Map(localDialogueEntries.map(entry => [normalizeId(entry._id), entry]))
-      const cloudEntriesById = new Map(cloudData.map(entry => [normalizeId(entry._id), entry]))
-
-      // Keep track of dialogue entries we process
-      let updatedCount = 0
-      let createdCount = 0
-      let skippedCount = 0
-      let cloudCreatedCount = 0
-      const newDialogueEntries: any[] = []
-
-      // First sync cloud dialogue entries to local
-      for (const cloudEntry of cloudData) {
-        if (!cloudEntry._id) {
-          console.warn('Skipping cloud dialogue entry without ID:', cloudEntry)
-          continue
-        }
-
-        const normalizedId = normalizeId(cloudEntry._id)
-        const localEntry = localEntriesById.get(normalizedId)
-
-        if (localEntry) {
-          // Dialogue entry exists locally - check if cloud version is newer
-          if (
-            cloudEntry.updatedAt &&
-            localEntry.updatedAt &&
-            new Date(cloudEntry.updatedAt).getTime() > new Date(localEntry.updatedAt).getTime()
-          ) {
-            console.log(`Updating dialogue entry ${cloudEntry._id} with newer cloud version`)
-            await dialogueStorage.update(DIALOGUE_ENTRIES_COLLECTION, cloudEntry._id, cloudEntry)
-            newDialogueEntries.push(cloudEntry)
-            updatedCount++
-          } else {
-            console.log(`Skipping dialogue entry ${cloudEntry._id}, local version is current or newer`)
-            skippedCount++
-          }
-        } else {
-          // Dialogue entry doesn't exist locally - create it with the SAME ID
-          console.log(`Creating new local dialogue entry from cloud with ID: ${cloudEntry._id}`)
-          try {
-            const newEntry = await dialogueStorage.create(DIALOGUE_ENTRIES_COLLECTION, {
-              ...cloudEntry,
-              // Use the same ID as the cloud version
-              _id: cloudEntry._id,
-            })
-            newDialogueEntries.push(newEntry)
-            createdCount++
-          } catch (error) {
-            console.error(`Error creating dialogue entry ${cloudEntry._id}:`, error)
-          }
-        }
-      }
-
-      // Then sync local dialogue entries to cloud
-      for (const localEntry of localDialogueEntries) {
-        if (!localEntry._id) {
-          console.warn('Skipping local dialogue entry without ID:', localEntry)
-          continue
-        }
-
-        const normalizedId = normalizeId(localEntry._id)
-        const cloudEntry = cloudEntriesById.get(normalizedId)
-
-        if (!cloudEntry) {
-          // Dialogue entry exists locally but not in cloud - create it in cloud
-          console.log(`Creating dialogue entry in cloud with local ID: ${localEntry._id}`)
-          try {
-            await performCloudOperation('post', '/dialogue', {
-              ...localEntry,
-              _id: localEntry._id, // Ensure we use the same ID
-            })
-            cloudCreatedCount++
-          } catch (error) {
-            console.error(`Error creating dialogue entry ${localEntry._id} in cloud:`, error)
-          }
-        } else {
-          // Dialogue entry exists in both local and cloud - check if local version is newer
-          if (
-            localEntry.updatedAt &&
-            cloudEntry.updatedAt &&
-            new Date(localEntry.updatedAt).getTime() > new Date(cloudEntry.updatedAt).getTime()
-          ) {
-            // Local dialogue entry is newer, update cloud version
-            console.log(`Updating cloud dialogue entry ${localEntry._id} with newer local version`)
-            try {
-              await performCloudOperation('patch', `/dialogue/${localEntry._id}`, localEntry)
-              cloudCreatedCount++ // Reuse this counter for updates too
-            } catch (error) {
-              console.error(`Error updating dialogue entry ${localEntry._id} in cloud:`, error)
-            }
-          }
-        }
-      }
-
-      console.log(
-        `Dialogue entry sync complete. Updated locally: ${updatedCount}, Created locally: ${createdCount}, Created/Updated in cloud: ${cloudCreatedCount}, Skipped: ${skippedCount}`,
-      )
-
-      // If we have new or updated dialogue entries, notify all windows
-      if (newDialogueEntries.length > 0) {
-        BrowserWindow.getAllWindows().forEach(window => {
-          if (!window.isDestroyed()) {
-            window.webContents.send('sync:updates', { dialogue: newDialogueEntries })
-          }
-        })
-      }
-    } finally {
-      // Always release the sync flag when done
-      syncInProgress.dialogue = false
-    }
+  if (collectionConfig && Array.isArray(cloudData)) {
+    await syncCollectionToLocal(collectionConfig, cloudData)
   }
 }
 
