@@ -8,7 +8,9 @@ import { useAPI } from '@components/providers'
 import { useUser } from '@wrappers/auth-wrapper-client'
 import { Paper, Typography, Chip, Box, IconButton, Tooltip, TextField, Button } from '@mui/material'
 import EditIcon from '@mui/icons-material/Edit'
+import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import CharacterModal from '@components/character-modal'
+import { useLocation } from 'wouter'
 
 // Character type definition from character-modal.tsx
 interface CharacterData {
@@ -64,6 +66,7 @@ const CharacterDetailPage = ({
 }) => {
   const { patch, get, post } = useAPI()
   const { isLoading: userLoading } = useUser()
+  const [, setLocation] = useLocation()
   const [editingCharacter, setEditingCharacter] = useState<CharacterData | null>(null)
   const [dialogue, setDialogue] = useState<DialogueEntry[]>([])
   const [loadingDialogue, setLoadingDialogue] = useState(false)
@@ -180,6 +183,21 @@ const CharacterDetailPage = ({
       />
       <div className="relative top-[44px] flex h-[calc(100vh_-_44px)] justify-center pb-10">
         <div className="flex w-11/12 max-w-[740px] flex-col justify-center sm:w-9/12">
+          {/* Back Button */}
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={() => setLocation('/characters')}
+            variant="text"
+            className="mb-4 self-start"
+            sx={{
+              color: 'rgba(0, 0, 0, 0.87)',
+              '&:hover': {
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              },
+            }}>
+            Back to Characters
+          </Button>
+
           {/* Character Header */}
           <Paper
             elevation={0}
