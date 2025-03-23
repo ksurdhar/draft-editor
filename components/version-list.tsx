@@ -159,7 +159,7 @@ const VersionList = ({ documentId, onRestore, onCompare, currentContent }: Versi
         </h2>
         <button
           onClick={handleCreateVersion}
-          className={`p-1 text-gray-400 transition-colors hover:text-gray-600 ${
+          className={`flex h-7 w-7 items-center justify-center rounded text-gray-400 transition-colors hover:bg-white/[.05] hover:text-gray-600 ${
             selectedVersion ? 'invisible' : ''
           }`}>
           <PlusIcon className="h-4 w-4" />
@@ -179,9 +179,9 @@ const VersionList = ({ documentId, onRestore, onCompare, currentContent }: Versi
               <div className="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                 <button
                   onClick={() => handleCompareClick(version)}
-                  className={`p-1 ${
+                  className={`flex h-7 w-7 items-center justify-center rounded ${
                     version === selectedVersion ? 'text-gray-600' : 'text-gray-400 hover:text-gray-600'
-                  } transition-colors`}
+                  } transition-colors hover:bg-white/[.05]`}
                   title={version === selectedVersion ? 'Exit comparison' : 'Compare with current'}>
                   <EyeIcon className="h-4 w-4" />
                 </button>
@@ -189,13 +189,13 @@ const VersionList = ({ documentId, onRestore, onCompare, currentContent }: Versi
                   <>
                     <button
                       onClick={() => onRestore(version)}
-                      className="p-1 text-gray-400 transition-colors hover:text-gray-600"
+                      className="flex h-7 w-7 items-center justify-center rounded text-gray-400 transition-colors hover:bg-white/[.05] hover:text-gray-600"
                       title="Restore version">
                       <RewindIcon className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteClick(version)}
-                      className="p-1 text-gray-400 transition-colors hover:text-gray-600"
+                      className="flex h-7 w-7 items-center justify-center rounded text-gray-400 transition-colors hover:bg-white/[.05] hover:text-gray-600"
                       title="Delete version">
                       <TrashIcon className="h-4 w-4" />
                     </button>

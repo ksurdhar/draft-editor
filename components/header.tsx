@@ -136,7 +136,7 @@ const HeaderComponent = ({ id }: HeaderProps) => {
   }
 
   // Determine the padding based on whether we're in Electron or not
-  const headerPadding = isElectron ? 'pt-8 p-5 pb-[30px]' : 'p-5 pb-[30px]'
+  const headerPadding = isElectron ? 'pt-8 p-5 pb-[0px]' : 'p-5 pb-[0px]'
 
   // Adjust the hamburger menu position for Electron
   const hamburgerTopPosition = isElectron ? 'top-[28px]' : 'top-[20px]'

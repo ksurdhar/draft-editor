@@ -13,9 +13,10 @@ import { useCallback, useEffect, useState, useMemo } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useDebouncedCallback } from 'use-debounce'
 import { motion, AnimatePresence } from 'framer-motion'
-import { EyeIcon, EyeOffIcon, ClockIcon, SearchIcon } from '@heroicons/react/outline'
+import { EyeIcon, EyeOffIcon, ClockIcon, SearchIcon, ChatIcon } from '@heroicons/react/outline'
 import VersionList from '@components/version-list'
 import GlobalFind from '@components/global-find'
+import DialogueList from '@components/dialogue-list'
 import { renameItem, DocumentOperations } from '@lib/document-operations'
 
 const backdropStyles = `
@@ -214,6 +215,7 @@ export default function SharedDocumentPage() {
   const skipAnimation = searchParams.get('from') === 'tree'
   const [showTree, setShowTree] = useState(true)
   const [showVersions, setShowVersions] = useState(false)
+  const [showDialogue, setShowDialogue] = useState(false)
   const [showGlobalFind, setShowGlobalFind] = useState(false)
   const [diffContent, setDiffContent] = useState<any>(null)
   const [showInitialLoader, setShowInitialLoader] = useState(false)
@@ -380,75 +382,102 @@ export default function SharedDocumentPage() {
         </div>
       )}
       <div className="flex h-screen">
-        {/* Control Buttons */}
-        <div className="fixed left-[18px] top-[41px] z-50 flex gap-2">
-          <button
-            onClick={() => {
-              setShowTree(!showTree)
-              if (!showTree) {
-                setShowGlobalFind(false)
-              }
-            }}
-            className="rounded-lg p-1.5 transition-colors hover:bg-white/[.1]"
-            title={showTree ? 'Hide document tree' : 'Show document tree'}>
-            {showTree ? (
-              <EyeIcon className="h-4 w-4 text-black/70" />
-            ) : (
-              <EyeOffIcon className="h-4 w-4 text-black/70" />
-            )}
-          </button>
-          <button
-            onClick={() => {
-              setShowGlobalFind(!showGlobalFind)
-              if (!showGlobalFind) {
-                setShowTree(false)
-              }
-            }}
-            className="rounded-lg p-1.5 transition-colors hover:bg-white/[.1]"
-            title={showGlobalFind ? 'Hide global find' : 'Show global find'}>
-            <SearchIcon className="h-4 w-4 text-black/70" />
-          </button>
-          <button
-            onClick={() => setShowVersions(!showVersions)}
-            className="rounded-lg p-1.5 transition-colors hover:bg-white/[.1]"
-            title={showVersions ? 'Hide versions' : 'Show versions'}>
-            <ClockIcon className="h-4 w-4 text-black/70" />
-          </button>
-        </div>
+        {/* Left Sidebar Container */}
+        <div className="h-screen w-[320px] shrink-0 pt-[60px] lg:fixed lg:left-0 lg:top-0">
+          {/* Control Buttons */}
+          <div className="relative z-50 px-4 pb-2">
+            <div className="pointer-events-auto flex gap-2">
+              <button
+                onClick={() => {
+                  setShowTree(!showTree)
+                  if (!showTree) {
+                    setShowGlobalFind(false)
+                    setShowDialogue(false)
+                  }
+                }}
+                className="rounded-lg p-1.5 transition-colors hover:bg-white/[.1]"
+                title={showTree ? 'Hide document tree' : 'Show document tree'}>
+                {showTree ? (
+                  <EyeIcon className="h-4 w-4 text-black/70" />
+                ) : (
+                  <EyeOffIcon className="h-4 w-4 text-black/70" />
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setShowGlobalFind(!showGlobalFind)
+                  if (!showGlobalFind) {
+                    setShowTree(false)
+                    setShowDialogue(false)
+                  }
+                }}
+                className="rounded-lg p-1.5 transition-colors hover:bg-white/[.1]"
+                title={showGlobalFind ? 'Hide global find' : 'Show global find'}>
+                <SearchIcon className="h-4 w-4 text-black/70" />
+              </button>
+              <button
+                onClick={() => {
+                  setShowVersions(!showVersions)
+                  if (!showVersions) {
+                    setShowDialogue(false)
+                    setDiffContent(null)
+                  }
+                }}
+                className="rounded-lg p-1.5 transition-colors hover:bg-white/[.1]"
+                title={showVersions ? 'Hide versions' : 'Show versions'}>
+                <ClockIcon className="h-4 w-4 text-black/70" />
+              </button>
+              <button
+                onClick={() => {
+                  setShowDialogue(!showDialogue)
+                  if (!showDialogue) {
+                    setShowVersions(false)
+                    setDiffContent(null)
+                  }
+                }}
+                className="rounded-lg p-1.5 transition-colors hover:bg-white/[.1]"
+                title={showDialogue ? 'Hide dialogue' : 'Show dialogue'}>
+                <ChatIcon className="h-4 w-4 text-black/70" />
+              </button>
+            </div>
+          </div>
 
-        {/* Document Tree or Global Find */}
-        <AnimatePresence initial={false}>
-          {(showTree || showGlobalFind) && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.98, filter: 'blur(8px)' }}
-              animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, scale: 0.98, filter: 'blur(8px)' }}
-              transition={{
-                opacity: { duration: 0.5, ease: [0.23, 1, 0.32, 1] },
-                scale: { duration: 0.25, ease: [0.23, 1, 0.32, 1] },
-                filter: { duration: 0.4, ease: [0.23, 1, 0.32, 1] },
-              }}
-              style={{ willChange: 'filter' }}
-              className="h-screen w-[320px] shrink-0 pt-[44px] lg:fixed lg:left-0 lg:top-0">
-              {showTree && allDocs && allFolders && (
-                <div className="h-[calc(100vh_-_44px)] overflow-y-auto p-4">
-                  <DocumentTree
-                    key="document-tree"
-                    items={createTreeItems(allDocs, allFolders)}
-                    onPrimaryAction={handlePrimaryAction}
-                    onRename={handleRename}
-                    showActionButton={false}
-                    className="h-full"
-                    persistExpanded={true}
-                    theme="dark"
-                    showSelectedStyles={false}
-                  />
-                </div>
+          {/* Document Tree or Global Find */}
+          <div className="relative">
+            <AnimatePresence initial={false}>
+              {(showTree || showGlobalFind) && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.98, filter: 'blur(8px)' }}
+                  animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+                  exit={{ opacity: 0, scale: 0.98, filter: 'blur(8px)' }}
+                  transition={{
+                    opacity: { duration: 0.5, ease: [0.23, 1, 0.32, 1] },
+                    scale: { duration: 0.25, ease: [0.23, 1, 0.32, 1] },
+                    filter: { duration: 0.4, ease: [0.23, 1, 0.32, 1] },
+                  }}
+                  style={{ willChange: 'filter' }}
+                  className="absolute inset-x-0 h-[calc(100vh-100px)]">
+                  {showTree && allDocs && allFolders && (
+                    <div className="h-full overflow-y-auto px-4">
+                      <DocumentTree
+                        key="document-tree"
+                        items={createTreeItems(allDocs, allFolders)}
+                        onPrimaryAction={handlePrimaryAction}
+                        onRename={handleRename}
+                        showActionButton={false}
+                        className="h-full"
+                        persistExpanded={true}
+                        theme="dark"
+                        showSelectedStyles={false}
+                      />
+                    </div>
+                  )}
+                  {showGlobalFind && <GlobalFind onClose={() => setShowGlobalFind(false)} />}
+                </motion.div>
               )}
-              {showGlobalFind && <GlobalFind onClose={() => setShowGlobalFind(false)} />}
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </AnimatePresence>
+          </div>
+        </div>
 
         {/* Versions Sidebar */}
         <AnimatePresence initial={false}>
@@ -463,14 +492,35 @@ export default function SharedDocumentPage() {
                 filter: { duration: 0.4, ease: [0.23, 1, 0.32, 1] },
               }}
               style={{ willChange: 'filter' }}
-              className="fixed right-0 top-0 h-screen w-[320px] shrink-0 bg-white/[.02] pt-[44px] backdrop-blur-xl">
-              <div className="h-[calc(100vh_-_44px)] overflow-y-auto p-4">
+              className="fixed right-0 top-0 h-screen w-[320px] shrink-0 bg-white/[.02] pt-[60px] backdrop-blur-xl">
+              <div className="h-[calc(100vh_-_60px)] overflow-y-auto p-4">
                 <VersionList
                   documentId={documentId}
                   onRestore={handleRestoreVersion}
                   onCompare={setDiffContent}
                   currentContent={documentContent}
                 />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Dialogue Sidebar */}
+        <AnimatePresence initial={false}>
+          {showDialogue && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98, filter: 'blur(8px)' }}
+              animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, scale: 0.98, filter: 'blur(8px)' }}
+              transition={{
+                opacity: { duration: 0.5, ease: [0.23, 1, 0.32, 1] },
+                scale: { duration: 0.25, ease: [0.23, 1, 0.32, 1] },
+                filter: { duration: 0.4, ease: [0.23, 1, 0.32, 1] },
+              }}
+              style={{ willChange: 'filter' }}
+              className="fixed right-0 top-0 h-screen w-[320px] shrink-0 bg-white/[.02] pt-[60px] backdrop-blur-xl">
+              <div className="h-[calc(100vh_-_60px)] overflow-y-auto p-4">
+                <DialogueList documentId={documentId} currentContent={documentContent} />
               </div>
             </motion.div>
           )}

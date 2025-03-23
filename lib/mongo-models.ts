@@ -248,7 +248,6 @@ export interface IFolderModel extends Model<IFolderDocument> {}
 export const Folder =
   (Mongoose.models && Mongoose.models.Folder) || Mongoose.model<IFolderDocument>('Folder', FolderSchema)
 
-// Add a new schema for dialogue entries
 const DialogueEntrySchema = new Mongoose.Schema({
   _id: {
     type: Mongoose.Schema.Types.String,
@@ -314,7 +313,6 @@ const DialogueEntrySchema = new Mongoose.Schema({
   },
 })
 
-// Add toJSON for DialogueEntrySchema
 DialogueEntrySchema.set('toJSON', {
   virtuals: true,
   versionKey: false,
@@ -352,7 +350,6 @@ export const DialogueEntry =
   (Mongoose.models && Mongoose.models.DialogueEntry) ||
   Mongoose.model<IDialogueEntryDocument>('DialogueEntry', DialogueEntrySchema)
 
-// Add a new schema for characters
 const CharacterSchema = new Mongoose.Schema({
   _id: {
     type: Mongoose.Schema.Types.String,
@@ -402,7 +399,6 @@ const CharacterSchema = new Mongoose.Schema({
   },
 })
 
-// Add toJSON for CharacterSchema
 CharacterSchema.set('toJSON', {
   virtuals: true,
   versionKey: false,
