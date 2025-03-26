@@ -39,7 +39,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 "context": "surrounding context"
               }
             ]
-          }`,
+          }
+          
+          If no dialogue is found, return: {"dialogues": []}`,
         },
         {
           role: 'user',
@@ -52,23 +54,50 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const result = completion.choices[0].message.content
     if (!result) {
-      throw new Error('No response from OpenAI')
+      return res.status(500).json({ error: 'No response from OpenAI' })
     }
 
-    const parsed = JSON.parse(result)
+    let parsed
+    try {
+      parsed = JSON.parse(result)
+    } catch (parseError) {
+      console.error('Failed to parse OpenAI response:', result)
+      return res.status(500).json({ error: 'Invalid JSON response from OpenAI' })
+    }
+
+    if (!parsed || !Array.isArray(parsed.dialogues)) {
+      console.error('Invalid response structure:', parsed)
+      return res.status(500).json({ error: 'Invalid response structure from OpenAI' })
+    }
 
     // Add start and end indices for each dialogue
-    const dialogues = parsed.dialogues.map((dialogue: any) => ({
-      ...dialogue,
-      startIndex: text.indexOf(dialogue.text),
-      endIndex: text.indexOf(dialogue.text) + dialogue.text.length,
-    }))
+    const dialogues = parsed.dialogues
+      .map((dialogue: any) => {
+        if (!dialogue.text) {
+          console.warn('Dialogue entry missing text:', dialogue)
+          return null
+        }
+
+        const startIndex = text.indexOf(dialogue.text)
+        if (startIndex === -1) {
+          console.warn('Could not find dialogue text in original content:', dialogue.text)
+          return null
+        }
+
+        return {
+          ...dialogue,
+          startIndex,
+          endIndex: startIndex + dialogue.text.length,
+        }
+      })
+      .filter(Boolean) // Remove any null entries
 
     return res.status(200).json({ dialogues })
   } catch (error: any) {
     console.error('Dialogue detection error:', error)
     return res.status(500).json({
       error: error.message || 'Failed to detect dialogue',
+      details: error.response?.data || error.toString(),
     })
   }
 }

@@ -11,7 +11,7 @@ import {
 import { DEFAULT_DOCUMENT_CONTENT } from '../lib/constants'
 import { isOnline } from './network-detector'
 import { BrowserWindow } from 'electron'
-import { dialogueDetectionService } from './services/dialogue-detection'
+import { detectDialogue } from './services/dialogue-detection'
 
 // We'll always use local storage and sync with cloud when possible
 const BASE_URL = 'https://www.whetstone-writer.com/api'
@@ -248,6 +248,22 @@ const collections: Record<string, CollectionConfig> = {
           return { data: await dialogueStorage.find(DIALOGUE_ENTRIES_COLLECTION, { documentId }) }
         }
         return { data: null }
+      },
+      // Handle dialogue detection
+      '^dialogue/detect$': async (method, match, data) => {
+        if (method !== 'post' || !data?.text) {
+          console.log('Invalid request for dialogue detection:', { method, data })
+          return { data: null }
+        }
+        console.log('Detecting dialogue in text:', data.text.substring(0, 100) + '...')
+        try {
+          const dialogues = await detectDialogue(data.text)
+          console.log('Dialogue detection successful:', dialogues.length, 'dialogues found')
+          return { data: dialogues }
+        } catch (error: any) {
+          console.error('Error in dialogue detection:', error)
+          throw error
+        }
       },
     },
   },
@@ -615,15 +631,6 @@ export const electronAPI = {
     const result = await makeRequest('delete', url)
     return result.data
   },
-
-  detectDialogue: async (text: string) => {
-    try {
-      return await dialogueDetectionService.detectDialogue(text)
-    } catch (error) {
-      console.error('Error in detectDialogue:', error)
-      throw error
-    }
-  },
 }
 
 export default apiService
@@ -642,13 +649,13 @@ const makeRequest = async (
     let localResult = await routeLocalOperation(method, cleanEndpoint, data)
     console.log('Local operation result:', localResult?.data ? 'success' : 'no data')
 
-    // If we're online, perform cloud operation in the background without blocking
-    if (isOnline()) {
+    // If we're online and this isn't a dialogue detection request, perform cloud operation
+    if (isOnline() && !cleanEndpoint.startsWith('dialogue/detect')) {
       // Since we're now using the same IDs for both local and cloud,
       // we can simply pass the same endpoint to the cloud operation
       performCloudOperationAsync(method, endpoint, data, cleanEndpoint, localResult)
     } else {
-      console.log('Offline mode - using local data only')
+      console.log('Skipping cloud sync - offline or dialogue detection request')
     }
 
     // Always return the local result immediately

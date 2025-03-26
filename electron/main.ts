@@ -13,6 +13,13 @@ const envPath = path.resolve(__dirname, '../../env-electron.json')
 const env = JSON.parse(fs.readFileSync(envPath, 'utf-8'))
 const mockAuth = env.MOCK_AUTH || false
 
+// Set OpenAI API key from environment
+if (env.OPENAI_API_KEY) {
+  process.env.OPENAI_API_KEY = env.OPENAI_API_KEY
+} else {
+  console.error('OpenAI API key not found in env-electron.json')
+}
+
 let currentNetworkStatus = true
 let networkDetector: {
   checkNow: () => void

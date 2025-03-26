@@ -18,8 +18,15 @@ import VersionList from '@components/version-list'
 import GlobalFind from '@components/global-find'
 import DialogueList from '@components/dialogue-list'
 import { renameItem, DocumentOperations } from '@lib/document-operations'
-import { dialogueService } from '@lib/dialogue-service'
-import { DialogueDetectionResult } from '@lib/dialogue-service'
+
+export interface DialogueDetectionResult {
+  character: string
+  confidence: number
+  text: string
+  startIndex: number
+  endIndex: number
+  context?: string
+}
 
 const backdropStyles = `
   fixed top-0 left-0 h-screen w-screen z-[-1]
@@ -375,11 +382,43 @@ export default function SharedDocumentPage() {
 
     setIsSyncingDialogue(true)
     try {
-      // Get plain text content from the editor
-      const text = documentContent.content?.content || ''
+      // Parse the content if it's a string
+      const parsedContent =
+        typeof documentContent === 'string' ? JSON.parse(documentContent) : documentContent
 
-      // Detect dialogue using our service
-      const dialogues = await dialogueService.detectDialogue(text)
+      // Extract text from the document content
+      let text = ''
+      if (parsedContent && parsedContent.content) {
+        const extractText = (node: any): string => {
+          if (typeof node === 'string') return node
+          if (!node) return ''
+
+          if (node.type === 'text') {
+            return node.text || ''
+          }
+
+          if (Array.isArray(node.content)) {
+            return node.content.map(extractText).join(' ')
+          }
+
+          return ''
+        }
+
+        text = extractText(parsedContent)
+      }
+
+      if (!text.trim()) {
+        console.log('No text content found in document')
+        return
+      }
+
+      // Detect dialogue using the API
+      const response = await post('/dialogue/detect', { text })
+      const dialogues = Array.isArray(response) ? response : response.dialogues
+
+      if (!dialogues) {
+        throw new Error('Invalid response from dialogue detection')
+      }
 
       // Update the document content with dialogue marks
       const updatedContent = {
