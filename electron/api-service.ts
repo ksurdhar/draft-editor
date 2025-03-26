@@ -11,6 +11,7 @@ import {
 import { DEFAULT_DOCUMENT_CONTENT } from '../lib/constants'
 import { isOnline } from './network-detector'
 import { BrowserWindow } from 'electron'
+import { dialogueDetectionService } from './services/dialogue-detection'
 
 // We'll always use local storage and sync with cloud when possible
 const BASE_URL = 'https://www.whetstone-writer.com/api'
@@ -613,6 +614,15 @@ export const electronAPI = {
   destroy: async (url: string) => {
     const result = await makeRequest('delete', url)
     return result.data
+  },
+
+  detectDialogue: async (text: string) => {
+    try {
+      return await dialogueDetectionService.detectDialogue(text)
+    } catch (error) {
+      console.error('Error in detectDialogue:', error)
+      throw error
+    }
   },
 }
 

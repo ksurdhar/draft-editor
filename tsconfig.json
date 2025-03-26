@@ -21,11 +21,12 @@
     "baseUrl": ".",
     "outDir": "dist",
     "paths": {
-      "@components/*": ["components/*"],
+      "@components/*": ["./components/*"],
       "@styles/*": ["styles/*"],
       "@wrappers/*": ["wrappers/*"],
-      "@lib/*": ["lib/*"],
-      "@typez/*": ["types/*"]
+      "@lib/*": ["./lib/*"],
+      "@typez/*": ["types/*"],
+      "@services/*": ["./services/*"]
     }
   },
   "include": ["next-env.d.ts", "types/globals.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "electron"],

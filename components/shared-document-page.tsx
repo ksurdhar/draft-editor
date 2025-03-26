@@ -18,6 +18,8 @@ import VersionList from '@components/version-list'
 import GlobalFind from '@components/global-find'
 import DialogueList from '@components/dialogue-list'
 import { renameItem, DocumentOperations } from '@lib/document-operations'
+import { dialogueService } from '@lib/dialogue-service'
+import { DialogueDetectionResult } from '@lib/dialogue-service'
 
 const backdropStyles = `
   fixed top-0 left-0 h-screen w-screen z-[-1]
@@ -219,6 +221,7 @@ export default function SharedDocumentPage() {
   const [showGlobalFind, setShowGlobalFind] = useState(false)
   const [diffContent, setDiffContent] = useState<any>(null)
   const [showInitialLoader, setShowInitialLoader] = useState(false)
+  const [isSyncingDialogue, setIsSyncingDialogue] = useState(false)
 
   const debouncedSave = useDebouncedCallback((data: Partial<DocumentData>) => {
     mutate(`/documents/${documentId}/versions`)
@@ -367,6 +370,55 @@ export default function SharedDocumentPage() {
     [patch, post],
   )
 
+  const syncDialogue = async () => {
+    if (!documentContent || isSyncingDialogue) return
+
+    setIsSyncingDialogue(true)
+    try {
+      // Get plain text content from the editor
+      const text = documentContent.content?.content || ''
+
+      // Detect dialogue using our service
+      const dialogues = await dialogueService.detectDialogue(text)
+
+      // Update the document content with dialogue marks
+      const updatedContent = {
+        ...documentContent,
+        content: {
+          ...documentContent.content,
+          marks: dialogues.map((dialogue: DialogueDetectionResult) => ({
+            type: 'dialogue',
+            attrs: {
+              character: dialogue.character,
+              confidence: dialogue.confidence,
+              context: dialogue.context,
+            },
+            from: dialogue.startIndex,
+            to: dialogue.endIndex,
+          })),
+        },
+      }
+
+      // Save the updated content
+      await debouncedSave({
+        content: updatedContent,
+      })
+
+      console.log('Dialogue sync completed:', dialogues.length, 'dialogues found')
+    } catch (e) {
+      console.error('Failed to sync dialogue:', e)
+    } finally {
+      setIsSyncingDialogue(false)
+    }
+  }
+
+  // Auto-sync dialogue when document is opened
+  useEffect(() => {
+    if (documentContent && !isTransitioning && !showSpinner) {
+      syncDialogue()
+    }
+  }, [documentId, documentContent, isTransitioning, showSpinner])
+
   return (
     <Layout documentId={id} onToggleGlobalSearch={handleToggleGlobalSearch}>
       {!skipAnimation && (
@@ -438,6 +490,17 @@ export default function SharedDocumentPage() {
                 className="rounded-lg p-1.5 transition-colors hover:bg-white/[.1]"
                 title={showDialogue ? 'Hide dialogue' : 'Show dialogue'}>
                 <ChatIcon className="h-4 w-4 text-black/70" />
+              </button>
+              <button
+                onClick={syncDialogue}
+                disabled={isSyncingDialogue}
+                className="rounded-lg p-1.5 transition-colors hover:bg-white/[.1]"
+                title={isSyncingDialogue ? 'Syncing dialogue...' : 'Detect dialogue'}>
+                {isSyncingDialogue ? (
+                  <Loader className="h-4 w-4" />
+                ) : (
+                  <ChatIcon className="h-4 w-4 text-black/70" />
+                )}
               </button>
             </div>
           </div>

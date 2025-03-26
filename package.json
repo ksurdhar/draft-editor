@@ -30,6 +30,7 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@ai-sdk/openai": "^1.3.2",
     "@auth0/nextjs-auth0": "^3.2.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
@@ -45,6 +46,7 @@
     "@tiptap/react": "^2.11.5",
     "@tiptap/starter-kit": "^2.11.5",
     "@types/slate": "^0.47.11",
+    "ai": "^4.2.5",
     "axios": "^1.5.1",
     "bufferutil": "^4.0.9",
     "compromise": "^14.14.4",
@@ -74,7 +76,8 @@
     "use-debounce": "^8.0.1",
     "utf-8-validate": "^6.0.5",
     "uuid": "^9.0.1",
-    "wouter": "^2.12.1"
+    "wouter": "^2.12.1",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "@electron-forge/cli": "^6.4.2",
