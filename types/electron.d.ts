@@ -11,3 +11,10 @@ declare global {
     }
   }
 }
+
+export interface DialogueDetectionResult {
+  character: string
+  confidence: number
+  snippet: string
+  conversationId: string
+}

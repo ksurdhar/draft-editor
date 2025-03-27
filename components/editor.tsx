@@ -9,6 +9,7 @@ import { useEditorFades } from './header'
 import FindPanel from './find-panel'
 import { SearchHighlight } from '../lib/tiptap-extensions/search-highlight'
 import { DiffHighlight } from '../lib/tiptap-extensions/diff-highlight'
+import { DialogueMark } from '../lib/tiptap-extensions/dialogue-mark'
 
 // Add styles to override ProseMirror defaults
 const editorStyles = `
@@ -30,6 +31,10 @@ const editorStyles = `
   .diff-removed {
     background-color: rgba(252, 165, 165, 0.25); /* red-300 with opacity */
   }
+  .dialogue-mark {
+    background-color: rgba(147, 197, 253, 0.25); /* blue-300 with opacity */
+    border-bottom: 1px solid rgba(147, 197, 253, 0.5);
+  }
 `
 
 type EditorProps = {
@@ -41,6 +46,7 @@ type EditorProps = {
   hideFooter?: boolean
   shouldFocusTitle?: boolean
   diffMode?: boolean
+  onEditorReady?: (editor: any) => void
 }
 
 const DEFAULT_CONTENT = {
@@ -61,6 +67,7 @@ const EditorComponent = ({
   hideFooter,
   shouldFocusTitle,
   diffMode,
+  onEditorReady,
 }: EditorProps) => {
   const [inputValue, setInputValue] = useState(title === 'Untitled' ? '' : title)
   const [showFindPanel, setShowFindPanel] = useState(false)
@@ -89,7 +96,7 @@ const EditorComponent = ({
   })()
 
   const editor = useEditor({
-    extensions: [StarterKit, SearchHighlight, DiffHighlight],
+    extensions: [StarterKit, SearchHighlight, DiffHighlight, DialogueMark],
     content: initialContent,
     editable: canEdit && !diffMode,
     onUpdate: ({ editor }) => {
@@ -100,8 +107,10 @@ const EditorComponent = ({
         title: inputValue || 'Untitled',
       })
     },
-    onCreate: ({ editor: _editor }) => {
-      // console.log('Editor onCreate - initial content:', editor.getJSON())
+    onCreate: ({ editor }) => {
+      if (onEditorReady) {
+        onEditorReady(editor)
+      }
     },
   })
 

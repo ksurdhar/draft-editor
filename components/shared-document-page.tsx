@@ -18,15 +18,7 @@ import VersionList from '@components/version-list'
 import GlobalFind from '@components/global-find'
 import DialogueList from '@components/dialogue-list'
 import { renameItem, DocumentOperations } from '@lib/document-operations'
-
-export interface DialogueDetectionResult {
-  character: string
-  confidence: number
-  text: string
-  startIndex: number
-  endIndex: number
-  context?: string
-}
+import { findAllMatches } from '../lib/search'
 
 const backdropStyles = `
   fixed top-0 left-0 h-screen w-screen z-[-1]
@@ -98,6 +90,8 @@ export default function SharedDocumentPage() {
   const [hybridDoc, setHybridDoc] = useState<DocumentData | null>()
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [currentContent, setCurrentContent] = useState<any>(null)
+  const [editor, setEditor] = useState<any>(null)
+  const [initAnimate, setInitAnimate] = useState(false)
 
   useEffect(() => {
     if (databaseDoc) {
@@ -107,6 +101,10 @@ export default function SharedDocumentPage() {
 
   // Use the current document's content or fall back to hybrid doc
   const documentContent = currentContent || hybridDoc?.content
+
+  // Ensure we have valid arrays for the document tree
+  const safeAllDocs = allDocs || []
+  const safeAllFolders = allFolders || []
 
   // Handle document content updates - split into two effects
   useEffect(() => {
@@ -219,7 +217,6 @@ export default function SharedDocumentPage() {
   const showSpinner = !documentContent && isTransitioning
 
   const { isLoading } = useUser()
-  const [initAnimate, setInitAnimate] = useState(false)
   const [recentlySaved, setRecentlySaved] = useState(false)
   const skipAnimation = searchParams.get('from') === 'tree'
   const [showTree, setShowTree] = useState(true)
@@ -377,40 +374,17 @@ export default function SharedDocumentPage() {
     [patch, post],
   )
 
+  const handleEditorReady = (editorInstance: any) => {
+    setEditor(editorInstance)
+  }
+
   const syncDialogue = async () => {
-    if (!documentContent || isSyncingDialogue) return
+    if (!documentContent || isSyncingDialogue || !editor) return
 
     setIsSyncingDialogue(true)
     try {
-      // Parse the content if it's a string
-      const parsedContent =
-        typeof documentContent === 'string' ? JSON.parse(documentContent) : documentContent
-
-      // Extract text from the document content
-      let text = ''
-      if (parsedContent && parsedContent.content) {
-        const extractText = (node: any): string => {
-          if (typeof node === 'string') return node
-          if (!node) return ''
-
-          if (node.type === 'text') {
-            return node.text || ''
-          }
-
-          if (Array.isArray(node.content)) {
-            return node.content.map(extractText).join(' ')
-          }
-
-          return ''
-        }
-
-        text = extractText(parsedContent)
-      }
-
-      if (!text.trim()) {
-        console.log('No text content found in document')
-        return
-      }
+      // Get the document text directly from editor state
+      const text = editor.state.doc.textContent
 
       // Detect dialogue using the API
       const response = await post('/dialogue/detect', { text })
@@ -420,43 +394,50 @@ export default function SharedDocumentPage() {
         throw new Error('Invalid response from dialogue detection')
       }
 
-      // Update the document content with dialogue marks
-      const updatedContent = {
-        ...documentContent,
-        content: {
-          ...documentContent.content,
-          marks: dialogues.map((dialogue: DialogueDetectionResult) => ({
-            type: 'dialogue',
-            attrs: {
-              character: dialogue.character,
-              confidence: dialogue.confidence,
-              context: dialogue.context,
-            },
-            from: dialogue.startIndex,
-            to: dialogue.endIndex,
-          })),
-        },
+      interface RawDialogue {
+        character: string
+        snippet: string
+        confidence: number
+        conversationId: string
       }
+
+      // Remove existing dialogue marks
+      editor.commands.unsetMark('dialogue')
+
+      // Find and mark each dialogue
+      dialogues.forEach((dialogue: RawDialogue) => {
+        // Find all occurrences using findAllMatches
+        const matches = findAllMatches(editor.state.doc, dialogue.snippet)
+
+        // Apply mark to each match
+        matches.forEach(match => {
+          editor.commands.setTextSelection({
+            from: match.from,
+            to: match.to,
+          })
+          editor.commands.setDialogueMark({
+            character: dialogue.character,
+            conversationId: dialogue.conversationId,
+          })
+        })
+      })
+
+      // Clear the selection
+      editor.commands.setTextSelection(0)
+
+      // Get the updated content with marks
+      const updatedContent = editor.getJSON()
 
       // Save the updated content
       await debouncedSave({
         content: updatedContent,
       })
-
-      console.log('Dialogue sync completed:', dialogues.length, 'dialogues found')
     } catch (e) {
       console.error('Failed to sync dialogue:', e)
     } finally {
       setIsSyncingDialogue(false)
     }
   }
-
-  // Auto-sync dialogue when document is opened
-  useEffect(() => {
-    if (documentContent && !isTransitioning && !showSpinner) {
-      syncDialogue()
-    }
-  }, [documentId, documentContent, isTransitioning, showSpinner])
 
   return (
     <Layout documentId={id} onToggleGlobalSearch={handleToggleGlobalSearch}>
@@ -530,17 +511,6 @@ export default function SharedDocumentPage() {
                 title={showDialogue ? 'Hide dialogue' : 'Show dialogue'}>
                 <ChatIcon className="h-4 w-4 text-black/70" />
               </button>
-              <button
-                onClick={syncDialogue}
-                disabled={isSyncingDialogue}
-                className="rounded-lg p-1.5 transition-colors hover:bg-white/[.1]"
-                title={isSyncingDialogue ? 'Syncing dialogue...' : 'Detect dialogue'}>
-                {isSyncingDialogue ? (
-                  <Loader className="h-4 w-4" />
-                ) : (
-                  <ChatIcon className="h-4 w-4 text-black/70" />
-                )}
-              </button>
             </div>
           </div>
 
@@ -563,7 +533,7 @@ export default function SharedDocumentPage() {
                     <div className="h-full overflow-y-auto px-4">
                       <DocumentTree
                         key="document-tree"
-                        items={createTreeItems(allDocs, allFolders)}
+                        items={createTreeItems(safeAllDocs, safeAllFolders)}
                         onPrimaryAction={handlePrimaryAction}
                         onRename={handleRename}
                         showActionButton={false}
@@ -622,7 +592,12 @@ export default function SharedDocumentPage() {
               style={{ willChange: 'filter' }}
               className="fixed right-0 top-0 h-screen w-[320px] shrink-0 bg-white/[.02] pt-[60px] backdrop-blur-xl">
               <div className="h-[calc(100vh_-_60px)] overflow-y-auto p-4">
-                <DialogueList documentId={documentId} currentContent={documentContent} />
+                <DialogueList
+                  documentId={documentId}
+                  currentContent={documentContent}
+                  onSyncDialogue={syncDialogue}
+                  isSyncing={isSyncingDialogue}
+                />
               </div>
             </motion.div>
           )}
@@ -656,6 +631,7 @@ export default function SharedDocumentPage() {
                         onUpdate={debouncedSave}
                         canEdit={!diffContent}
                         hideFooter={!!diffContent}
+                        onEditorReady={handleEditorReady}
                       />
                     </motion.div>
                   )}

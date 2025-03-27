@@ -10,10 +10,8 @@ const openai = createOpenAI({
 export interface DialogueDetectionResult {
   character: string
   confidence: number
-  text: string
-  startIndex: number
-  endIndex: number
-  context?: string
+  snippet: string
+  conversationId: string
 }
 
 const DialogueResponseSchema = z.object({
@@ -21,8 +19,8 @@ const DialogueResponseSchema = z.object({
     z.object({
       character: z.string(),
       confidence: z.number(),
-      text: z.string(),
-      context: z.string().optional(),
+      snippet: z.string(),
+      conversationId: z.string(),
     }),
   ),
 })
@@ -34,16 +32,30 @@ async function processTextChunk(text: string): Promise<DialogueDetectionResult[]
       mode: 'json',
       schema: DialogueResponseSchema,
       schemaName: 'DialogueDetection',
-      schemaDescription: 'Detect dialogue sections in text with character identification',
+      schemaDescription:
+        'Detect dialogue sections in text with character and conversation identification. Return the exact dialogue text without any surrounding context.',
       messages: [
         {
           role: 'system',
           content: `You are a dialogue detection system. Analyze the provided text and identify dialogue sections.
-          For each dialogue section, determine:
-          1. The character speaking
-          2. The exact dialogue text
-          3. The context around the dialogue (up to 50 characters before and after)
-          4. Your confidence in the character identification (0-1)`,
+          For each dialogue section:
+          1. Determine the character speaking
+          2. Extract ONLY the exact dialogue text (the precise words spoken, without any surrounding context or narration)
+          3. Assign a conversation ID to group related dialogue together
+          4. Assess your confidence in the character identification (0-1)
+          
+          Group dialogue into conversations based on:
+          - Proximity of dialogue segments
+          - Character interactions
+          - Natural breaks in conversation (scene changes, etc.)
+          
+          Use incrementing conversation IDs (conv1, conv2, etc.) for different conversations.
+          Keep the same conversation ID for back-and-forth dialogue between characters.
+          
+          IMPORTANT: For the dialogue snippet, include ONLY the exact words spoken by the character.
+          Do NOT include any surrounding context, narration, or speaker attribution.
+          For example, from the text: 'John said "Hello there!" with a smile'
+          Return ONLY: "Hello there!" as the snippet.`,
         },
         {
           role: 'user',
@@ -53,19 +65,14 @@ async function processTextChunk(text: string): Promise<DialogueDetectionResult[]
       temperature: 0.1,
     })
 
-    // Add start and end indices for each dialogue
-    return object.dialogues.map(dialogue => ({
-      ...dialogue,
-      startIndex: text.indexOf(dialogue.text),
-      endIndex: text.indexOf(dialogue.text) + dialogue.text.length,
-    }))
+    return object.dialogues
   } catch (e) {
     console.error('Failed to detect dialogue in chunk:', e)
     throw e
   }
 }
 
-export async function detectDialogue(text: string, chunkSize = 4000): Promise<DialogueDetectionResult[]> {
+export async function detectDialogue(text: string, chunkSize = 10000): Promise<DialogueDetectionResult[]> {
   try {
     // Split text into chunks if it's larger than the chunk size
     if (text.length <= chunkSize) {
@@ -103,17 +110,8 @@ export async function detectDialogue(text: string, chunkSize = 4000): Promise<Di
     // Process all chunks in parallel
     const results = await Promise.all(chunks.map(chunk => processTextChunk(chunk)))
 
-    // Combine results and adjust indices based on chunk positions
-    let offset = 0
-    return results.flatMap((chunkResults, index) => {
-      const adjustedResults = chunkResults.map(result => ({
-        ...result,
-        startIndex: result.startIndex + offset,
-        endIndex: result.endIndex + offset,
-      }))
-      offset += chunks[index].length
-      return adjustedResults
-    })
+    // Combine results
+    return results.flat()
   } catch (e) {
     console.error('Failed to detect dialogue:', e)
     throw e

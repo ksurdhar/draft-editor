@@ -25,18 +25,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           content: `You are a dialogue detection system. Analyze the provided text and identify dialogue sections.
           For each dialogue section, determine:
           1. The character speaking
-          2. The exact dialogue text
-          3. The context around the dialogue (up to 50 characters before and after)
+          2. ONLY the exact dialogue text (the precise words spoken)
+          3. A conversation ID to group related dialogue (use conv1, conv2, etc.)
           4. Your confidence in the character identification (0-1)
+          
+          IMPORTANT: For the dialogue snippet, include ONLY the exact words spoken by the character.
+          Do NOT include any surrounding context, narration, or speaker attribution.
+          For example, from the text: 'John said "Hello there!" with a smile'
+          Return ONLY: "Hello there!" as the snippet.
           
           Return only valid JSON in the following format:
           {
             "dialogues": [
               {
                 "character": "character name",
-                "text": "exact dialogue text",
+                "snippet": "exact dialogue text only",
                 "confidence": 0.95,
-                "context": "surrounding context"
+                "conversationId": "conv1"
               }
             ]
           }
@@ -70,25 +75,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: 'Invalid response structure from OpenAI' })
     }
 
-    // Add start and end indices for each dialogue
+    // Validate each dialogue entry
     const dialogues = parsed.dialogues
       .map((dialogue: any) => {
-        if (!dialogue.text) {
-          console.warn('Dialogue entry missing text:', dialogue)
+        if (!dialogue.snippet || !dialogue.character || !dialogue.conversationId) {
+          console.warn('Invalid dialogue entry:', dialogue)
           return null
         }
-
-        const startIndex = text.indexOf(dialogue.text)
-        if (startIndex === -1) {
-          console.warn('Could not find dialogue text in original content:', dialogue.text)
-          return null
-        }
-
-        return {
-          ...dialogue,
-          startIndex,
-          endIndex: startIndex + dialogue.text.length,
-        }
+        return dialogue
       })
       .filter(Boolean) // Remove any null entries
 
