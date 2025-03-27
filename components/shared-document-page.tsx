@@ -92,6 +92,7 @@ export default function SharedDocumentPage() {
   const [currentContent, setCurrentContent] = useState<any>(null)
   const [editor, setEditor] = useState<any>(null)
   const [initAnimate, setInitAnimate] = useState(false)
+  const [isDialogueMode, setIsDialogueMode] = useState(false)
 
   useEffect(() => {
     if (databaseDoc) {
@@ -439,6 +440,12 @@ export default function SharedDocumentPage() {
     }
   }
 
+  useEffect(() => {
+    if (editor) {
+      editor.commands.setDialogueHighlight(isDialogueMode)
+    }
+  }, [isDialogueMode, editor])
+
   return (
     <Layout documentId={id} onToggleGlobalSearch={handleToggleGlobalSearch}>
       {!skipAnimation && (
@@ -501,8 +508,10 @@ export default function SharedDocumentPage() {
               </button>
               <button
                 onClick={() => {
-                  setShowDialogue(!showDialogue)
-                  if (!showDialogue) {
+                  const newShowDialogue = !showDialogue
+                  setShowDialogue(newShowDialogue)
+                  setIsDialogueMode(newShowDialogue)
+                  if (!newShowDialogue) {
                     setShowVersions(false)
                     setDiffContent(null)
                   }

@@ -10,6 +10,7 @@ import FindPanel from './find-panel'
 import { SearchHighlight } from '../lib/tiptap-extensions/search-highlight'
 import { DiffHighlight } from '../lib/tiptap-extensions/diff-highlight'
 import { DialogueMark } from '../lib/tiptap-extensions/dialogue-mark'
+import { DialogueHighlight } from '../lib/tiptap-extensions/dialogue-highlight'
 
 // Add styles to override ProseMirror defaults
 const editorStyles = `
@@ -32,6 +33,9 @@ const editorStyles = `
     background-color: rgba(252, 165, 165, 0.25); /* red-300 with opacity */
   }
   .dialogue-mark {
+    /* Base class - no styling */
+  }
+  .dialogue-mark-active {
     background-color: rgba(147, 197, 253, 0.25); /* blue-300 with opacity */
     border-bottom: 1px solid rgba(147, 197, 253, 0.5);
   }
@@ -96,7 +100,7 @@ const EditorComponent = ({
   })()
 
   const editor = useEditor({
-    extensions: [StarterKit, SearchHighlight, DiffHighlight, DialogueMark],
+    extensions: [StarterKit, SearchHighlight, DiffHighlight, DialogueMark, DialogueHighlight],
     content: initialContent,
     editable: canEdit && !diffMode,
     onUpdate: ({ editor }) => {
