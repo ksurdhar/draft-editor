@@ -660,10 +660,6 @@ export default function SharedDocumentPage() {
                         content={diffContent || documentContent}
                         title={hybridDoc?.title || ''}
                         onUpdate={data => {
-                          if (!data.content) return
-                          // Update current content immediately for real-time updates
-                          setCurrentContent(JSON.parse(data.content))
-                          // Save in the background
                           debouncedSave(data)
                         }}
                         canEdit={!diffContent}
