@@ -453,9 +453,20 @@ export default function SharedDocumentPage() {
 
   useEffect(() => {
     if (editor) {
-      editor.commands.setDialogueHighlight(isDialogueMode)
+      // const { from, to } = editor.state.selection
+      if (isDialogueMode) {
+        console.log('setting dialogue highlight')
+        editor.commands.setDialogueHighlight(true)
+        // Restore selection so that decorations don’t move the cursor
+        // setTimeout(() => {
+        //   editor.commands.setTextSelection({ from, to })
+        // }, 0)
+      } else {
+        console.log('unsetting dialogue highlight')
+        editor.commands.unsetDialogueHighlight()
+      }
     }
-  }, [isDialogueMode, editor])
+  }, [isDialogueMode])
 
   return (
     <Layout documentId={id} onToggleGlobalSearch={handleToggleGlobalSearch}>
@@ -654,13 +665,6 @@ export default function SharedDocumentPage() {
                           setCurrentContent(JSON.parse(data.content))
                           // Save in the background
                           debouncedSave(data)
-                          // If dialogue mode is active, reapply the highlighting
-                          if (isDialogueMode && editor) {
-                            // Small delay to ensure the editor state is fully updated
-                            setTimeout(() => {
-                              editor.commands.setDialogueHighlight(true)
-                            }, 0)
-                          }
                         }}
                         canEdit={!diffContent}
                         hideFooter={!!diffContent}

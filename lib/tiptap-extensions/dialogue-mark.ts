@@ -82,7 +82,9 @@ export const DialogueMark = Mark.create<DialogueMarkOptions>({
           'data-character': HTMLAttributes.character,
           'data-conversation-id': HTMLAttributes.conversationId,
         },
-        { class: 'dialogue-mark' },
+        {
+          class: 'dialogue-mark',
+        },
       ),
       0,
     ]

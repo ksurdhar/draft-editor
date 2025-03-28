@@ -30,9 +30,8 @@ export const DialogueHighlight = Extension.create<DialogueHighlightOptions>({
     return {
       setDialogueHighlight:
         active =>
-        ({ tr, state, dispatch }) => {
+        ({ tr, dispatch, state }) => {
           if (dispatch) {
-            // Find all dialogue marks in the document
             const decorations: any[] = []
             state.doc.descendants((node, pos) => {
               const dialogueMark = node.marks.find(mark => mark.type.name === 'dialogue')
@@ -44,9 +43,9 @@ export const DialogueHighlight = Extension.create<DialogueHighlightOptions>({
                 )
               }
             })
-
             const decos = DecorationSet.create(tr.doc, decorations)
-            tr.setMeta(dialogueHighlightPluginKey, { decorations: decos })
+            // Set the meta with a custom flag (keepHighlight) to control remapping
+            tr.setMeta(dialogueHighlightPluginKey, { decorations: decos, keepHighlight: active })
           }
           return true
         },
@@ -54,7 +53,10 @@ export const DialogueHighlight = Extension.create<DialogueHighlightOptions>({
         () =>
         ({ tr, dispatch }) => {
           if (dispatch) {
-            tr.setMeta(dialogueHighlightPluginKey, { decorations: DecorationSet.empty })
+            tr.setMeta(dialogueHighlightPluginKey, {
+              decorations: DecorationSet.empty,
+              keepHighlight: false,
+            })
           }
           return true
         },
@@ -68,15 +70,15 @@ export const DialogueHighlight = Extension.create<DialogueHighlightOptions>({
         key,
         state: {
           init() {
-            return { decorations: DecorationSet.empty }
+            return { decorations: DecorationSet.empty, keepHighlight: false }
           },
           apply(tr, value) {
-            const meta = tr.getMeta(key)
+            const meta = tr.getMeta(dialogueHighlightPluginKey)
             if (meta) {
               return meta
             }
-            if (tr.docChanged) {
-              return { decorations: value.decorations.map(tr.mapping, tr.doc) }
+            if (tr.docChanged && !value.keepHighlight) {
+              return { decorations: value.decorations.map(tr.mapping, tr.doc), keepHighlight: false }
             }
             return value
           },
