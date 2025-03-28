@@ -30,22 +30,10 @@ export const DialogueHighlight = Extension.create<DialogueHighlightOptions>({
     return {
       setDialogueHighlight:
         active =>
-        ({ tr, dispatch, state }) => {
+        ({ tr, dispatch }) => {
           if (dispatch) {
-            const decorations: any[] = []
-            state.doc.descendants((node, pos) => {
-              const dialogueMark = node.marks.find(mark => mark.type.name === 'dialogue')
-              if (dialogueMark) {
-                decorations.push(
-                  Decoration.inline(pos, pos + node.nodeSize, {
-                    class: active ? this.options.highlightClass : '',
-                  }),
-                )
-              }
-            })
-            const decos = DecorationSet.create(tr.doc, decorations)
-            // Set the meta with a custom flag (keepHighlight) to control remapping
-            tr.setMeta(dialogueHighlightPluginKey, { decorations: decos, keepHighlight: active })
+            // Store the active flag in the plugin meta
+            tr.setMeta(dialogueHighlightPluginKey, { active })
           }
           return true
         },
@@ -53,10 +41,7 @@ export const DialogueHighlight = Extension.create<DialogueHighlightOptions>({
         () =>
         ({ tr, dispatch }) => {
           if (dispatch) {
-            tr.setMeta(dialogueHighlightPluginKey, {
-              decorations: DecorationSet.empty,
-              keepHighlight: false,
-            })
+            tr.setMeta(dialogueHighlightPluginKey, { active: false })
           }
           return true
         },
@@ -64,21 +49,18 @@ export const DialogueHighlight = Extension.create<DialogueHighlightOptions>({
   },
 
   addProseMirrorPlugins() {
-    const key = dialogueHighlightPluginKey
+    const self = this
     return [
       new Plugin({
-        key,
+        key: dialogueHighlightPluginKey,
         state: {
           init() {
-            return { decorations: DecorationSet.empty, keepHighlight: false }
+            return { active: false }
           },
           apply(tr, value) {
             const meta = tr.getMeta(dialogueHighlightPluginKey)
-            if (meta) {
-              return meta
-            }
-            if (tr.docChanged && !value.keepHighlight) {
-              return { decorations: value.decorations.map(tr.mapping, tr.doc), keepHighlight: false }
+            if (meta && typeof meta.active === 'boolean') {
+              return { active: meta.active }
             }
             return value
           },
@@ -86,7 +68,22 @@ export const DialogueHighlight = Extension.create<DialogueHighlightOptions>({
         props: {
           decorations(state) {
             const pluginState = this.getState(state)
-            return pluginState?.decorations || DecorationSet.empty
+            // Only compute decorations if dialogue highlighting is active
+            if (!pluginState.active) {
+              return DecorationSet.empty
+            }
+
+            const decorations: Decoration[] = []
+            state.doc.descendants((node, pos) => {
+              if (node.marks.some(mark => mark.type.name === 'dialogue')) {
+                decorations.push(
+                  Decoration.inline(pos, pos + node.nodeSize, {
+                    class: self.options.highlightClass,
+                  }),
+                )
+              }
+            })
+            return DecorationSet.create(state.doc, decorations)
           },
         },
       }),
