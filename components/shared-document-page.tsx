@@ -110,13 +110,6 @@ export default function SharedDocumentPage() {
   // Handle document content updates - split into two effects
   useEffect(() => {
     const loadDocument = async (docId: string) => {
-      // console.log('Loading document:', {
-      //   docId,
-      //   currentDocId: documentId,
-      //   hasCurrentContent: !!currentContent,
-      //   isTransitioning,
-      // })
-
       // Only skip if we have content for this specific document and we're not in transition
       if (currentContent && docId === documentId && !isTransitioning) {
         // console.log('Skipping load - already have content for this document')
@@ -133,11 +126,6 @@ export default function SharedDocumentPage() {
 
         // Get document from API
         const doc = await get(`/documents/${docId}`)
-        // console.log('Loaded document:', {
-        //   docId,
-        //   hasContent: !!doc.content,
-        //   contentLength: doc.content?.content?.length,
-        // })
 
         // Check if we're still on the same document
         const currentDocId = new URLSearchParams(window.location.search).get('documentId') || id
@@ -175,13 +163,6 @@ export default function SharedDocumentPage() {
       const newParams = new URLSearchParams(window.location.search)
       const newDocId = newParams.get('documentId') || id
 
-      // console.log('Document change event:', {
-      //   newDocId,
-      //   currentDocId: documentId,
-      //   hasCurrentContent: !!currentContent,
-      //   isTransitioning,
-      // })
-
       if (newDocId !== documentId) {
         // Reset state before loading new document
         setCurrentContent(null)
@@ -199,11 +180,6 @@ export default function SharedDocumentPage() {
       if (docId) {
         mutate(`/documents/${docId}`, undefined, false)
       }
-
-      // console.log('Document changing event:', {
-      //   targetDocId: event.detail?.documentId,
-      //   currentDocId: documentId,
-      // })
     }
 
     window.addEventListener('documentChanged', handleDocumentChange)
@@ -453,20 +429,29 @@ export default function SharedDocumentPage() {
 
   useEffect(() => {
     if (editor) {
-      // const { from, to } = editor.state.selection
       if (isDialogueMode) {
         console.log('setting dialogue highlight')
         editor.commands.setDialogueHighlight(true)
-        // Restore selection so that decorations don’t move the cursor
-        // setTimeout(() => {
-        //   editor.commands.setTextSelection({ from, to })
-        // }, 0)
       } else {
         console.log('unsetting dialogue highlight')
         editor.commands.unsetDialogueHighlight()
       }
     }
   }, [isDialogueMode])
+
+  const [dialogueDoc, setDialogueDoc] = useState<any>(documentContent)
+
+  useEffect(() => {
+    if (editor) {
+      const updateDialogueDoc = () => {
+        setDialogueDoc(editor.getJSON())
+      }
+      editor.on('transaction', updateDialogueDoc)
+      return () => {
+        editor.off('transaction', updateDialogueDoc)
+      }
+    }
+  }, [editor])
 
   return (
     <Layout documentId={id} onToggleGlobalSearch={handleToggleGlobalSearch}>
@@ -625,7 +610,7 @@ export default function SharedDocumentPage() {
               <div className="h-[calc(100vh_-_60px)] overflow-y-auto p-4">
                 <DialogueList
                   documentId={documentId}
-                  currentContent={documentContent}
+                  currentContent={dialogueDoc}
                   onSyncDialogue={syncDialogue}
                   isSyncing={isSyncingDialogue}
                 />
