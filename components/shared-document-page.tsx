@@ -429,10 +429,21 @@ export default function SharedDocumentPage() {
       // Get the updated content with marks
       const updatedContent = editor.getJSON()
 
-      // Save the updated content
+      // Update current content immediately to trigger DialogueList update
+      setCurrentContent(updatedContent)
+
+      // Save the updated content in the background
       await debouncedSave({
         content: updatedContent,
       })
+
+      // If dialogue mode is active, reapply the highlighting
+      if (isDialogueMode) {
+        // Small delay to ensure the editor state is fully updated
+        setTimeout(() => {
+          editor.commands.setDialogueHighlight(true)
+        }, 0)
+      }
     } catch (e) {
       console.error('Failed to sync dialogue:', e)
     } finally {
@@ -637,7 +648,20 @@ export default function SharedDocumentPage() {
                         key={documentId}
                         content={diffContent || documentContent}
                         title={hybridDoc?.title || ''}
-                        onUpdate={debouncedSave}
+                        onUpdate={data => {
+                          if (!data.content) return
+                          // Update current content immediately for real-time updates
+                          setCurrentContent(JSON.parse(data.content))
+                          // Save in the background
+                          debouncedSave(data)
+                          // If dialogue mode is active, reapply the highlighting
+                          if (isDialogueMode && editor) {
+                            // Small delay to ensure the editor state is fully updated
+                            setTimeout(() => {
+                              editor.commands.setDialogueHighlight(true)
+                            }, 0)
+                          }
+                        }}
                         canEdit={!diffContent}
                         hideFooter={!!diffContent}
                         onEditorReady={handleEditorReady}

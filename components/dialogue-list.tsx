@@ -1,7 +1,8 @@
 'use client'
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { ChatIcon, RefreshIcon } from '@heroicons/react/outline'
 import { ListItem } from './list-item'
+import { useDebouncedCallback } from 'use-debounce'
 
 interface DialogueListProps {
   documentId: string
@@ -31,6 +32,9 @@ interface GroupedDialogue {
 }
 
 const DialogueList = ({ currentContent, onSyncDialogue, isSyncing }: DialogueListProps) => {
+  // Track processed dialogue marks with their text content
+  const [validDialogueMarks, setValidDialogueMarks] = useState<ProcessedDialogueMark[]>([])
+
   // Extract dialogue marks from the document content
   const dialogueMarks = useMemo(() => {
     if (!currentContent?.content) return []
@@ -73,15 +77,58 @@ const DialogueList = ({ currentContent, onSyncDialogue, isSyncing }: DialogueLis
 
     // Start processing from the root node
     processNode(currentContent)
-
     return marks
   }, [currentContent])
+
+  // Debounced function to validate dialogue marks
+  const validateDialogueMarks = useDebouncedCallback(() => {
+    if (!currentContent?.content) return
+
+    // Function to check if text exists at the given position
+    const checkTextAtPosition = (id: string, content: string): boolean => {
+      const [start, end] = id.split('-').map(Number)
+      let currentOffset = 0
+      let found = false
+
+      const checkNode = (node: any) => {
+        if (found) return
+        if (node.type === 'text' && node.text) {
+          const nodeStart = currentOffset
+          const nodeEnd = currentOffset + node.text.length
+
+          // Check if this node contains our target range
+          if (nodeStart <= start && nodeEnd >= end) {
+            const textInRange = node.text.substring(start - nodeStart, end - nodeStart)
+            found = textInRange === content
+          }
+          currentOffset = nodeEnd
+        }
+
+        if (node.content) {
+          node.content.forEach(checkNode)
+        }
+      }
+
+      checkNode(currentContent)
+      return found
+    }
+
+    // Filter marks to only those whose text content still exists at their position
+    const validMarks = dialogueMarks.filter(mark => checkTextAtPosition(mark.id, mark.content))
+
+    setValidDialogueMarks(validMarks)
+  }, 500) // 500ms debounce
+
+  // Update valid marks when dialogue marks change
+  useEffect(() => {
+    validateDialogueMarks()
+  }, [dialogueMarks, validateDialogueMarks])
 
   // Group dialogues by conversation
   const groupedDialogues = useMemo(() => {
     const groups: Record<string, ProcessedDialogueMark[]> = {}
 
-    dialogueMarks.forEach(mark => {
+    validDialogueMarks.forEach(mark => {
       if (!groups[mark.conversationId]) {
         groups[mark.conversationId] = []
       }
@@ -96,7 +143,7 @@ const DialogueList = ({ currentContent, onSyncDialogue, isSyncing }: DialogueLis
         return aStart - bStart
       }),
     }))
-  }, [dialogueMarks])
+  }, [validDialogueMarks])
 
   return (
     <div className="flex flex-col gap-2">
@@ -111,7 +158,7 @@ const DialogueList = ({ currentContent, onSyncDialogue, isSyncing }: DialogueLis
         </button>
       </div>
 
-      {dialogueMarks.length === 0 ? (
+      {validDialogueMarks.length === 0 ? (
         <div className="flex h-full items-center justify-center">
           <div className="text-black/50">
             {isSyncing ? 'Scanning for dialogue...' : 'No dialogue detected'}
