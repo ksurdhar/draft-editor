@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism' // Or choose another theme
 import { XIcon, ClipboardCopyIcon, DocumentTextIcon, TerminalIcon } from '@heroicons/react/outline'
-import { getDebugLogs, clearDebugLogs } from '@lib/debug-logger' // Import logger functions
+import { getDebugLogs, clearDebugLogs, subscribeToLogs } from '@lib/debug-logger' // Import logger functions
 
 interface DebugPanelProps {
   content: any // The Tiptap JSON content
@@ -48,12 +48,14 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ content, onClose }) => {
       })
   }
 
-  // Effect to update logs when panel is visible (or periodically)
-  // In a real app, this might use events or context for updates.
+  // Subscribe to log updates
   useEffect(() => {
-    // Refresh logs when the panel is opened or tab switched
-    setLogs(getDebugLogs())
-  }, [activeTab]) // Re-fetch logs when tab changes
+    // Only subscribe when the logs tab is active
+    if (activeTab === 'logs') {
+      const unsubscribe = subscribeToLogs(setLogs)
+      return () => unsubscribe()
+    }
+  }, [activeTab])
 
   return (
     <motion.div

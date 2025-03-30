@@ -21,6 +21,7 @@ import { renameItem, DocumentOperations } from '@lib/document-operations'
 import { findAllMatches } from '../lib/search'
 import { Node as ProseMirrorNode } from 'prosemirror-model'
 import DebugPanel from './debug-panel'
+import { debugLog } from '@lib/debug-logger'
 
 const backdropStyles = `
   fixed top-0 left-0 h-screen w-screen z-[-1]
@@ -401,6 +402,7 @@ export default function SharedDocumentPage() {
       // Ensure response structure matches expected DialogueDetectionResult[]
       const detectedDialogues: { character: string; snippet: string; conversationId: string }[] =
         Array.isArray(response) ? response : response?.dialogues || []
+      debugLog('Syncing dialogue', { detectedDialogues })
 
       if (!detectedDialogues) {
         throw new Error('Invalid response from dialogue detection')

@@ -10,7 +10,6 @@ import {
 import { ListItem } from './list-item'
 import { useDebouncedCallback } from 'use-debounce'
 import { AnimatePresence, motion } from 'framer-motion'
-import { debugLog } from '../lib/debug-logger'
 import { Editor } from '@tiptap/react'
 
 interface DialogueListProps {
@@ -57,13 +56,9 @@ const DialogueList = ({
 
   const dialogueMarks = useMemo(() => {
     if (!editor || !editor.state.doc) {
-      debugLog('DialogueList: Editor not ready, returning empty marks', { editorExists: !!editor })
       return []
     }
 
-    debugLog('DialogueList: Processing content with editor state', {
-      editorState: editor.state.doc.toJSON(),
-    })
     const doc = editor.state.doc
 
     const marks: ProcessedDialogueMark[] = []
@@ -128,10 +123,6 @@ const DialogueList = ({
     }
 
     const filteredMarks = marks.filter(mark => mark.content.trim().length > 0)
-    debugLog('DialogueList: Processed dialogue marks from editor', {
-      count: filteredMarks.length,
-      marks: filteredMarks,
-    })
     return filteredMarks
   }, [editor, currentContent])
 
@@ -191,10 +182,6 @@ const DialogueList = ({
       }
 
       const stillValidMarks = dialogueMarks.filter(checkNodeForMarkPresence)
-      debugLog('DialogueList: Validated dialogue marks', {
-        count: stillValidMarks.length,
-        validMarks: stillValidMarks,
-      })
       setValidDialogueMarks(stillValidMarks)
     },
     500,
@@ -231,7 +218,6 @@ const DialogueList = ({
         return firstAStart - firstBStart
       })
 
-    debugLog('DialogueList: Grouped dialogues', { count: grouped.length, groups: grouped })
     return grouped
   }, [validDialogueMarks])
 
@@ -245,7 +231,6 @@ const DialogueList = ({
   }
 
   const handleConfirm = (mark: ProcessedDialogueMark) => {
-    debugLog('DialogueList: Handling confirm', { mark, editingCharacter })
     onConfirmDialogue(mark.id, editingCharacter, mark.conversationId ?? 'unknown')
     setExpandedMarkId(null)
   }

@@ -30,3 +30,15 @@ body {
 #root {
   padding-top: 28px; /* Adjust this value as needed for your title bar height */
 }
+
+/* Add draggable region for window dragging */
+.titlebar-drag-region {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 28px; /* Match the padding-top value from #root */
+  -webkit-app-region: drag;
+  z-index: 9999;
+  pointer-events: auto;
+}

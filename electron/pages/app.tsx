@@ -100,6 +100,7 @@ function ElectronApp() {
 
   return (
     <div>
+      <div className="titlebar-drag-region" />
       <NavigationProvider getLocation={getLocation} navigateTo={setLocation} signOut={signOut}>
         <APIProvider
           get={window.electronAPI.get}
