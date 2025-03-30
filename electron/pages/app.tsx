@@ -6,6 +6,7 @@ import LandingPage from './landing-page'
 import ElectronDocumentsPage from './documents-page'
 import ElectronCharactersPage from './characters-page'
 import ElectronCharacterDetailPage from './character-detail-page'
+import DebugPanel from '@components/debug-panel'
 
 interface Profile {
   name: string
@@ -81,6 +82,7 @@ function ElectronApp() {
   // Profile state is maintained for future use but not displayed in the current UI
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [profile, setProfile] = useState({} as Profile)
+  const [isDebugPanelOpen, setIsDebugPanelOpen] = useState(false)
 
   useEffect(() => {
     const getProfile = async () => {
@@ -88,6 +90,23 @@ function ElectronApp() {
       setProfile(result)
     }
     getProfile()
+  }, [])
+
+  // Effect to handle global keyboard shortcut for debug panel
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Check for Cmd+Shift+D or Ctrl+Shift+D
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key === 'd') {
+        event.preventDefault() // Prevent default browser behavior (like bookmarking)
+        setIsDebugPanelOpen(prev => !prev)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
   }, [])
 
   const getLocation = useCallback(() => {
@@ -118,6 +137,8 @@ function ElectronApp() {
             </Switch>
             {/* Network status indicator */}
             <NetworkStatus />
+            {/* Conditionally render DebugPanel */}
+            {isDebugPanelOpen && <DebugPanel onClose={() => setIsDebugPanelOpen(false)} />}
           </Providers>
         </APIProvider>
       </NavigationProvider>

@@ -443,6 +443,7 @@ export default function SharedDocumentPage() {
       // 2. Apply *new* marks from AI, skipping confirmed ranges
       for (const dialogue of detectedDialogues) {
         const matches = findAllMatches(editor.state.doc, dialogue.snippet)
+        debugLog('findAllMatches results', { matches })
         for (const match of matches) {
           const rangeKey = `${match.from}-${match.to}`
           if (confirmedRanges.has(rangeKey)) {

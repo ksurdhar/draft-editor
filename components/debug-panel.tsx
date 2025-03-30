@@ -7,7 +7,7 @@ import { XIcon, ClipboardCopyIcon, DocumentTextIcon, TerminalIcon } from '@heroi
 import { getDebugLogs, clearDebugLogs, subscribeToLogs } from '@lib/debug-logger' // Import logger functions
 
 interface DebugPanelProps {
-  content: any // The Tiptap JSON content
+  content?: any // Made content optional
   onClose: () => void
 }
 
@@ -15,10 +15,11 @@ type ActiveTab = 'json' | 'logs'
 
 const DebugPanel: React.FC<DebugPanelProps> = ({ content, onClose }) => {
   const [isCopied, setIsCopied] = useState(false)
-  const [activeTab, setActiveTab] = useState<ActiveTab>('json') // State for active tab
+  const [activeTab, setActiveTab] = useState<ActiveTab>('logs') // Default to logs tab
   const [logs, setLogs] = useState(getDebugLogs()) // State for logs
 
-  const jsonString = JSON.stringify(content, null, 2) // Pretty print the JSON
+  // Only stringify content if it exists
+  const jsonString = content ? JSON.stringify(content, null, 2) : null // Pretty print the JSON
 
   // Function to format log entries
   const formatLogs = (): string => {
@@ -31,7 +32,8 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ content, onClose }) => {
       .join('\n\n')
   }
 
-  const contentToCopy = activeTab === 'json' ? jsonString : formatLogs()
+  // Adjust contentToCopy based on active tab and content availability
+  const contentToCopy = activeTab === 'logs' ? formatLogs() : jsonString || ''
 
   // Function to handle copying to clipboard
   const handleCopy = () => {
@@ -135,17 +137,22 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ content, onClose }) => {
           </motion.div>
         )}
         {/* JSON Content */}
-        {activeTab === 'json' && (
-          <SyntaxHighlighter
-            language="json"
-            style={vscDarkPlus} // Apply the chosen theme
-            customStyle={{ margin: 0, height: '100%', width: '100%', fontSize: '11px' }} // Ensure width is 100%
-            wrapLines={true}
-            showLineNumbers={true} // Optional: show line numbers
-          >
-            {jsonString}
-          </SyntaxHighlighter>
-        )}
+        {activeTab === 'json' &&
+          (jsonString ? (
+            <SyntaxHighlighter
+              language="json"
+              style={vscDarkPlus} // Apply the chosen theme
+              customStyle={{ margin: 0, height: '100%', width: '100%', fontSize: '11px' }} // Ensure width is 100%
+              wrapLines={true}
+              showLineNumbers={true} // Optional: show line numbers
+            >
+              {jsonString}
+            </SyntaxHighlighter>
+          ) : (
+            <div className="flex h-full items-center justify-center p-4 text-sm text-gray-400">
+              No document JSON available in this view.
+            </div>
+          ))}
         {/* Logs Content */}
         {activeTab === 'logs' && (
           <pre className="whitespace-pre-wrap break-words p-3 text-xs text-gray-300">

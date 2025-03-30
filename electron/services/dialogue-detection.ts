@@ -43,19 +43,26 @@ async function processTextChunk(text: string): Promise<DialogueDetectionResult[]
           2. Extract ONLY the exact dialogue text (the precise words spoken, without any surrounding context or narration)
           3. Assign a conversation ID to group related dialogue together
           4. Assess your confidence in the character identification (0-1)
-          
+
           Group dialogue into conversations based on:
           - Proximity of dialogue segments
           - Character interactions
           - Natural breaks in conversation (scene changes, etc.)
-          
+
           Use incrementing conversation IDs (conv1, conv2, etc.) for different conversations.
           Keep the same conversation ID for back-and-forth dialogue between characters.
-          
+
           IMPORTANT: For the dialogue snippet, include ONLY the exact words spoken by the character.
           Do NOT include any surrounding context, narration, or speaker attribution.
           For example, from the text: 'John said "Hello there!" with a smile'
-          Return ONLY: "Hello there!" as the snippet.`,
+          Return ONLY: "Hello there!" as the snippet.
+
+          *** VERY IMPORTANT RULE ***
+          If a single character's speech is interrupted by narration (e.g., "Go away," he said, "now."), you MUST return TWO SEPARATE dialogue objects for that speech turn.
+          - The first object's snippet would be "Go away,"
+          - The second object's snippet would be "now."
+          - Both objects should have the same character and conversationId.
+          DO NOT combine interrupted dialogue into a single snippet. Always split it based on the interruption.`,
         },
         {
           role: 'user',

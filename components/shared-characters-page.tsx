@@ -25,6 +25,8 @@ import { useUser } from '@wrappers/auth-wrapper-client'
 import { mutate } from 'swr'
 import CharacterModal from '@components/character-modal'
 import { useNavigation } from '@components/providers'
+import { DocumentData } from '@typez/globals'
+import { debugLog } from '@lib/debug-logger'
 
 // Character type definition
 interface CharacterData {
@@ -46,12 +48,16 @@ interface CharacterData {
 
 const SharedCharactersPage = ({
   characters,
-  isLoading,
+  isLoading: charactersLoading,
   onCharactersChange,
+  documents,
+  onDocumentsChange,
 }: {
   characters: CharacterData[]
   isLoading?: boolean
   onCharactersChange: (characters: CharacterData[]) => void
+  documents: DocumentData[]
+  onDocumentsChange: (docs: DocumentData[]) => void
 }) => {
   const { post, patch, destroy } = useAPI()
   const { user, isLoading: userLoading } = useUser()
@@ -74,7 +80,16 @@ const SharedCharactersPage = ({
     [characters, onCharactersChange],
   )
 
-  const charactersLoading = isLoading
+  // Add useEffect to log document titles when documents prop changes
+  useEffect(() => {
+    // Check if documents is an array before mapping
+    const documentTitles = Array.isArray(documents)
+      ? documents.map(doc => doc?.title || 'Untitled Document')
+      : []
+    debugLog('SharedCharactersPage: Received document titles', documentTitles)
+  }, [documents])
+
+  const combinedLoading = charactersLoading
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -225,7 +240,7 @@ const SharedCharactersPage = ({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedCharacterId])
 
-  const showSpinner = useSpinner(charactersLoading || userLoading)
+  const showSpinner = useSpinner(combinedLoading || userLoading)
 
   const emptyMessage = (
     <div className={'text-center text-[14px] font-semibold uppercase text-black/[.5]'}>
@@ -259,8 +274,8 @@ const SharedCharactersPage = ({
           </div>
           <div className="max-h-[calc(100vh_-_100px)] overflow-y-auto rounded-lg bg-white/[.05] p-4">
             {showSpinner && <Loader />}
-            {!charactersLoading && characters.length === 0 && emptyMessage}
-            {!charactersLoading && characters.length > 0 && (
+            {!combinedLoading && characters.length === 0 && emptyMessage}
+            {!combinedLoading && characters.length > 0 && (
               <List>
                 {characters
                   .filter(character => character !== null)
