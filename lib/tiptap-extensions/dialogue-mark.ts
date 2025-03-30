@@ -7,7 +7,11 @@ export interface DialogueMarkOptions {
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     dialogue: {
-      setDialogueMark: (attrs: { character: string; conversationId: string }) => ReturnType
+      setDialogueMark: (attrs: {
+        character: string
+        conversationId: string
+        userConfirmed?: boolean
+      }) => ReturnType
       unsetDialogueMark: () => ReturnType
     }
   }
@@ -52,20 +56,42 @@ export const DialogueMark = Mark.create<DialogueMarkOptions>({
           }
         },
       },
+      userConfirmed: {
+        default: false,
+        rendered: true,
+        parseHTML: element => element.getAttribute('data-user-confirmed') === 'true',
+        renderHTML: attributes => {
+          if (!attributes.userConfirmed) {
+            return {}
+          }
+          return {
+            'data-user-confirmed': 'true',
+          }
+        },
+      },
     }
   },
 
   parseHTML() {
     return [
       {
-        tag: 'span[data-character]',
+        tag: 'span[data-character][data-conversation-id]',
         getAttrs: element => {
           if (typeof element === 'string') {
             return false
           }
+          const character = element.getAttribute('data-character')
+          const conversationId = element.getAttribute('data-conversation-id')
+          const userConfirmed = element.getAttribute('data-user-confirmed') === 'true'
+
+          if (!character || !conversationId) {
+            return false
+          }
+
           return {
-            character: element.getAttribute('data-character'),
-            conversationId: element.getAttribute('data-conversation-id'),
+            character,
+            conversationId,
+            userConfirmed,
           }
         },
       },
@@ -73,21 +99,19 @@ export const DialogueMark = Mark.create<DialogueMarkOptions>({
   },
 
   renderHTML({ HTMLAttributes }) {
-    return [
-      'span',
-      mergeAttributes(
-        this.options.HTMLAttributes,
-        HTMLAttributes,
-        {
-          'data-character': HTMLAttributes.character,
-          'data-conversation-id': HTMLAttributes.conversationId,
-        },
-        {
-          class: 'dialogue-mark',
-        },
-      ),
-      0,
-    ]
+    const renderAttributes: Record<string, any> = {
+      ...this.options.HTMLAttributes,
+      ...HTMLAttributes,
+      'data-character': HTMLAttributes.character,
+      'data-conversation-id': HTMLAttributes.conversationId,
+      class: 'dialogue-mark',
+    }
+
+    if (HTMLAttributes.userConfirmed) {
+      renderAttributes['data-user-confirmed'] = 'true'
+    }
+
+    return ['span', mergeAttributes(renderAttributes), 0]
   },
 
   addCommands() {

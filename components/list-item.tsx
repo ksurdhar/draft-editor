@@ -59,7 +59,8 @@ const TypewriterText = ({ text, className }: { text: string; className: string }
 interface ListItemProps {
   leftIcon?: ReactNode
   rightContent?: ReactNode
-  label: string
+  rightIcon?: ReactNode
+  label: React.ReactNode
   depth?: number
   isSelected?: boolean
   onClick?: () => void
@@ -77,6 +78,7 @@ interface ListItemProps {
 export const ListItem = ({
   leftIcon,
   rightContent,
+  rightIcon,
   label,
   depth = 0,
   isSelected = false,
@@ -192,13 +194,19 @@ export const ListItem = ({
             className={`block h-[20px] w-full cursor-pointer overflow-hidden whitespace-nowrap bg-transparent ${
               isEditing ? 'opacity-0' : ''
             }`}>
-            <TypewriterText
-              text={label}
-              className={`${themeClasses.text} text-sm font-[600] font-semibold uppercase leading-[20px] tracking-wide`}
-            />
+            {typeof label === 'string' ? (
+              <TypewriterText
+                text={label}
+                className={`${themeClasses.text} text-sm font-[600] font-semibold uppercase leading-[20px] tracking-wide`}
+              />
+            ) : (
+              <div className={`${themeClasses.text} text-sm leading-[20px]`}>{label}</div>
+            )}
           </div>
         </div>
-        {rightContent && <div className="ml-2 flex shrink-0 items-center">{rightContent}</div>}
+        {(rightIcon || rightContent) && (
+          <div className="ml-2 flex shrink-0 items-center">{rightIcon ? rightIcon : rightContent}</div>
+        )}
       </div>
       <AnimatePresence initial={false} mode="wait">
         {children && (

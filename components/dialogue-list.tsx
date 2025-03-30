@@ -1,14 +1,25 @@
 'use client'
 import { useMemo, useState, useEffect } from 'react'
-import { ChatIcon, RefreshIcon } from '@heroicons/react/outline'
+import {
+  ChatIcon,
+  RefreshIcon,
+  CheckCircleIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+} from '@heroicons/react/outline'
 import { ListItem } from './list-item'
 import { useDebouncedCallback } from 'use-debounce'
+import { AnimatePresence, motion } from 'framer-motion'
+import { debugLog } from '../lib/debug-logger'
+import { Editor } from '@tiptap/react'
 
 interface DialogueListProps {
   documentId: string
   currentContent: any
+  editor: Editor | null
   onSyncDialogue: () => Promise<void>
   isSyncing: boolean
+  onConfirmDialogue: (markId: string, character: string, conversationId: string) => void
 }
 
 interface DialogueMark {
@@ -16,6 +27,7 @@ interface DialogueMark {
   attrs: {
     character: string
     conversationId: string
+    userConfirmed?: boolean
   }
 }
 
@@ -23,7 +35,8 @@ interface ProcessedDialogueMark {
   id: string
   character: string
   content: string
-  conversationId: string
+  conversationId: string | null
+  userConfirmed?: boolean
 }
 
 interface GroupedDialogue {
@@ -31,119 +44,211 @@ interface GroupedDialogue {
   dialogues: ProcessedDialogueMark[]
 }
 
-const DialogueList = ({ currentContent, onSyncDialogue, isSyncing }: DialogueListProps) => {
-  // Track processed dialogue marks with their text content
+const DialogueList = ({
+  currentContent,
+  editor,
+  onSyncDialogue,
+  isSyncing,
+  onConfirmDialogue,
+}: DialogueListProps) => {
   const [validDialogueMarks, setValidDialogueMarks] = useState<ProcessedDialogueMark[]>([])
+  const [expandedMarkId, setExpandedMarkId] = useState<string | null>(null)
+  const [editingCharacter, setEditingCharacter] = useState<string>('')
 
-  // Extract dialogue marks from the document content
   const dialogueMarks = useMemo(() => {
-    if (!currentContent?.content) return []
+    if (!editor || !editor.state.doc) {
+      debugLog('DialogueList: Editor not ready, returning empty marks', { editorExists: !!editor })
+      return []
+    }
+
+    debugLog('DialogueList: Processing content with editor state', {
+      editorState: editor.state.doc.toJSON(),
+    })
+    const doc = editor.state.doc
+
     const marks: ProcessedDialogueMark[] = []
+    let currentGroup: ProcessedDialogueMark | null = null
 
-    // Recursively traverse the document tree to find text nodes with dialogue marks
-    const processNode = (node: any, textOffset = 0): number => {
-      if (!node) return textOffset
+    doc.descendants((node, pos) => {
+      if (node.isText && node.text) {
+        const text = node.text
+        const nodeEndPos = pos + node.nodeSize
+        const dialogueMarkData = node.marks.find(mark => mark.type.name === 'dialogue')
 
-      // If this is a text node, check for dialogue marks
-      if (node.type === 'text' && node.text) {
-        const nodeMarks = node.marks || []
-        const dialogueMarks = nodeMarks.filter((mark: any) => mark.type === 'dialogue')
-
-        if (dialogueMarks.length > 0) {
-          dialogueMarks.forEach((mark: DialogueMark) => {
-            marks.push({
-              id: `${textOffset}-${textOffset + node.text.length}`,
-              character: mark.attrs.character,
-              content: node.text,
-              conversationId: mark.attrs.conversationId,
-            })
-          })
-        }
-
-        return textOffset + node.text.length
-      }
-
-      // If the node has content, process each child node
-      if (node.content) {
-        let currentOffset = textOffset
-        node.content.forEach((child: any) => {
-          currentOffset = processNode(child, currentOffset)
-        })
-        return currentOffset
-      }
-
-      return textOffset
-    }
-
-    // Start processing from the root node
-    processNode(currentContent)
-    return marks
-  }, [currentContent])
-
-  // Debounced function to validate dialogue marks
-  const validateDialogueMarks = useDebouncedCallback(() => {
-    if (!currentContent?.content) return
-
-    // Function to check if text exists at the given position
-    const checkTextAtPosition = (id: string, content: string): boolean => {
-      const [start, end] = id.split('-').map(Number)
-      let currentOffset = 0
-      let found = false
-
-      const checkNode = (node: any) => {
-        if (found) return
-        if (node.type === 'text' && node.text) {
-          const nodeStart = currentOffset
-          const nodeEnd = currentOffset + node.text.length
-
-          // Check if this node contains our target range
-          if (nodeStart <= start && nodeEnd >= end) {
-            const textInRange = node.text.substring(start - nodeStart, end - nodeStart)
-            found = textInRange === content
+        if (dialogueMarkData) {
+          const markAttrs = dialogueMarkData.attrs as DialogueMark['attrs']
+          const markInfo = {
+            character: markAttrs.character,
+            conversationId: markAttrs.conversationId || null,
+            userConfirmed: markAttrs.userConfirmed || false,
           }
-          currentOffset = nodeEnd
+
+          if (
+            currentGroup &&
+            currentGroup.character === markInfo.character &&
+            currentGroup.conversationId === markInfo.conversationId &&
+            pos === parseInt(currentGroup.id.split('-')[1], 10)
+          ) {
+            currentGroup.content += text
+            const [start] = currentGroup.id.split('-').map(Number)
+            currentGroup.id = `${start}-${nodeEndPos}`
+            if (markInfo.userConfirmed) {
+              currentGroup.userConfirmed = true
+            }
+          } else {
+            if (currentGroup) {
+              marks.push(currentGroup)
+            }
+            currentGroup = {
+              id: `${pos}-${nodeEndPos}`,
+              character: markInfo.character,
+              content: text,
+              conversationId: markInfo.conversationId,
+              userConfirmed: markInfo.userConfirmed,
+            }
+          }
+        } else {
+          if (currentGroup) {
+            marks.push(currentGroup)
+            currentGroup = null
+          }
         }
-
-        if (node.content) {
-          node.content.forEach(checkNode)
+        return true
+      } else {
+        if (currentGroup) {
+          marks.push(currentGroup)
+          currentGroup = null
         }
+        return true
       }
-
-      checkNode(currentContent)
-      return found
-    }
-
-    // Filter marks to only those whose text content still exists at their position
-    const validMarks = dialogueMarks.filter(mark => checkTextAtPosition(mark.id, mark.content))
-
-    setValidDialogueMarks(validMarks)
-  }, 500) // 500ms debounce
-
-  // Update valid marks when dialogue marks change
-  useEffect(() => {
-    validateDialogueMarks()
-  }, [dialogueMarks, validateDialogueMarks])
-
-  // Group dialogues by conversation
-  const groupedDialogues = useMemo(() => {
-    const groups: Record<string, ProcessedDialogueMark[]> = {}
-
-    validDialogueMarks.forEach(mark => {
-      if (!groups[mark.conversationId]) {
-        groups[mark.conversationId] = []
-      }
-      groups[mark.conversationId].push(mark)
     })
 
-    return Object.entries(groups).map(([conversationId, dialogues]) => ({
-      conversationId,
-      dialogues: dialogues.sort((a, b) => {
-        const [aStart] = a.id.split('-').map(Number)
-        const [bStart] = b.id.split('-').map(Number)
-        return aStart - bStart
-      }),
-    }))
+    if (currentGroup) {
+      marks.push(currentGroup)
+    }
+
+    const filteredMarks = marks.filter(mark => mark.content.trim().length > 0)
+    debugLog('DialogueList: Processed dialogue marks from editor', {
+      count: filteredMarks.length,
+      marks: filteredMarks,
+    })
+    return filteredMarks
+  }, [editor, currentContent])
+
+  const validateDialogueMarks = useDebouncedCallback(
+    () => {
+      const doc = editor?.state.doc
+      const contentToCheck = doc ? { type: 'doc', content: doc.content } : currentContent
+
+      if (!contentToCheck?.content) {
+        setValidDialogueMarks([])
+        return
+      }
+      const checkNodeForMarkPresence = (targetMark: ProcessedDialogueMark): boolean => {
+        let found = false
+        const [start, end] = targetMark.id.split('-').map(Number)
+        if (isNaN(start) || isNaN(end)) return false
+
+        if (doc) {
+          doc.descendants((node, pos) => {
+            if (found) return false
+            if (node.isText) {
+              const nodeEnd = pos + node.nodeSize
+              if (pos < end && nodeEnd > start) {
+                const dialogueMark = node.marks.find(m => m.type.name === 'dialogue')
+                if (
+                  dialogueMark &&
+                  (dialogueMark.attrs.conversationId || null) === targetMark.conversationId &&
+                  dialogueMark.attrs.character === targetMark.character
+                ) {
+                  found = true
+                }
+              }
+            }
+            return !found
+          })
+        } else {
+          console.warn('validateDialogueMarks: using currentContent fallback')
+          contentToCheck?.content?.descendants((node: any, pos: number) => {
+            if (found) return false
+            if (node.isText) {
+              const nodeEnd = pos + node.nodeSize
+              if (pos < end && nodeEnd > start) {
+                const dialogueMark = node.marks.find((m: any) => m.type === 'dialogue')
+                if (
+                  dialogueMark &&
+                  (dialogueMark.attrs.conversationId || null) === targetMark.conversationId &&
+                  dialogueMark.attrs.character === targetMark.character
+                ) {
+                  found = true
+                }
+              }
+            }
+            return true
+          })
+        }
+        return found
+      }
+
+      const stillValidMarks = dialogueMarks.filter(checkNodeForMarkPresence)
+      debugLog('DialogueList: Validated dialogue marks', {
+        count: stillValidMarks.length,
+        validMarks: stillValidMarks,
+      })
+      setValidDialogueMarks(stillValidMarks)
+    },
+    500,
+    { leading: false, trailing: true },
+  )
+
+  useEffect(() => {
+    setValidDialogueMarks(dialogueMarks)
+    validateDialogueMarks()
+  }, [dialogueMarks, validateDialogueMarks, editor])
+
+  const groupedDialogues = useMemo(() => {
+    const groups: Record<string, ProcessedDialogueMark[]> = {}
+    validDialogueMarks.forEach(mark => {
+      const convId = mark.conversationId ?? 'unknown'
+      if (!groups[convId]) {
+        groups[convId] = []
+      }
+      groups[convId].push(mark)
+    })
+
+    const grouped = Object.entries(groups)
+      .map(([conversationId, dialogues]) => ({
+        conversationId,
+        dialogues: dialogues.sort((a, b) => {
+          const [aStart] = a.id.split('-').map(Number)
+          const [bStart] = b.id.split('-').map(Number)
+          return aStart - bStart
+        }),
+      }))
+      .sort((a, b) => {
+        const firstAStart = a.dialogues[0]?.id.split('-').map(Number)[0] ?? Infinity
+        const firstBStart = b.dialogues[0]?.id.split('-').map(Number)[0] ?? Infinity
+        return firstAStart - firstBStart
+      })
+
+    debugLog('DialogueList: Grouped dialogues', { count: grouped.length, groups: grouped })
+    return grouped
   }, [validDialogueMarks])
+
+  const handleToggleExpand = (markId: string, currentCharacter: string) => {
+    if (expandedMarkId === markId) {
+      setExpandedMarkId(null)
+    } else {
+      setExpandedMarkId(markId)
+      setEditingCharacter(currentCharacter)
+    }
+  }
+
+  const handleConfirm = (mark: ProcessedDialogueMark) => {
+    debugLog('DialogueList: Handling confirm', { mark, editingCharacter })
+    onConfirmDialogue(mark.id, editingCharacter, mark.conversationId ?? 'unknown')
+    setExpandedMarkId(null)
+  }
 
   return (
     <div className="flex flex-col gap-2">
@@ -152,32 +257,96 @@ const DialogueList = ({ currentContent, onSyncDialogue, isSyncing }: DialogueLis
         <button
           onClick={onSyncDialogue}
           disabled={isSyncing}
-          className="flex items-center gap-1.5 rounded px-2 py-1.5 text-gray-400 transition-colors hover:bg-white/[.05] hover:text-gray-600">
+          className="flex items-center gap-1.5 rounded px-2 py-1.5 text-gray-400 transition-colors hover:bg-white/[.05] hover:text-gray-600 disabled:opacity-50">
           <RefreshIcon className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
           <span className="text-xs">{isSyncing ? 'Syncing...' : 'Sync'}</span>
         </button>
       </div>
 
       {validDialogueMarks.length === 0 ? (
-        <div className="flex h-full items-center justify-center">
-          <div className="text-black/50">
-            {isSyncing ? 'Scanning for dialogue...' : 'No dialogue detected'}
+        <div className="flex h-full items-center justify-center py-10">
+          <div className="text-center text-xs text-black/50">
+            {isSyncing ? 'Scanning for dialogue...' : 'No dialogue detected or Sync needed.'}
           </div>
         </div>
       ) : (
         groupedDialogues.map((group: GroupedDialogue) => (
-          <div key={group.conversationId} className="mb-4">
-            <div className="mb-2 text-xs font-medium text-black/50">
-              Conversation {group.conversationId.replace('conv', '')}
+          <div
+            key={group.conversationId}
+            className="mb-1 rounded-md border border-white/[.07] bg-white/[.01]">
+            <div className="px-3 py-2 text-xs font-medium text-black/40">
+              Conversation{' '}
+              {group.conversationId === 'unknown' ? 'Unknown' : group.conversationId.replace('conv', '')}
             </div>
-            {group.dialogues.map((mark: ProcessedDialogueMark) => (
-              <ListItem
-                key={mark.id}
-                label={`${mark.character}: ${mark.content.substring(0, 30)}${mark.content.length > 30 ? '...' : ''}`}
-                leftIcon={<ChatIcon className="h-4 w-4" />}
-                theme="dark"
-              />
-            ))}
+            <div className="border-t border-white/[.07]">
+              {group.dialogues.map((mark: ProcessedDialogueMark) => (
+                <div key={mark.id} className="border-b border-white/[.05] last:border-b-0">
+                  <ListItem
+                    label={
+                      <div className="flex items-center gap-2">
+                        {mark.userConfirmed && (
+                          <div title="Speaker confirmed by user">
+                            <CheckCircleIcon className="h-3.5 w-3.5 flex-shrink-0 text-green-400/80" />
+                          </div>
+                        )}
+                        <span>
+                          <span className="font-medium text-black/70">{mark.character}:</span>{' '}
+                          <span className="text-black/60">
+                            {mark.content.substring(0, 50)}
+                            {mark.content.length > 50 ? '...' : ''}
+                          </span>
+                        </span>
+                      </div>
+                    }
+                    leftIcon={<ChatIcon className="mt-1 h-4 w-4 flex-shrink-0 text-black/40" />}
+                    onClick={() => handleToggleExpand(mark.id, mark.character)}
+                    rightIcon={
+                      expandedMarkId === mark.id ? (
+                        <ChevronUpIcon className="h-4 w-4 text-black/40" />
+                      ) : (
+                        <ChevronDownIcon className="h-4 w-4 text-black/40" />
+                      )
+                    }
+                    theme="dark"
+                    itemContainerProps={{
+                      className: `transition-colors duration-150 ${expandedMarkId === mark.id ? 'bg-white/[.05]' : ''}`,
+                    }}
+                  />
+                  <AnimatePresence>
+                    {expandedMarkId === mark.id && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2, ease: 'easeInOut' }}
+                        className="overflow-hidden bg-black/[.03]">
+                        <div className="p-3">
+                          <label className="mb-1 block text-xs font-medium text-black/60">
+                            Confirm Speaker
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={editingCharacter}
+                              onChange={e => setEditingCharacter(e.target.value)}
+                              className="flex-grow rounded border border-white/10 bg-white/5 px-2 py-1 text-sm text-black/80 placeholder-black/40 focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                              placeholder="Enter speaker name"
+                            />
+                            <button
+                              onClick={() => handleConfirm(mark)}
+                              disabled={!editingCharacter.trim()}
+                              className="rounded bg-green-600/80 px-2.5 py-1 text-xs font-medium text-white shadow-sm transition-colors hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-50"
+                              title="Confirm this speaker">
+                              Confirm
+                            </button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ))}
+            </div>
           </div>
         ))
       )}

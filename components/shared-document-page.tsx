@@ -13,12 +13,14 @@ import { useCallback, useEffect, useState, useMemo } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useDebouncedCallback } from 'use-debounce'
 import { motion, AnimatePresence } from 'framer-motion'
-import { EyeIcon, EyeOffIcon, ClockIcon, SearchIcon, ChatIcon } from '@heroicons/react/outline'
+import { EyeIcon, EyeOffIcon, ClockIcon, SearchIcon, ChatIcon, CodeIcon } from '@heroicons/react/outline'
 import VersionList from '@components/version-list'
 import GlobalFind from '@components/global-find'
 import DialogueList from '@components/dialogue-list'
 import { renameItem, DocumentOperations } from '@lib/document-operations'
 import { findAllMatches } from '../lib/search'
+import { Node as ProseMirrorNode } from 'prosemirror-model'
+import DebugPanel from './debug-panel'
 
 const backdropStyles = `
   fixed top-0 left-0 h-screen w-screen z-[-1]
@@ -93,6 +95,7 @@ export default function SharedDocumentPage() {
   const [editor, setEditor] = useState<any>(null)
   const [initAnimate, setInitAnimate] = useState(false)
   const [isDialogueMode, setIsDialogueMode] = useState(false)
+  const [showDebugPanel, setShowDebugPanel] = useState(false)
 
   useEffect(() => {
     if (databaseDoc) {
@@ -208,25 +211,17 @@ export default function SharedDocumentPage() {
     mutate(`/documents/${documentId}/versions`)
     save(data, documentId, setRecentlySaved)
 
-    // When saving, force a refresh of the document data to prevent stale data
     mutate(documentPath, async () => {
-      // Get fresh data from API after saving
       const freshDoc = await get(`/documents/${documentId}`)
       return freshDoc
     })
 
-    // If the title is being updated, also update it in the allDocs array
-    // This ensures the document tree shows the latest title immediately
     if (data.title && allDocs) {
-      // Use the false parameter for optimistic UI update, then revalidate to trigger animations
       mutate(
         '/documents',
         allDocs.map(doc => (doc._id === documentId ? { ...doc, title: data.title } : doc)),
         false,
       )
-
-      // After a brief delay, trigger a revalidation to ensure consistency
-      // This also helps trigger the animation by causing a re-render
       setTimeout(() => {
         mutate('/documents')
       }, 100)
@@ -355,70 +350,152 @@ export default function SharedDocumentPage() {
     setEditor(editorInstance)
   }
 
+  const handleConfirmDialogue = useCallback(
+    (markId: string, newCharacter: string) => {
+      if (!editor) return
+
+      // The markId is expected to be "start-end"
+      const [startStr, endStr] = markId.split('-')
+      const start = parseInt(startStr, 10)
+      const end = parseInt(endStr, 10)
+
+      if (isNaN(start) || isNaN(end)) {
+        console.error('Invalid markId format:', markId)
+        return
+      }
+
+      // Use Tiptap commands to update the mark
+      // We apply the update to the specific range identified by the ID
+      editor
+        .chain()
+        .focus() // Optional: focus the editor
+        .setTextSelection({ from: start, to: end }) // Select the text range
+        .setDialogueMark({
+          // We don't have conversationId here, but Tiptap merges attributes,
+          // so we only need to provide the ones we change + userConfirmed.
+          character: newCharacter,
+          userConfirmed: true,
+          // Tiptap should preserve existing conversationId attribute automatically
+        })
+        .run()
+
+      // Trigger a save after the update
+      // Get the latest JSON content after the command runs
+      const updatedContent = editor.getJSON()
+      // Update state immediately for reactivity
+      setDialogueDoc(updatedContent)
+      setCurrentContent(updatedContent) // Also update main content state if necessary
+      // Use debouncedSave to persist the changes
+      debouncedSave({ content: updatedContent })
+    },
+    [editor, debouncedSave],
+  )
+
   const syncDialogue = async () => {
     if (!documentContent || isSyncingDialogue || !editor) return
 
     setIsSyncingDialogue(true)
     try {
-      // Get the document text directly from editor state
       const text = editor.state.doc.textContent
-
-      // Detect dialogue using the API
       const response = await post('/dialogue/detect', { text })
-      const dialogues = Array.isArray(response) ? response : response.dialogues
+      // Ensure response structure matches expected DialogueDetectionResult[]
+      const detectedDialogues: { character: string; snippet: string; conversationId: string }[] =
+        Array.isArray(response) ? response : response?.dialogues || []
 
-      if (!dialogues) {
+      if (!detectedDialogues) {
         throw new Error('Invalid response from dialogue detection')
       }
 
-      interface RawDialogue {
-        character: string
-        snippet: string
-        confidence: number
-        conversationId: string
+      // Store confirmed marks before making changes
+      const confirmedRanges = new Map<string, { character: string; conversationId: string }>()
+      editor.state.doc.descendants((node: ProseMirrorNode, pos: number) => {
+        if (node.isText) {
+          const dialogueMark = node.marks.find(mark => mark.type.name === 'dialogue')
+          if (dialogueMark?.attrs.userConfirmed) {
+            const rangeKey = `${pos}-${pos + node.nodeSize}`
+            confirmedRanges.set(rangeKey, {
+              character: dialogueMark.attrs.character,
+              conversationId: dialogueMark.attrs.conversationId,
+            })
+          }
+        }
+      })
+
+      // Start a Tiptap transaction to batch changes
+      let tr = editor.state.tr
+
+      // 1. Remove all *existing* non-confirmed dialogue marks first
+      editor.state.doc.descendants((node: ProseMirrorNode, pos: number) => {
+        if (node.isText) {
+          const dialogueMark = node.marks.find(mark => mark.type.name === 'dialogue')
+          if (dialogueMark && !dialogueMark.attrs.userConfirmed) {
+            tr = tr.removeMark(pos, pos + node.nodeSize, editor.schema.marks.dialogue)
+          }
+        }
+      })
+
+      // Apply the transaction to remove marks before adding new ones
+      editor.view.dispatch(tr)
+      tr = editor.state.tr // Get a new transaction based on the updated state
+
+      // 2. Apply *new* marks from AI, skipping confirmed ranges
+      for (const dialogue of detectedDialogues) {
+        const matches = findAllMatches(editor.state.doc, dialogue.snippet)
+        for (const match of matches) {
+          const rangeKey = `${match.from}-${match.to}`
+          if (confirmedRanges.has(rangeKey)) {
+            console.log('Skipping confirmed dialogue:', dialogue.snippet)
+            continue
+          }
+          tr = tr.addMark(
+            match.from,
+            match.to,
+            editor.schema.marks.dialogue.create({
+              character: dialogue.character,
+              conversationId: dialogue.conversationId,
+              userConfirmed: false,
+            }),
+          )
+        }
       }
 
-      // Remove existing dialogue marks
-      editor.commands.unsetMark('dialogue')
-
-      // Find and mark each dialogue
-      dialogues.forEach((dialogue: RawDialogue) => {
-        // Find all occurrences using findAllMatches
-        const matches = findAllMatches(editor.state.doc, dialogue.snippet)
-
-        // Apply mark to each match
-        matches.forEach(match => {
-          editor.commands.setTextSelection({
-            from: match.from,
-            to: match.to,
-          })
-          editor.commands.setDialogueMark({
-            character: dialogue.character,
-            conversationId: dialogue.conversationId,
-          })
+      // 3. Re-apply confirmed marks
+      confirmedRanges.forEach((attrs, rangeKey) => {
+        const [from, to] = rangeKey.split('-').map(Number)
+        let needsReapply = true
+        editor.state.doc.nodesBetween(from, to, (node: ProseMirrorNode, pos: number) => {
+          if (pos === from && node.isText) {
+            const existingMark = node.marks.find(m => m.type.name === 'dialogue')
+            if (
+              existingMark &&
+              existingMark.attrs.userConfirmed &&
+              existingMark.attrs.character === attrs.character
+            ) {
+              needsReapply = false
+            }
+          }
         })
+
+        if (needsReapply && !isNaN(from) && !isNaN(to)) {
+          tr = tr.addMark(from, to, editor.schema.marks.dialogue.create({ ...attrs, userConfirmed: true }))
+        }
       })
 
-      // Clear the selection
-      editor.commands.setTextSelection(0)
+      // Dispatch the final transaction
+      editor.view.dispatch(tr)
 
-      // Get the updated content with marks
+      // Get the final updated content
       const updatedContent = editor.getJSON()
-
-      // Update current content immediately to trigger DialogueList update
       setCurrentContent(updatedContent)
+      setDialogueDoc(updatedContent) // Ensure dialogue list also updates
 
-      // Save the updated content in the background
-      await debouncedSave({
-        content: updatedContent,
-      })
+      // Save the updated content
+      await debouncedSave({ content: updatedContent })
 
-      // If dialogue mode is active, reapply the highlighting
       if (isDialogueMode) {
-        // Small delay to ensure the editor state is fully updated
         setTimeout(() => {
           editor.commands.setDialogueHighlight(true)
-        }, 0)
+        }, 50)
       }
     } catch (e) {
       console.error('Failed to sync dialogue:', e)
@@ -527,6 +604,12 @@ export default function SharedDocumentPage() {
                 title={showDialogue ? 'Hide dialogue' : 'Show dialogue'}>
                 <ChatIcon className="h-4 w-4 text-black/70" />
               </button>
+              <button
+                onClick={() => setShowDebugPanel(!showDebugPanel)}
+                className="rounded-lg p-1.5 transition-colors hover:bg-white/[.1]"
+                title={showDebugPanel ? 'Hide Debug Panel' : 'Show Debug Panel'}>
+                <CodeIcon className="h-4 w-4 text-black/70" />
+              </button>
             </div>
           </div>
 
@@ -609,14 +692,21 @@ export default function SharedDocumentPage() {
               className="fixed right-0 top-0 h-screen w-[320px] shrink-0 bg-white/[.02] pt-[60px] backdrop-blur-xl">
               <div className="h-[calc(100vh_-_60px)] overflow-y-auto p-4">
                 <DialogueList
+                  editor={editor}
                   documentId={documentId}
                   currentContent={dialogueDoc}
                   onSyncDialogue={syncDialogue}
                   isSyncing={isSyncingDialogue}
+                  onConfirmDialogue={handleConfirmDialogue}
                 />
               </div>
             </motion.div>
           )}
+        </AnimatePresence>
+
+        {/* ---- Debug Panel ---- */}
+        <AnimatePresence>
+          {showDebugPanel && <DebugPanel content={dialogueDoc} onClose={() => setShowDebugPanel(false)} />}
         </AnimatePresence>
 
         {/* Editor Container */}

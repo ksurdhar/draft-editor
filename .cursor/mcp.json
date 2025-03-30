@@ -1,15 +1,11 @@
 {
   "mcpServers": {
-    "@smithery-ai-server-sequential-thinking": {
+    "memory": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@smithery/cli@latest",
-        "run",
-        "@smithery-ai/server-sequential-thinking",
-        "--config",
-        "{}"
-      ]
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "env": {
+        "MEMORY_FILE_PATH": "/Users/ksurdhar/projects/draft-editor/.cursor/memory.json"
+      }
     }
   }
 }
