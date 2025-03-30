@@ -289,9 +289,9 @@ const CharacterDetailPage = ({
           initAnimate ? 'opacity-100' : 'opacity-0'
         }`}
       />
-      <div className="relative top-[44px] flex h-[calc(100vh_-_44px)] justify-center pb-10">
-        <div className="flex w-11/12 max-w-[740px] flex-col justify-center sm:w-9/12">
-          {/* Back Button */}
+      <div className="relative top-[44px] flex h-[calc(100vh_-_44px)] flex-col justify-center pb-5">
+        {/* Back Button */}
+        <div className="mx-auto w-11/12 max-w-[1200px] px-4">
           <Button
             startIcon={<ArrowBackIcon />}
             onClick={() => setLocation('/characters')}
@@ -305,125 +305,172 @@ const CharacterDetailPage = ({
             }}>
             Back to Characters
           </Button>
+        </div>
 
-          {/* Character Header */}
-          <Paper
-            elevation={0}
-            className="mb-6 overflow-hidden rounded-lg p-6"
-            sx={{
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              backdropFilter: 'blur(10px)',
-            }}>
-            <div className="flex items-center justify-between">
-              <Typography variant="h4" className="font-bold">
-                {character.name}
-              </Typography>
-              <Tooltip title="Edit Character">
-                <IconButton onClick={() => setEditingCharacter(character)} size="small">
-                  <EditIcon />
-                </IconButton>
-              </Tooltip>
-            </div>
-
-            <Typography variant="subtitle1" className="mt-2 text-black/[.7]">
-              <span className="font-semibold">Motivation:</span>{' '}
-              {character.motivation || 'No motivation specified'}
-            </Typography>
-
-            <Typography variant="body1" className="mt-4 text-black/[.8]">
-              {character.description || 'No description available'}
-            </Typography>
-
-            {character.traits && character.traits.length > 0 && (
-              <Box className="mt-4">
-                <Typography variant="subtitle2" className="mb-2 font-semibold">
-                  Traits:
+        {/* Two Column Layout */}
+        <div className="mx-auto grid w-11/12 max-w-[1200px] flex-1 grid-cols-1 gap-6 overflow-hidden px-4 md:grid-cols-3">
+          {/* Left Column - Character Details */}
+          <div className="md:col-span-1">
+            <Paper
+              elevation={0}
+              className="sticky top-[54px] overflow-hidden rounded-lg p-5"
+              sx={{
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(10px)',
+                height: 'fit-content',
+                maxHeight: 'calc(100vh - 120px)',
+                overflowY: 'auto',
+              }}>
+              <div className="mb-4 flex items-center justify-between">
+                <Typography variant="h4" className="font-bold">
+                  {character.name}
                 </Typography>
-                <div className="flex flex-wrap gap-1">
-                  {character.traits.map((trait, index) => (
-                    <Chip
-                      key={index}
-                      label={trait}
-                      size="small"
-                      color="primary"
-                      variant="outlined"
-                      sx={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
-                    />
-                  ))}
-                </div>
-              </Box>
-            )}
-
-            {/* Document links */}
-            {character.documentIds && character.documentIds.length > 0 && (
-              <Box className="mt-4">
-                <Typography variant="subtitle2" className="mb-2 font-semibold">
-                  Appears in:
-                </Typography>
-                <div className="flex flex-wrap gap-1">
-                  {character.documentIds.map((docId, index) => (
-                    <Chip
-                      key={index}
-                      label={`Document ${index + 1}`}
-                      size="small"
-                      color="secondary"
-                      variant="outlined"
-                      onClick={() => navigateTo(`/documents/${docId}`)}
-                      sx={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
-                    />
-                  ))}
-                </div>
-              </Box>
-            )}
-          </Paper>
-
-          {/* Dialogue Section */}
-          <Typography variant="h5" className="mb-4 font-semibold">
-            Character Dialogue
-          </Typography>
-
-          {/* Dialogue Entries */}
-          <div className="max-h-[calc(100vh_-_300px)] overflow-y-auto">
-            {loadingDialogue ? (
-              <div className="flex justify-center p-4">
-                <Loader />
+                <Tooltip title="Edit Character">
+                  <IconButton onClick={() => setEditingCharacter(character)} size="small">
+                    <EditIcon />
+                  </IconButton>
+                </Tooltip>
               </div>
-            ) : dialogue.length === 0 ? (
-              <Typography variant="body2" className="text-center text-black/[.6]">
-                No dialogue found in associated documents
+
+              <Typography variant="subtitle1" className="mb-4 text-black/[.7]">
+                <span className="font-semibold">Motivation:</span>{' '}
+                {character.motivation || 'No motivation specified'}
               </Typography>
-            ) : (
-              dialogue.map((entry: DialogueEntry) => (
-                <Paper
-                  key={entry._id}
-                  elevation={0}
-                  className="mb-4 cursor-pointer overflow-hidden rounded-lg p-4 hover:bg-opacity-20"
-                  onClick={() => handleDialogueClick(entry.documentId || '')}
-                  sx={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    '&:hover': {
-                      backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                    },
-                  }}>
-                  <div className="flex justify-between">
-                    <Typography variant="caption" className="text-black/[.5]">
-                      {entry.context?.before || 'No context'}
-                    </Typography>
-                    <Typography variant="caption" className="text-black/[.5]">
-                      {formatDate(entry.lastUpdated)}
+
+              <Typography variant="body1" className="mb-5 text-black/[.8]">
+                {character.description || 'No description available'}
+              </Typography>
+
+              {character.traits && character.traits.length > 0 && (
+                <Box className="mb-5">
+                  <Typography variant="subtitle2" className="mb-2 font-semibold">
+                    Traits:
+                  </Typography>
+                  <div className="flex flex-wrap gap-1">
+                    {character.traits.map((trait, index) => (
+                      <Chip
+                        key={index}
+                        label={trait}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                        sx={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
+                      />
+                    ))}
+                  </div>
+                </Box>
+              )}
+
+              {/* Document links */}
+              {character.documentIds && character.documentIds.length > 0 && (
+                <Box>
+                  <Typography variant="subtitle2" className="mb-2 font-semibold">
+                    Appears in:
+                  </Typography>
+                  <div className="flex flex-wrap gap-2">
+                    {character.documentIds.map((docId, index) => (
+                      <Chip
+                        key={index}
+                        label={`Document ${index + 1}`}
+                        size="small"
+                        color="secondary"
+                        variant="outlined"
+                        onClick={() => navigateTo(`/documents/${docId}`)}
+                        sx={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
+                      />
+                    ))}
+                  </div>
+                </Box>
+              )}
+            </Paper>
+          </div>
+
+          {/* Right Column - Dialogue */}
+          <div className="md:col-span-2">
+            <Paper
+              elevation={0}
+              className="mb-6 overflow-hidden rounded-lg p-6"
+              sx={{
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(10px)',
+                height: 'calc(100vh - 120px)',
+                display: 'flex',
+                flexDirection: 'column',
+              }}>
+              <Typography variant="h5" className="mb-4 font-semibold">
+                Character Dialogue
+              </Typography>
+
+              {/* Dialogue Entries */}
+              <div className="flex-1 overflow-y-auto pr-2">
+                {loadingDialogue ? (
+                  <div className="flex h-full items-center justify-center">
+                    <Loader />
+                  </div>
+                ) : dialogue.length === 0 ? (
+                  <div className="flex h-full items-center justify-center">
+                    <Typography variant="body2" className="text-center text-black/[.6]">
+                      No dialogue found in associated documents
                     </Typography>
                   </div>
-                  <Typography variant="body1" className="mt-2 italic">
-                    &ldquo;{entry.content}&rdquo;
-                  </Typography>
-                  {entry.documentTitle && (
-                    <Typography variant="caption" className="mt-1 block text-black/[.5]">
-                      From: {entry.documentTitle}
-                    </Typography>
-                  )}
-                </Paper>
-              ))
-            )}
+                ) : (
+                  <div className="space-y-4">
+                    {/* Group dialogues by document */}
+                    {Object.entries(
+                      dialogue.reduce(
+                        (groups, entry) => {
+                          const key = entry.documentTitle || 'Unknown Document'
+                          if (!groups[key]) groups[key] = []
+                          groups[key].push(entry)
+                          return groups
+                        },
+                        {} as Record<string, DialogueEntry[]>,
+                      ),
+                    ).map(([documentTitle, entries]) => (
+                      <div key={documentTitle} className="mb-6">
+                        <Typography
+                          variant="subtitle1"
+                          className="mb-2 border-b border-white/20 pb-2 font-medium">
+                          {documentTitle}
+                        </Typography>
+                        <div className="space-y-3">
+                          {entries.map((entry: DialogueEntry) => (
+                            <Paper
+                              key={entry._id}
+                              elevation={0}
+                              className="cursor-pointer overflow-hidden rounded-lg p-4 transition-all hover:bg-opacity-20"
+                              onClick={() => handleDialogueClick(entry.documentId || '')}
+                              sx={{
+                                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                '&:hover': {
+                                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                                },
+                              }}>
+                              <div className="flex justify-between">
+                                <Typography variant="caption" className="text-black/[.5]">
+                                  {entry.context?.before || 'No context'}
+                                </Typography>
+                                <Typography variant="caption" className="text-black/[.5]">
+                                  {formatDate(entry.lastUpdated)}
+                                </Typography>
+                              </div>
+                              <Typography variant="body1" className="mt-2 italic">
+                                &ldquo;{entry.content}&rdquo;
+                              </Typography>
+                              {entry.context?.after && (
+                                <Typography variant="caption" className="mt-1 block text-black/[.5]">
+                                  {entry.context.after}
+                                </Typography>
+                              )}
+                            </Paper>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Paper>
           </div>
         </div>
       </div>
