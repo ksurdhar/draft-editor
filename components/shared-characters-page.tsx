@@ -26,8 +26,6 @@ import { mutate } from 'swr'
 import CharacterModal from '@components/character-modal'
 import { useNavigation } from '@components/providers'
 import { DocumentData } from '@typez/globals'
-import { debugLog } from '@lib/debug-logger'
-
 // Character type definition
 interface CharacterData {
   _id: string
@@ -44,6 +42,35 @@ interface CharacterData {
   documentIds: string[]
   lastUpdated: number
   isArchived: boolean
+}
+
+// New interface for combined display
+interface DisplayCharacter extends Partial<CharacterData> {
+  name: string // Ensure name is always present
+  isOfficial: boolean
+}
+
+// Helper type for Tiptap JSON nodes
+interface TiptapNode {
+  type: string
+  content?: TiptapNode[]
+  marks?: Array<{ type: string; attrs?: Record<string, any> }>
+  text?: string
+}
+
+// Helper function to extract character names from Tiptap content
+const extractCharacterNamesFromNode = (node: TiptapNode, names: Set<string>): void => {
+  if (node.marks) {
+    node.marks.forEach(mark => {
+      if (mark.type === 'dialogue' && mark.attrs?.character) {
+        names.add(mark.attrs.character)
+      }
+    })
+  }
+
+  if (node.content) {
+    node.content.forEach(childNode => extractCharacterNamesFromNode(childNode, names))
+  }
 }
 
 const SharedCharactersPage = ({
@@ -69,6 +96,8 @@ const SharedCharactersPage = ({
   const [createCharacterModalOpen, setCreateCharacterModalOpen] = useState(false)
   const [editingCharacter, setEditingCharacter] = useState<CharacterData | null>(null)
   const [initAnimate, setInitAnimate] = useState(false)
+  // State for the merged list of official and potential characters
+  const [displayCharacters, setDisplayCharacters] = useState<DisplayCharacter[]>([])
 
   // Wrap mutation functions in useCallback
   const mutateCharacters = useCallback(
@@ -80,14 +109,44 @@ const SharedCharactersPage = ({
     [characters, onCharactersChange],
   )
 
-  // Add useEffect to log document titles when documents prop changes
+  // Effect to merge official characters and potential characters from documents
   useEffect(() => {
-    // Check if documents is an array before mapping
-    const documentTitles = Array.isArray(documents)
-      ? documents.map(doc => doc?.title || 'Untitled Document')
-      : []
-    debugLog('SharedCharactersPage: Received document titles', documentTitles)
-  }, [documents])
+    const potentialNames = new Set<string>()
+    if (Array.isArray(documents)) {
+      documents.forEach(doc => {
+        // Ensure doc.content exists and is an object (basic check for Tiptap structure)
+        if (doc?.content && typeof doc.content === 'object' && doc.content !== null) {
+          try {
+            // Assume doc.content is the root node or has a root node structure
+            extractCharacterNamesFromNode(doc.content as TiptapNode, potentialNames)
+          } catch (error) {
+            console.error(`Error parsing document content for doc ID ${doc._id}:`, error)
+          }
+        }
+      })
+    }
+
+    // Map official characters
+    const officialCharacters: DisplayCharacter[] = characters
+      .filter(Boolean)
+      .map(char => ({ ...char, isOfficial: true }))
+
+    // Get official names (case-insensitive) for quick lookup
+    const officialNamesLower = new Set(officialCharacters.map(char => char.name.toLowerCase()))
+
+    // Add potential characters that aren't already official
+    const mergedCharacters = [...officialCharacters]
+    potentialNames.forEach(name => {
+      if (!officialNamesLower.has(name.toLowerCase())) {
+        mergedCharacters.push({ name, isOfficial: false })
+      }
+    })
+
+    // Sort or order if needed (e.g., alphabetically, or official first)
+    // mergedCharacters.sort((a, b) => a.name.localeCompare(b.name));
+
+    setDisplayCharacters(mergedCharacters)
+  }, [characters, documents]) // Rerun when characters or documents change
 
   const combinedLoading = charactersLoading
 
@@ -277,11 +336,11 @@ const SharedCharactersPage = ({
             {!combinedLoading && characters.length === 0 && emptyMessage}
             {!combinedLoading && characters.length > 0 && (
               <List>
-                {characters
+                {displayCharacters
                   .filter(character => character !== null)
                   .map(character => (
                     <Paper
-                      key={character._id}
+                      key={character.isOfficial ? character._id : character.name}
                       elevation={0}
                       className="mb-3 overflow-hidden rounded-lg transition-all duration-200"
                       sx={{
@@ -290,27 +349,56 @@ const SharedCharactersPage = ({
                           backgroundColor: 'rgba(255, 255, 255, 0.15)',
                         },
                       }}>
-                      <ListItem button onClick={() => handleCharacterClick(character._id)} className="py-3">
+                      <ListItem
+                        button={character.isOfficial as any}
+                        onClick={
+                          character.isOfficial && character._id
+                            ? () => handleCharacterClick(character._id!)
+                            : undefined
+                        }
+                        className="py-3">
                         <ListItemText
                           primary={
                             <Typography variant="subtitle1" className="font-semibold">
                               {character.name}
+                              {!character.isOfficial && (
+                                <span className="ml-2 text-xs font-normal text-gray-500">(Potential)</span>
+                              )}
                             </Typography>
                           }
                           secondary={
                             <Typography variant="body2" className="line-clamp-1 text-black/[.6]">
-                              {character.description || 'No description'}
+                              {character.description ||
+                                (character.isOfficial ? 'No description' : 'Found in documents')}
                             </Typography>
                           }
                         />
                         <ListItemSecondaryAction>
-                          <IconButton
-                            edge="end"
-                            onClick={e => handleMenuClick(e, character._id)}
-                            size="small"
-                            className="opacity-50 hover:opacity-100">
-                            <MoreVertIcon />
-                          </IconButton>
+                          {character.isOfficial ? (
+                            <Tooltip title="More options">
+                              <IconButton
+                                edge="end"
+                                onClick={(e: React.MouseEvent<HTMLElement>) => {
+                                  if (character._id) {
+                                    handleMenuClick(e, character._id)
+                                  }
+                                }}
+                                size="small"
+                                className="opacity-50 hover:opacity-100">
+                                <MoreVertIcon />
+                              </IconButton>
+                            </Tooltip>
+                          ) : (
+                            <Tooltip title="Create this character">
+                              <IconButton
+                                edge="end"
+                                onClick={() => handleCreateCharacter({ name: character.name })}
+                                size="small"
+                                className="text-green-500 hover:text-green-400">
+                                <PersonAddIcon />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         </ListItemSecondaryAction>
                       </ListItem>
                     </Paper>
