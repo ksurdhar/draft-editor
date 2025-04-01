@@ -1,14 +1,15 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import Layout from '@components/layout'
 import { Loader } from '@components/loader'
 import { useSpinner } from '@lib/hooks'
 import { useAPI } from '@components/providers'
 import { useUser } from '@wrappers/auth-wrapper-client'
-import { Paper, Typography, Chip, Box, IconButton, Tooltip, Button } from '@mui/material'
+import { Paper, Typography, Chip, Box, IconButton, Tooltip, Button, Menu, MenuItem } from '@mui/material'
 import EditIcon from '@mui/icons-material/Edit'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
+import MoreVertIcon from '@mui/icons-material/MoreVert'
 import CharacterModal from '@components/character-modal'
 import { useLocation } from 'wouter'
 import { useNavigation } from '@components/providers'
@@ -57,61 +58,107 @@ interface DialogueEntry {
   isValid?: boolean
 }
 
-// Extract dialogue for a character from a document's Tiptap JSON content
-const extractDialogueForCharacter = (
+// New interface for grouping dialogues by conversation
+interface ConversationGroup {
+  conversationId: string
+  documentId: string
+  documentTitle: string
+  entries: DialogueEntry[] // All entries in this conversation within this document
+  lastUpdated?: number // Timestamp of the document or latest entry? TBD
+  // Optional: Add position info if needed for sorting later
+}
+
+// Keep the old function for reference or potential future use, renamed
+/*
+const extractIndividualDialogueLinesForCharacter = (
   documentContent: any,
   characterName: string,
+  _documentTitle: string, // Prefix unused parameter
+  _documentId: string, // Prefix unused parameter
+): DialogueEntry[] => {
+    // ... existing implementation of extractDialogueForCharacter ...
+    // Note: The original _id generation might need adjustment if reused
+    const dialogueEntries: DialogueEntry[] = [] // Adjust type if needed
+
+   const processNode = (node: any / *, contextBefore = '', contextAfter = '' * /) => { // Comment out unused params
+      if (node.type === 'text' && node.marks) {
+        const dialogueMark = node.marks.find(
+          (mark: any) => mark.type === 'dialogue' && mark.attrs?.character === characterName,
+        )
+
+        if (dialogueMark && node.text) {
+         // Original push logic - adjust if this function is ever reused
+        dialogueEntries.push({
+         characterId: dialogueMark.attrs.character,
+         characterName: dialogueMark.attrs.character,
+         content: node.text,
+         lastUpdated: Date.now(),
+        })
+        }
+      }
+       // ... rest of recursive processing ...
+       if (node.content && Array.isArray(node.content)) {
+       node.content.forEach((childNode: any / *, index: number * /) => { // Comment out unused index
+            // Simplified context (less relevant for conversations)
+            processNode(childNode)
+        })
+       }
+    }
+     if (documentContent && documentContent.type === 'doc') {
+       processNode(documentContent)
+     }
+    return dialogueEntries
+}
+*/
+
+// New function to extract conversations
+const extractConversationsForCharacter = (
+  documentContent: any,
+  targetCharacterName: string,
   documentTitle: string,
   documentId: string,
-): DialogueEntry[] => {
-  const dialogueEntries: DialogueEntry[] = []
+): ConversationGroup[] => {
+  const conversationsMap: Record<string, ConversationGroup> = {}
+  let characterParticipates: Record<string, boolean> = {}
 
-  // Function to recursively process nodes
-  const processNode = (node: any, contextBefore = '', contextAfter = '') => {
-    // Handle text nodes with dialogue marks
+  const processNode = (node: any) => {
     if (node.type === 'text' && node.marks) {
-      const dialogueMark = node.marks.find(
-        (mark: any) => mark.type === 'dialogue' && mark.attrs?.character === characterName,
-      )
+      node.marks.forEach((mark: any) => {
+        if (mark.type === 'dialogue' && mark.attrs?.conversationId && mark.attrs?.character && node.text) {
+          const { conversationId, character } = mark.attrs
+          const content = node.text
 
-      if (dialogueMark && node.text) {
-        dialogueEntries.push({
-          _id: `${documentId}-${dialogueEntries.length}`, // Generate a pseudo-id
-          characterId: characterName,
-          characterName,
-          documentId,
-          documentTitle,
-          content: node.text,
-          context: {
-            before: contextBefore,
-            after: contextAfter,
-          },
-          lastUpdated: Date.now(),
-          isValid: true,
-        })
-      }
+          // Ensure conversation group exists
+          if (!conversationsMap[conversationId]) {
+            conversationsMap[conversationId] = {
+              conversationId,
+              documentId,
+              documentTitle,
+              entries: [],
+              // We might want to get a more accurate timestamp later
+              lastUpdated: Date.now(),
+            }
+            characterParticipates[conversationId] = false
+          }
+
+          // Add the dialogue entry
+          conversationsMap[conversationId].entries.push({
+            characterId: character,
+            characterName: character, // Assuming name is same as ID for now
+            content: content,
+          })
+
+          // Track if the target character is in this conversation
+          if (character === targetCharacterName) {
+            characterParticipates[conversationId] = true
+          }
+        }
+      })
     }
 
-    // Process child nodes
+    // Process child nodes recursively
     if (node.content && Array.isArray(node.content)) {
-      // For each node, gather context and process recursively
-      node.content.forEach((childNode: any, index: number) => {
-        // Simple context extraction (can be enhanced)
-        let before = ''
-        let after = ''
-
-        // Get text before this node (from previous sibling)
-        if (index > 0 && node.content[index - 1].type === 'text') {
-          before = node.content[index - 1].text || ''
-        }
-
-        // Get text after this node (from next sibling)
-        if (index < node.content.length - 1 && node.content[index + 1].type === 'text') {
-          after = node.content[index + 1].text || ''
-        }
-
-        processNode(childNode, before, after)
-      })
+      node.content.forEach(processNode)
     }
   }
 
@@ -120,7 +167,16 @@ const extractDialogueForCharacter = (
     processNode(documentContent)
   }
 
-  return dialogueEntries
+  // Filter conversations to include only those where the target character participates
+  const participatingConversations = Object.values(conversationsMap).filter(
+    group => characterParticipates[group.conversationId],
+  )
+
+  // Optional: Sort entries within each conversation based on their original order?
+  // This requires more complex tracking during parsing (e.g., node position).
+  // For now, they will be in the order they were found during traversal.
+
+  return participatingConversations
 }
 
 const CharacterDetailPage = ({
@@ -137,9 +193,15 @@ const CharacterDetailPage = ({
   const [, setLocation] = useLocation()
   const { navigateTo } = useNavigation()
   const [editingCharacter, setEditingCharacter] = useState<CharacterData | null>(null)
-  const [dialogue, setDialogue] = useState<DialogueEntry[]>([])
-  const [loadingDialogue, setLoadingDialogue] = useState(false)
+  // Update state to hold ConversationGroup[]
+  const [conversations, setConversations] = useState<ConversationGroup[]>([])
+  const [loadingConversations, setLoadingConversations] = useState(false)
   const [initAnimate, setInitAnimate] = useState(false)
+  // Expanded state now keys on conversationId - Currently unused
+  // const [expandedConversations, setExpandedConversations] = useState<Record<string, boolean>>({})
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
+  // Store documentId associated with the menu
+  const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null)
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -148,82 +210,80 @@ const CharacterDetailPage = ({
     return () => clearTimeout(timer)
   }, [])
 
-  // Load dialogue entries when character changes
+  // Load conversation groups when character changes
   useEffect(() => {
-    if (character?._id) {
-      loadDialogueEntries(character._id)
+    if (character?.name) {
+      // Use name as it's needed for extraction
+      loadConversations(character.name)
     }
-  }, [character?._id])
+  }, [character?.name]) // Depend on name
 
-  const loadDialogueEntries = async (_characterId: string) => {
+  const loadConversations = async (characterName: string) => {
     try {
-      setLoadingDialogue(true)
+      setLoadingConversations(true)
 
-      // Ensure we have the character data
-      if (!character) return
-
-      // Get all documents instead of just those in the character's documentIds
+      // Get all documents
       const allDocuments = await get('/documents')
 
       if (!allDocuments || allDocuments.length === 0) {
-        setDialogue([])
+        setConversations([])
         return
       }
 
-      // Fetch each document that has content
-      const allDialogueEntries: DialogueEntry[] = []
+      const allConversationGroups: ConversationGroup[] = []
       for (const document of allDocuments) {
         try {
           if (document && document.content) {
-            // Extract dialogue entries for this character from the document
-            const entriesFromDoc = extractDialogueForCharacter(
+            // Extract conversation groups for this character from the document
+            const groupsFromDoc = extractConversationsForCharacter(
               document.content,
-              character.name,
+              characterName,
               document.title || 'Untitled Document',
               document._id,
             )
 
-            if (entriesFromDoc.length > 0) {
-              allDialogueEntries.push(...entriesFromDoc)
+            if (groupsFromDoc.length > 0) {
+              allConversationGroups.push(...groupsFromDoc)
 
-              // If this document has dialogue for this character but isn't in documentIds,
-              // update the character's documentIds
-              if (character._id && character.documentIds && !character.documentIds.includes(document._id)) {
+              // Document ID association logic might need review based on how you want to track 'appears in'
+              // This assumes you still want to update based on *any* participation.
+              if (character?._id && character.documentIds && !character.documentIds.includes(document._id)) {
                 const updatedDocumentIds = [...character.documentIds, document._id]
+                // Assuming patch still works and onCharacterChange exists
                 await patch(`/characters/${character._id}`, {
                   documentIds: updatedDocumentIds,
                 })
-                // Update local character state with the new documentIds
-                onCharacterChange({
-                  ...character,
-                  documentIds: updatedDocumentIds,
-                })
+                if (character) {
+                  // Check character exists before spreading
+                  onCharacterChange({
+                    ...character,
+                    documentIds: updatedDocumentIds,
+                  })
+                }
               }
             }
           }
         } catch (error) {
-          console.error(`Error processing document ${document._id}:`, error)
+          console.error(`Error processing document ${document._id} for conversations:`, error)
         }
       }
-      debugLog('allDialogueEntries', allDialogueEntries)
+      debugLog('allConversationGroups', allConversationGroups)
 
-      // Sort dialogue entries by document title and position
-      allDialogueEntries.sort((a, b) => {
-        // Sort by document title first
+      // Sort conversation groups by document title and then maybe conversationId or position
+      allConversationGroups.sort((a, b) => {
         if (a.documentTitle !== b.documentTitle) {
           return (a.documentTitle || '').localeCompare(b.documentTitle || '')
         }
-
-        // Then by ID (which includes position information)
-        return (a._id || '').localeCompare(b._id || '')
+        // Secondary sort (e.g., by conversationId)
+        return a.conversationId.localeCompare(b.conversationId)
       })
 
-      setDialogue(allDialogueEntries)
+      setConversations(allConversationGroups)
     } catch (error) {
-      console.error('Error loading dialogue entries:', error)
-      setDialogue([])
+      console.error('Error loading conversation groups:', error)
+      setConversations([])
     } finally {
-      setLoadingDialogue(false)
+      setLoadingConversations(false)
     }
   }
 
@@ -243,25 +303,45 @@ const CharacterDetailPage = ({
     }
   }
 
-  const handleDialogueClick = useCallback(
-    (documentId: string) => {
-      if (documentId) {
-        navigateTo(`/documents/${documentId}`)
-      }
-    },
-    [navigateTo],
-  )
+  const showSpinner = useSpinner(isLoading || userLoading || loadingConversations) // Add loadingConversations
 
-  const formatDate = (timestamp?: number) => {
-    if (!timestamp) return 'Unknown date'
-    return new Date(timestamp).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
+  const handleOptionsClick = (
+    event: React.MouseEvent<HTMLElement>,
+    documentId: string, // Pass documentId directly
+  ) => {
+    event.stopPropagation()
+    setAnchorEl(event.currentTarget)
+    setActiveDocumentId(documentId) // Store the documentId
   }
 
-  const showSpinner = useSpinner(isLoading || userLoading)
+  const handleOptionsClose = () => {
+    setAnchorEl(null)
+    setActiveDocumentId(null)
+  }
+
+  const handleGoToDocument = () => {
+    if (activeDocumentId) {
+      navigateTo(`/documents/${activeDocumentId}`)
+    }
+    handleOptionsClose()
+  }
+
+  // Toggle conversation expansion - Currently unused in JSX but kept for potential future use
+
+  // const toggleConversationExpansion = useCallback((conversationId: string, event: React.MouseEvent) => {
+  //   event.stopPropagation() // Prevent navigation if needed
+  //   setExpandedConversations(prev => ({
+  //     ...prev,
+  //     [conversationId]: !prev[conversationId],
+  //   }))
+  // }, [])
+  const toggleConversationExpansion = (conversationId: string, event: React.MouseEvent) => {
+    event.stopPropagation() // Prevent navigation if needed
+    // setExpandedConversations(prev => ({
+    //   ...prev,
+    //   [conversationId]: !prev[conversationId],
+    // }))
+  }
 
   if (showSpinner) {
     return (
@@ -385,7 +465,7 @@ const CharacterDetailPage = ({
             </Paper>
           </div>
 
-          {/* Right Column - Dialogue */}
+          {/* Right Column - Conversations */}
           <div className="md:col-span-2">
             <Paper
               elevation={0}
@@ -398,35 +478,36 @@ const CharacterDetailPage = ({
                 flexDirection: 'column',
               }}>
               <Typography variant="h5" className="mb-4 font-semibold">
-                Character Dialogue
+                Character Conversations
               </Typography>
 
-              {/* Dialogue Entries */}
+              {/* Conversation Groups */}
               <div className="flex-1 overflow-y-auto pr-2">
-                {loadingDialogue ? (
+                {loadingConversations ? ( // Use new loading state
                   <div className="flex h-full items-center justify-center">
                     <Loader />
                   </div>
-                ) : dialogue.length === 0 ? (
+                ) : conversations.length === 0 ? ( // Use new state name
                   <div className="flex h-full items-center justify-center">
                     <Typography variant="body2" className="text-center text-black/[.6]">
-                      No dialogue found in associated documents
+                      No conversations found involving this character.
                     </Typography>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {/* Group dialogues by document */}
+                    {/* Group conversations by document */}
                     {Object.entries(
-                      dialogue.reduce(
-                        (groups, entry) => {
-                          const key = entry.documentTitle || 'Unknown Document'
+                      conversations.reduce(
+                        // Use new state name
+                        (groups, convo) => {
+                          const key = convo.documentTitle || 'Unknown Document'
                           if (!groups[key]) groups[key] = []
-                          groups[key].push(entry)
+                          groups[key].push(convo)
                           return groups
                         },
-                        {} as Record<string, DialogueEntry[]>,
+                        {} as Record<string, ConversationGroup[]>, // Use new type
                       ),
-                    ).map(([documentTitle, entries]) => (
+                    ).map(([documentTitle, convosInDoc]) => (
                       <div key={documentTitle} className="mb-6">
                         <Typography
                           variant="subtitle1"
@@ -434,36 +515,76 @@ const CharacterDetailPage = ({
                           {documentTitle}
                         </Typography>
                         <div className="space-y-3">
-                          {entries.map((entry: DialogueEntry) => (
-                            <Paper
-                              key={entry._id}
-                              elevation={0}
-                              className="cursor-pointer overflow-hidden rounded-lg p-4 transition-all hover:bg-opacity-20"
-                              onClick={() => handleDialogueClick(entry.documentId || '')}
-                              sx={{
-                                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                                '&:hover': {
-                                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                                },
-                              }}>
-                              <div className="flex justify-between">
-                                <Typography variant="caption" className="text-black/[.5]">
-                                  {entry.context?.before || 'No context'}
-                                </Typography>
-                                <Typography variant="caption" className="text-black/[.5]">
-                                  {formatDate(entry.lastUpdated)}
-                                </Typography>
-                              </div>
-                              <Typography variant="body1" className="mt-2 italic">
-                                &ldquo;{entry.content}&rdquo;
-                              </Typography>
-                              {entry.context?.after && (
-                                <Typography variant="caption" className="mt-1 block text-black/[.5]">
-                                  {entry.context.after}
-                                </Typography>
-                              )}
-                            </Paper>
-                          ))}
+                          {convosInDoc.map((convo: ConversationGroup) => {
+                            // Iterate through conversations
+                            // const isExpanded = expandedConversations[convo.conversationId] // Use conversationId for expansion - Currently unused
+                            const isExpanded = false // Default to false since expansion is disabled
+                            return (
+                              <Paper
+                                key={convo.conversationId} // Use conversationId as key
+                                elevation={0}
+                                className="overflow-hidden rounded-lg transition-all hover:bg-opacity-20"
+                                sx={{
+                                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                  '&:hover': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                                  },
+                                }}>
+                                <div className={`p-4 ${isExpanded ? 'pb-4' : 'pb-2'}`}>
+                                  {' '}
+                                  {/* Adjust padding */}
+                                  <div className="flex items-start justify-between">
+                                    {' '}
+                                    {/* Use items-start */}
+                                    {/* Conversation Entries */}
+                                    <div className="flex-1 overflow-hidden pr-2">
+                                      {/* Optional: Display Conversation ID subtly */}
+                                      {/* <Typography variant="caption" className="mb-1 block text-black/[.4]">
+                                        ID: {convo.conversationId}
+                                      </Typography> */}
+
+                                      {/* Render all entries in the conversation */}
+                                      {convo.entries.map((entry, entryIndex) => (
+                                        <Typography
+                                          key={entryIndex}
+                                          variant="body2" // Use body2 for dialogue lines
+                                          className={`whitespace-pre-line text-black/[.8] ${
+                                            entry.characterName === character.name ? 'font-semibold' : '' // Highlight speaker
+                                          } mb-1`}>
+                                          <span className="text-black/[.6]">{entry.characterName}: </span>
+                                          {entry.content}
+                                        </Typography>
+                                      ))}
+                                    </div>
+                                    {/* Controls */}
+                                    <div className="ml-3 flex shrink-0 flex-col items-end space-y-1">
+                                      {' '}
+                                      {/* Flex column for controls */}
+                                      {/* Keep MoreVertIcon for document actions */}
+                                      <IconButton
+                                        size="small"
+                                        onClick={e => handleOptionsClick(e, convo.documentId)} // Pass documentId
+                                        sx={{ color: 'rgba(0, 0, 0, 0.6)' }}
+                                        title="Go to Document">
+                                        <MoreVertIcon fontSize="small" />
+                                      </IconButton>
+                                      {/* Add Expand/Collapse - maybe not needed per conversation? */}
+                                      {/* If needed, adapt toggleConversationExpansion */}
+                                      {/* Example of how expansion toggle could be added back */}
+                                      {/*
+                                      <IconButton
+                                        size="small"
+                                        onClick={e => toggleConversationExpansion(convo.conversationId, e)} // Need to uncomment toggle function and state
+                                        sx={{ color: 'rgba(0, 0, 0, 0.6)' }}>
+                                         {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />} // Need to import icons
+                                      </IconButton>
+                                      */}
+                                    </div>
+                                  </div>
+                                </div>
+                              </Paper>
+                            )
+                          })}
                         </div>
                       </div>
                     ))}
@@ -481,6 +602,23 @@ const CharacterDetailPage = ({
         onConfirm={handleUpdateCharacter}
         initialData={editingCharacter}
       />
+
+      {/* Menu for Options - Now triggers Go To Document */}
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleOptionsClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'right',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}>
+        <MenuItem onClick={handleGoToDocument}>Go to Document</MenuItem>
+        {/* Add other actions if needed */}
+      </Menu>
     </Layout>
   )
 }
