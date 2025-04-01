@@ -48,6 +48,7 @@ type EditorProps = {
   onUpdate: (data: Partial<DocumentData>) => void
   canEdit?: boolean
   hideFooter?: boolean
+  hideTitle?: boolean
   shouldFocusTitle?: boolean
   diffMode?: boolean
   onEditorReady?: (editor: any) => void
@@ -69,6 +70,7 @@ const EditorComponent = ({
   onUpdate,
   canEdit,
   hideFooter,
+  hideTitle,
   shouldFocusTitle,
   diffMode,
   onEditorReady,
@@ -161,36 +163,38 @@ const EditorComponent = ({
       <style>{editorStyles}</style>
       <div className="flex w-full justify-center">
         <div className="w-full max-w-[740px] px-4 pt-[44px]">
-          <textarea
-            rows={1}
-            ref={titleRef}
-            value={inputValue}
-            placeholder="Untitled"
-            className="editable block w-full resize-none overflow-hidden border-b border-transparent bg-transparent text-3xl uppercase [-webkit-appearance:none] [appearance:none] placeholder:text-black/[.3] focus:border-transparent focus:outline-none focus:ring-0 focus:ring-offset-0 active:outline-none md:text-4xl"
-            style={{
-              outline: 'none',
-              boxShadow: 'none',
-              whiteSpace: 'pre-wrap',
-              overflowWrap: 'break-word',
-              lineHeight: '1.2',
-              width: '100%',
-              minWidth: '100%',
-            }}
-            spellCheck={false}
-            onKeyDown={e => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                editor?.commands.focus()
-              }
-            }}
-            onChange={e => {
-              const newValue = e.target.value
-              e.target.style.height = 'auto'
-              e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px'
-              setInputValue(newValue)
-              onUpdate({ title: newValue || 'Untitled' })
-            }}
-          />
+          {!hideTitle && (
+            <textarea
+              rows={1}
+              ref={titleRef}
+              value={inputValue}
+              placeholder="Untitled"
+              className="editable block w-full resize-none overflow-hidden border-b border-transparent bg-transparent text-3xl uppercase [-webkit-appearance:none] [appearance:none] placeholder:text-black/[.3] focus:border-transparent focus:outline-none focus:ring-0 focus:ring-offset-0 active:outline-none md:text-4xl"
+              style={{
+                outline: 'none',
+                boxShadow: 'none',
+                whiteSpace: 'pre-wrap',
+                overflowWrap: 'break-word',
+                lineHeight: '1.2',
+                width: '100%',
+                minWidth: '100%',
+              }}
+              spellCheck={false}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  editor?.commands.focus()
+                }
+              }}
+              onChange={e => {
+                const newValue = e.target.value
+                e.target.style.height = 'auto'
+                e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px'
+                setInputValue(newValue)
+                onUpdate({ title: newValue || 'Untitled' })
+              }}
+            />
+          )}
         </div>
       </div>
       <div className="flex w-full flex-1 justify-center">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Layout from '@components/layout'
 import { Loader } from '@components/loader'
 import { useSpinner } from '@lib/hooks'
@@ -14,6 +14,9 @@ import CharacterModal from '@components/character-modal'
 import { useLocation } from 'wouter'
 import { useNavigation } from '@components/providers'
 import { debugLog } from '@lib/debug-logger'
+import TiptapJsonRenderer from '@components/tiptap-json-renderer'
+import EditorComponent from '@components/editor'
+import { DocumentData } from '@typez/globals'
 
 // Character type definition from character-modal.tsx
 interface CharacterData {
@@ -34,14 +37,29 @@ interface CharacterData {
   isArchived?: boolean
 }
 
-// Dialogue type definition
+// Basic type definitions for Tiptap JSON structure (reuse or import from renderer)
+interface TiptapMark {
+  type: string
+  attrs?: Record<string, any>
+}
+
+interface TiptapNode {
+  type: string
+  content?: TiptapNode[]
+  text?: string
+  marks?: TiptapMark[]
+  attrs?: Record<string, any>
+}
+
+// Dialogue type definition - Update content type
 interface DialogueEntry {
   _id?: string
   characterId: string
   characterName: string
   documentId?: string
   documentTitle?: string
-  content: string
+  // content: string // Changed from string to TiptapNode
+  contentNode: TiptapNode // Store the specific Tiptap node (usually 'text' type)
   context?: {
     before?: string
     after?: string
@@ -68,52 +86,9 @@ interface ConversationGroup {
   // Optional: Add position info if needed for sorting later
 }
 
-// Keep the old function for reference or potential future use, renamed
-/*
-const extractIndividualDialogueLinesForCharacter = (
-  documentContent: any,
-  characterName: string,
-  _documentTitle: string, // Prefix unused parameter
-  _documentId: string, // Prefix unused parameter
-): DialogueEntry[] => {
-    // ... existing implementation of extractDialogueForCharacter ...
-    // Note: The original _id generation might need adjustment if reused
-    const dialogueEntries: DialogueEntry[] = [] // Adjust type if needed
-
-   const processNode = (node: any / *, contextBefore = '', contextAfter = '' * /) => { // Comment out unused params
-      if (node.type === 'text' && node.marks) {
-        const dialogueMark = node.marks.find(
-          (mark: any) => mark.type === 'dialogue' && mark.attrs?.character === characterName,
-        )
-
-        if (dialogueMark && node.text) {
-         // Original push logic - adjust if this function is ever reused
-        dialogueEntries.push({
-         characterId: dialogueMark.attrs.character,
-         characterName: dialogueMark.attrs.character,
-         content: node.text,
-         lastUpdated: Date.now(),
-        })
-        }
-      }
-       // ... rest of recursive processing ...
-       if (node.content && Array.isArray(node.content)) {
-       node.content.forEach((childNode: any / *, index: number * /) => { // Comment out unused index
-            // Simplified context (less relevant for conversations)
-            processNode(childNode)
-        })
-       }
-    }
-     if (documentContent && documentContent.type === 'doc') {
-       processNode(documentContent)
-     }
-    return dialogueEntries
-}
-*/
-
 // New function to extract conversations
 const extractConversationsForCharacter = (
-  documentContent: any,
+  documentContent: any, // Keep as any for now, assuming it's parsed Tiptap JSON
   targetCharacterName: string,
   documentTitle: string,
   documentId: string,
@@ -121,12 +96,13 @@ const extractConversationsForCharacter = (
   const conversationsMap: Record<string, ConversationGroup> = {}
   let characterParticipates: Record<string, boolean> = {}
 
-  const processNode = (node: any) => {
+  // Cast node to TiptapNode for better type safety inside the function
+  const processNode = (node: TiptapNode) => {
     if (node.type === 'text' && node.marks) {
-      node.marks.forEach((mark: any) => {
+      node.marks.forEach((mark: TiptapMark) => {
         if (mark.type === 'dialogue' && mark.attrs?.conversationId && mark.attrs?.character && node.text) {
           const { conversationId, character } = mark.attrs
-          const content = node.text
+          // const content = node.text; // No longer needed
 
           // Ensure conversation group exists
           if (!conversationsMap[conversationId]) {
@@ -135,17 +111,19 @@ const extractConversationsForCharacter = (
               documentId,
               documentTitle,
               entries: [],
-              // We might want to get a more accurate timestamp later
-              lastUpdated: Date.now(),
+              lastUpdated: Date.now(), // Consider a more accurate timestamp
             }
             characterParticipates[conversationId] = false
           }
 
-          // Add the dialogue entry
+          // Add the dialogue entry, now storing the Tiptap node itself
           conversationsMap[conversationId].entries.push({
             characterId: character,
             characterName: character, // Assuming name is same as ID for now
-            content: content,
+            // content: content, // Remove old content field
+            contentNode: { ...node }, // Store a copy of the text node with its marks
+            documentId: documentId, // Add documentId to entry for context
+            documentTitle: documentTitle, // Add documentTitle to entry for context
           })
 
           // Track if the target character is in this conversation
@@ -163,18 +141,42 @@ const extractConversationsForCharacter = (
   }
 
   // Start processing from root node
-  if (documentContent && documentContent.type === 'doc') {
-    processNode(documentContent)
+  // Ensure documentContent is the parsed JSON object, not a string
+  if (documentContent && typeof documentContent === 'object' && documentContent.type === 'doc') {
+    let parsedContent: TiptapNode
+    if (typeof documentContent === 'string') {
+      try {
+        parsedContent = JSON.parse(documentContent)
+      } catch (e) {
+        console.error('Failed to parse document content in extractConversationsForCharacter:', e)
+        return [] // Return empty if parsing fails
+      }
+    } else {
+      parsedContent = documentContent // Assume it's already an object
+    }
+    processNode(parsedContent)
+  } else if (documentContent && typeof documentContent !== 'object') {
+    console.warn(
+      'extractConversationsForCharacter received non-object document content, attempting parse:',
+      typeof documentContent,
+    )
+    try {
+      const parsedContent = JSON.parse(documentContent)
+      if (parsedContent && parsedContent.type === 'doc') {
+        processNode(parsedContent)
+      } else {
+        console.error('Parsed content is not a valid Tiptap document.')
+      }
+    } catch (e) {
+      console.error('Failed to parse non-object document content:', e)
+      return []
+    }
   }
 
   // Filter conversations to include only those where the target character participates
   const participatingConversations = Object.values(conversationsMap).filter(
     group => characterParticipates[group.conversationId],
   )
-
-  // Optional: Sort entries within each conversation based on their original order?
-  // This requires more complex tracking during parsing (e.g., node position).
-  // For now, they will be in the order they were found during traversal.
 
   return participatingConversations
 }
@@ -197,11 +199,17 @@ const CharacterDetailPage = ({
   const [conversations, setConversations] = useState<ConversationGroup[]>([])
   const [loadingConversations, setLoadingConversations] = useState(false)
   const [initAnimate, setInitAnimate] = useState(false)
+  // State for inline editing
+  const [editingConversationId, setEditingConversationId] = useState<string | null>(null)
+  const [editingDocumentId, setEditingDocumentId] = useState<string | null>(null)
+  const [editingDocumentContent, setEditingDocumentContent] = useState<any>(null) // Store full document content for editor
+  const [isLoadingDocumentForEdit, setIsLoadingDocumentForEdit] = useState(false)
   // Expanded state now keys on conversationId - Currently unused
   // const [expandedConversations, setExpandedConversations] = useState<Record<string, boolean>>({})
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   // Store documentId associated with the menu
   const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null)
+  const editorWrapperRef = useRef<HTMLDivElement>(null) // Add ref for the editor wrapper
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -218,6 +226,31 @@ const CharacterDetailPage = ({
     }
   }, [character?.name]) // Depend on name
 
+  // Effect to handle clicking outside the inline editor
+  useEffect(() => {
+    // Function to check if click is outside the editor wrapper
+    const handleClickOutside = (event: MouseEvent) => {
+      if (editorWrapperRef.current && !editorWrapperRef.current.contains(event.target as Node)) {
+        // Clicked outside: Exit editing mode without saving
+        console.log('Clicked outside editor, exiting edit mode.') // Optional: for debugging
+        setEditingConversationId(null)
+        setEditingDocumentId(null)
+        setEditingDocumentContent(null)
+        // Note: This discards any unsaved changes in the inline editor.
+      }
+    }
+
+    // Add listener only when editing
+    if (editingConversationId) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    // Cleanup listener when component unmounts or editing stops
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [editingConversationId]) // Re-run this effect when editingConversationId changes
+
   const loadConversations = async (characterName: string) => {
     try {
       setLoadingConversations(true)
@@ -233,10 +266,21 @@ const CharacterDetailPage = ({
       const allConversationGroups: ConversationGroup[] = []
       for (const document of allDocuments) {
         try {
-          if (document && document.content) {
+          let contentToParse = document.content
+          // Ensure content is parsed if it's a string
+          if (typeof contentToParse === 'string') {
+            try {
+              contentToParse = JSON.parse(contentToParse)
+            } catch (e) {
+              console.error(`Failed to parse content for document ${document._id}:`, e)
+              contentToParse = null // Skip this document if content is invalid
+            }
+          }
+
+          if (contentToParse) {
             // Extract conversation groups for this character from the document
             const groupsFromDoc = extractConversationsForCharacter(
-              document.content,
+              contentToParse, // Pass the parsed content
               characterName,
               document.title || 'Untitled Document',
               document._id,
@@ -267,7 +311,6 @@ const CharacterDetailPage = ({
           console.error(`Error processing document ${document._id} for conversations:`, error)
         }
       }
-      debugLog('allConversationGroups', allConversationGroups)
 
       // Sort conversation groups by document title and then maybe conversationId or position
       allConversationGroups.sort((a, b) => {
@@ -326,21 +369,67 @@ const CharacterDetailPage = ({
     handleOptionsClose()
   }
 
-  // Toggle conversation expansion - Currently unused in JSX but kept for potential future use
+  // Function to handle starting the edit mode for a conversation
+  const handleEditConversation = async (conversationId: string, documentId: string) => {
+    // Prevent starting a new edit if one is already in progress
+    if (editingConversationId || isLoadingDocumentForEdit) return
 
-  // const toggleConversationExpansion = useCallback((conversationId: string, event: React.MouseEvent) => {
-  //   event.stopPropagation() // Prevent navigation if needed
-  //   setExpandedConversations(prev => ({
-  //     ...prev,
-  //     [conversationId]: !prev[conversationId],
-  //   }))
-  // }, [])
-  const toggleConversationExpansion = (conversationId: string, event: React.MouseEvent) => {
-    event.stopPropagation() // Prevent navigation if needed
-    // setExpandedConversations(prev => ({
-    //   ...prev,
-    //   [conversationId]: !prev[conversationId],
-    // }))
+    setEditingConversationId(conversationId)
+    setEditingDocumentId(documentId)
+    setIsLoadingDocumentForEdit(true)
+    setEditingDocumentContent(null) // Clear previous content
+
+    try {
+      // Fetch the full document content
+      const fullDocument = await get(`/documents/${documentId}`)
+      if (fullDocument) {
+        setEditingDocumentContent(fullDocument.content) // Store the full content
+      } else {
+        console.error('Failed to fetch document content for editing.')
+        // Reset state if fetch fails
+        setEditingConversationId(null)
+        setEditingDocumentId(null)
+      }
+    } catch (error) {
+      console.error('Error fetching document for editing:', error)
+      // Reset state on error
+      setEditingConversationId(null)
+      setEditingDocumentId(null)
+    } finally {
+      setIsLoadingDocumentForEdit(false)
+    }
+  }
+
+  // Function to handle saving the edited document content
+  const handleSaveEditedDocument = async (updatedData: Partial<DocumentData>) => {
+    if (!editingDocumentId) {
+      console.error('Cannot save: No document ID is being edited.')
+      return
+    }
+
+    setIsLoadingDocumentForEdit(true) // Indicate saving is in progress
+    try {
+      await patch(`/documents/${editingDocumentId}`, {
+        content: updatedData.content, // Assuming content is the main field to update
+        lastUpdated: Date.now(),
+        // Include title update if the editor modifies it, otherwise omit
+        // title: updatedData.title
+      })
+
+      // IMPORTANT: Reload conversations to show the updated content immediately
+      if (character?.name) {
+        await loadConversations(character.name)
+      }
+    } catch (error) {
+      console.error('Error saving document:', error)
+      // Maybe show an error message to the user
+    } finally {
+      // Exit editing mode regardless of success or failure
+      setEditingConversationId(null)
+      setEditingDocumentId(null)
+      setEditingDocumentContent(null)
+      setIsLoadingDocumentForEdit(false) // Finish loading/saving state
+    }
   }
 
   if (showSpinner) {
@@ -519,42 +608,78 @@ const CharacterDetailPage = ({
                             // Iterate through conversations
                             // const isExpanded = expandedConversations[convo.conversationId] // Use conversationId for expansion - Currently unused
                             const isExpanded = false // Default to false since expansion is disabled
+                            const isEditingThisConversation = editingConversationId === convo.conversationId
+
+                            // DEBUG LOG
+                            debugLog(
+                              `Rendering convo ${convo.conversationId}: isEditing = ${isEditingThisConversation}`,
+                            )
+
                             return (
                               <Paper
                                 key={convo.conversationId} // Use conversationId as key
                                 elevation={0}
-                                className="overflow-hidden rounded-lg transition-all hover:bg-opacity-20"
+                                className={`overflow-hidden rounded-lg transition-all hover:bg-opacity-20 ${isEditingThisConversation ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-transparent' : ''}`}
                                 sx={{
                                   backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                   '&:hover': {
                                     backgroundColor: 'rgba(255, 255, 255, 0.15)',
                                   },
-                                }}>
+                                }}
+                                // Add double-click handler to initiate editing
+                                onDoubleClick={() =>
+                                  handleEditConversation(convo.conversationId, convo.documentId)
+                                }>
                                 <div className={`p-4 ${isExpanded ? 'pb-4' : 'pb-2'}`}>
-                                  {' '}
-                                  {/* Adjust padding */}
                                   <div className="flex items-start justify-between">
-                                    {' '}
-                                    {/* Use items-start */}
-                                    {/* Conversation Entries */}
-                                    <div className="flex-1 overflow-hidden pr-2">
-                                      {/* Optional: Display Conversation ID subtly */}
-                                      {/* <Typography variant="caption" className="mb-1 block text-black/[.4]">
-                                        ID: {convo.conversationId}
-                                      </Typography> */}
-
-                                      {/* Render all entries in the conversation */}
-                                      {convo.entries.map((entry, entryIndex) => (
-                                        <Typography
-                                          key={entryIndex}
-                                          variant="body2" // Use body2 for dialogue lines
-                                          className={`whitespace-pre-line text-black/[.8] ${
-                                            entry.characterName === character.name ? 'font-semibold' : '' // Highlight speaker
-                                          } mb-1`}>
-                                          <span className="text-black/[.6]">{entry.characterName}: </span>
-                                          {entry.content}
-                                        </Typography>
-                                      ))}
+                                    {/* Conversation Entries / Editor Container */}
+                                    <div className="flex-1 overflow-hidden pr-2 font-editor2 text-black/[.79]">
+                                      {' '}
+                                      {/* Wrapper for content/editor */}
+                                      {/* Render editor if editing, otherwise render conversation */}
+                                      {isEditingThisConversation ? (
+                                        isLoadingDocumentForEdit ? (
+                                          <div className="flex h-20 items-center justify-center">
+                                            <Loader />
+                                          </div>
+                                        ) : editingDocumentContent ? (
+                                          // Render the actual EditorComponent
+                                          // Attach the ref to this wrapper div
+                                          <div ref={editorWrapperRef} className="editor-wrapper -mx-4 -my-2">
+                                            {' '}
+                                            {/* Attach ref here */}
+                                            <EditorComponent
+                                              key={editingDocumentId}
+                                              content={editingDocumentContent}
+                                              title={''}
+                                              onUpdate={handleSaveEditedDocument}
+                                              canEdit={true}
+                                              hideFooter={true}
+                                              hideTitle={true}
+                                            />
+                                          </div>
+                                        ) : (
+                                          <Typography color="error">
+                                            Failed to load content for editing.
+                                          </Typography>
+                                        )
+                                      ) : (
+                                        // Render read-only conversation entries
+                                        <div className="read-only-conversation">
+                                          {convo.entries.map((entry, entryIndex) => (
+                                            <div key={entryIndex} className="dialogue-line mb-1">
+                                              <span className="character-name mr-1 font-semibold text-black/[.6]">
+                                                {entry.characterName}:
+                                              </span>
+                                              {/* Ensure inline rendering flows correctly */}
+                                              <TiptapJsonRenderer
+                                                node={entry.contentNode}
+                                                className="inline"
+                                              />
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
                                     {/* Controls */}
                                     <div className="ml-3 flex shrink-0 flex-col items-end space-y-1">
