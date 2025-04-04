@@ -17,6 +17,7 @@ import { debugLog } from '@lib/debug-logger'
 import TiptapJsonRenderer from '@components/tiptap-json-renderer'
 import EditorComponent from '@components/editor'
 import { DocumentData } from '@typez/globals'
+import VisibilityIcon from '@mui/icons-material/Visibility' // Keep View icon
 
 // Character type definition from character-modal.tsx
 interface CharacterData {
@@ -198,17 +199,24 @@ const CharacterDetailPage = ({
   const [conversations, setConversations] = useState<ConversationGroup[]>([])
   const [loadingConversations, setLoadingConversations] = useState(false)
   const [initAnimate, setInitAnimate] = useState(false)
-  // State for inline editing
-  const [editingConversationId, setEditingConversationId] = useState<string | null>(null)
-  const [editingDocumentId, setEditingDocumentId] = useState<string | null>(null)
-  const [editingDocumentContent, setEditingDocumentContent] = useState<any>(null) // Store full document content for editor
-  const [isLoadingDocumentForEdit, setIsLoadingDocumentForEdit] = useState(false)
-  // Expanded state now keys on conversationId - Currently unused
-  // const [expandedConversations, setExpandedConversations] = useState<Record<string, boolean>>({})
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
-  // Store documentId associated with the menu
-  const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null)
-  const editorWrapperRef = useRef<HTMLDivElement>(null) // Add ref for the editor wrapper
+
+  // NEW STATE: Track view/edit mode for each conversation
+  const [editorModeMap, setEditorModeMap] = useState<Record<string, 'view' | 'edit'>>({})
+
+  // NEW STATE: Track the single active editor instance details
+  const [activeEditorInfo, setActiveEditorInfo] = useState<{
+    conversationId: string | null
+    documentId: string | null
+    content: any // Store full document content for the active editor
+    isLoading: boolean
+  }>({
+    conversationId: null,
+    documentId: null,
+    content: null,
+    isLoading: false,
+  })
+
+  const editorWrapperRef = useRef<HTMLDivElement>(null) // Keep ref for click outside
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -225,30 +233,42 @@ const CharacterDetailPage = ({
     }
   }, [character?.name]) // Depend on name
 
-  // Effect to handle clicking outside the inline editor
+  // Update Click Outside Logic to use activeEditorInfo
   useEffect(() => {
-    // Function to check if click is outside the editor wrapper
     const handleClickOutside = (event: MouseEvent) => {
-      if (editorWrapperRef.current && !editorWrapperRef.current.contains(event.target as Node)) {
-        // Clicked outside: Exit editing mode without saving
-        console.log('Clicked outside editor, exiting edit mode.') // Optional: for debugging
-        setEditingConversationId(null)
-        setEditingDocumentId(null)
-        setEditingDocumentContent(null)
-        // Note: This discards any unsaved changes in the inline editor.
+      if (
+        activeEditorInfo.conversationId && // Only run if an editor is active
+        editorWrapperRef.current &&
+        !editorWrapperRef.current.contains(event.target as Node)
+      ) {
+        console.log('Clicked outside active editor, switching back to view mode.')
+        // Switch the active editor back to view mode
+        setEditorModeMap(prevMap => ({
+          ...prevMap,
+          [activeEditorInfo.conversationId!]: 'view',
+        }))
+        // Reset active editor info
+        setActiveEditorInfo({
+          conversationId: null,
+          documentId: null,
+          content: null,
+          isLoading: false,
+        })
       }
     }
 
-    // Add listener only when editing
-    if (editingConversationId) {
+    // Add listener only when an editor is active
+    if (activeEditorInfo.conversationId) {
       document.addEventListener('mousedown', handleClickOutside)
+    } else {
+      document.removeEventListener('mousedown', handleClickOutside) // Ensure cleanup if no editor is active
     }
 
-    // Cleanup listener when component unmounts or editing stops
+    // Cleanup listener
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [editingConversationId]) // Re-run this effect when editingConversationId changes
+  }, [activeEditorInfo.conversationId]) // Depend on the active editor ID
 
   const loadConversations = async (characterName: string) => {
     try {
@@ -352,82 +372,184 @@ const CharacterDetailPage = ({
     documentId: string, // Pass documentId directly
   ) => {
     event.stopPropagation()
-    setAnchorEl(event.currentTarget)
-    setActiveDocumentId(documentId) // Store the documentId
+    setEditorModeMap(prevMap => ({
+      ...prevMap,
+      [activeEditorInfo.conversationId!]: 'view',
+    }))
+    setActiveEditorInfo({
+      conversationId: null,
+      documentId,
+      content: null,
+      isLoading: false,
+    })
   }
 
   const handleOptionsClose = () => {
-    setAnchorEl(null)
-    setActiveDocumentId(null)
+    setEditorModeMap(prevMap => ({
+      ...prevMap,
+      [activeEditorInfo.conversationId!]: 'view',
+    }))
+    setActiveEditorInfo({
+      conversationId: null,
+      documentId: null,
+      content: null,
+      isLoading: false,
+    })
   }
 
   const handleGoToDocument = () => {
-    if (activeDocumentId) {
-      navigateTo(`/documents/${activeDocumentId}`)
+    if (activeEditorInfo.documentId) {
+      navigateTo(`/documents/${activeEditorInfo.documentId}`)
     }
     handleOptionsClose()
   }
 
-  // Function to handle starting the edit mode for a conversation
-  const handleEditConversation = async (conversationId: string, documentId: string) => {
-    // Prevent starting a new edit if one is already in progress
-    if (editingConversationId || isLoadingDocumentForEdit) return
+  // NEW function to handle toggling editor mode
+  const handleToggleEditorMode = async (conversationId: string, documentId: string) => {
+    const currentMode = editorModeMap[conversationId] || 'view'
+    const isCurrentlyEditingThis = currentMode === 'edit'
 
-    setEditingConversationId(conversationId)
-    setEditingDocumentId(documentId)
-    setIsLoadingDocumentForEdit(true)
-    setEditingDocumentContent(null) // Clear previous content
+    // --- Switching FROM Edit TO View ---
+    if (isCurrentlyEditingThis) {
+      console.log(`Switching ${conversationId} from edit to view.`)
+      // Simply switch mode and clear active editor info
+      // NOTE: This currently discards unsaved changes in the editor!
+      // Consider adding a confirmation or save prompt later if needed.
+      setEditorModeMap(prevMap => ({
+        ...prevMap,
+        [conversationId]: 'view',
+      }))
+      setActiveEditorInfo({
+        conversationId: null,
+        documentId: null,
+        content: null,
+        isLoading: false,
+      })
+      return // Done for this case
+    }
 
+    // --- Switching FROM View TO Edit ---
+    console.log(`Switching ${conversationId} from view to edit.`)
+
+    // If another editor is already active, switch it to view mode first
+    if (activeEditorInfo.conversationId && activeEditorInfo.conversationId !== conversationId) {
+      console.log(`Closing previously active editor: ${activeEditorInfo.conversationId}`)
+      setEditorModeMap(prevMap => ({
+        ...prevMap,
+        [activeEditorInfo.conversationId!]: 'view',
+      }))
+    }
+
+    // Set loading state for the new active editor
+    setActiveEditorInfo({
+      conversationId: conversationId,
+      documentId: documentId,
+      content: null, // Clear previous content
+      isLoading: true,
+    })
+    // Update the map to reflect the switch to edit mode
+    setEditorModeMap(prevMap => ({
+      ...prevMap,
+      [conversationId]: 'edit',
+    }))
+
+    // Fetch document content
     try {
-      // Fetch the full document content
       const fullDocument = await get(`/documents/${documentId}`)
-      if (fullDocument) {
-        setEditingDocumentContent(fullDocument.content) // Store the full content
-      } else {
-        console.error('Failed to fetch document content for editing.')
-        // Reset state if fetch fails
-        setEditingConversationId(null)
-        setEditingDocumentId(null)
+      // Check if we are still trying to edit the same conversation
+      // (User might have clicked another toggle quickly)
+      // USE FUNCTIONAL UPDATE FORM FOR STATE CHECK AND UPDATE
+      setActiveEditorInfo(prev => {
+        if (prev.conversationId === conversationId) {
+          // Still editing the same one, update content and loading state
+          if (fullDocument) {
+            return {
+              ...prev,
+              content: fullDocument.content,
+              isLoading: false, // Loading finished
+            }
+          } else {
+            console.error('Failed to fetch document content for editing.')
+            // Revert to view mode on fetch failure - handled outside this update
+            // We just need to stop loading for this specific one
+            return { ...prev, isLoading: false }
+          }
+        } else {
+          // Editor target changed during fetch, just return previous state (the new target)
+          console.log('Editor target changed during fetch, aborting content set.')
+          return prev
+        }
+      })
+
+      // Handle reverting to view mode if fetch failed for the *target* conversation
+      if (!fullDocument) {
+        setEditorModeMap(prevMap => {
+          // Only revert if the map still shows this convo as 'edit'
+          if (prevMap[conversationId] === 'edit') {
+            return { ...prevMap, [conversationId]: 'view' }
+          }
+          return prevMap // No change needed if it's already 'view' or another convo is active
+        })
       }
     } catch (error) {
       console.error('Error fetching document for editing:', error)
-      // Reset state on error
-      setEditingConversationId(null)
-      setEditingDocumentId(null)
-    } finally {
-      setIsLoadingDocumentForEdit(false)
+      // USE FUNCTIONAL UPDATE FORM FOR STATE CHECK AND REVERT
+      setActiveEditorInfo(prev => {
+        if (prev.conversationId === conversationId) {
+          // Error occurred while trying to load the active editor, stop loading
+          return { ...prev, isLoading: false }
+        }
+        // Error occurred for a different convo, ignore
+        return prev
+      })
+      // Revert to view mode on error only if this is still the target
+      setEditorModeMap(prevMap => {
+        if (prevMap[conversationId] === 'edit') {
+          return { ...prevMap, [conversationId]: 'view' }
+        }
+        return prevMap
+      })
     }
   }
 
-  // Function to handle saving the edited document content
+  // UPDATE Save Logic to use activeEditorInfo
   const handleSaveEditedDocument = async (updatedData: Partial<DocumentData>) => {
-    if (!editingDocumentId) {
-      console.error('Cannot save: No document ID is being edited.')
+    if (!activeEditorInfo.documentId) {
+      console.error('Cannot save: No active document ID.')
+      return
+    }
+    if (!activeEditorInfo.conversationId) {
+      console.error('Cannot save: No active conversation ID.') // Should not happen if documentId exists
       return
     }
 
-    setIsLoadingDocumentForEdit(true) // Indicate saving is in progress
+    setActiveEditorInfo(prev => ({ ...prev, isLoading: true })) // Indicate saving
+
     try {
-      await patch(`/documents/${editingDocumentId}`, {
-        content: updatedData.content, // Assuming content is the main field to update
+      await patch(`/documents/${activeEditorInfo.documentId}`, {
+        content: updatedData.content,
         lastUpdated: Date.now(),
-        // Include title update if the editor modifies it, otherwise omit
-        // title: updatedData.title
       })
 
-      // IMPORTANT: Reload conversations to show the updated content immediately
       if (character?.name) {
-        await loadConversations(character.name)
+        await loadConversations(character.name) // Reload to show updated content
       }
+
+      // Switch back to view mode after successful save
+      const savedConversationId = activeEditorInfo.conversationId
+      setEditorModeMap(prevMap => ({
+        ...prevMap,
+        [savedConversationId]: 'view',
+      }))
+      setActiveEditorInfo({ conversationId: null, documentId: null, content: null, isLoading: false })
     } catch (error) {
       console.error('Error saving document:', error)
-      // Maybe show an error message to the user
+      // Keep editor open on error? Or close? For now, keep open and reset loading state.
+      setActiveEditorInfo(prev => ({ ...prev, isLoading: false }))
     } finally {
-      // Exit editing mode regardless of success or failure
-      setEditingConversationId(null)
-      setEditingDocumentId(null)
-      setEditingDocumentContent(null)
-      setIsLoadingDocumentForEdit(false) // Finish loading/saving state
+      // Ensure loading state is reset even if save fails but we stay in edit mode
+      // setActiveEditorInfo(prev => ({ ...prev, isLoading: false }))
+      // ^^^ Already handled in catch and success path correctly
     }
   }
 
@@ -604,58 +726,75 @@ const CharacterDetailPage = ({
                         </Typography>
                         <div className="space-y-3">
                           {convosInDoc.map((convo: ConversationGroup) => {
-                            // Iterate through conversations
-                            // const isExpanded = expandedConversations[convo.conversationId] // Use conversationId for expansion - Currently unused
-                            const isExpanded = false // Default to false since expansion is disabled
-                            const isEditingThisConversation = editingConversationId === convo.conversationId
+                            const currentMode = editorModeMap[convo.conversationId] || 'view'
+                            const isEditingThisConversation = currentMode === 'edit'
+                            const isActiveEditorLoading =
+                              activeEditorInfo.isLoading &&
+                              activeEditorInfo.conversationId === convo.conversationId
 
-                            // DEBUG LOG
+                            // DEBUG LOG remains useful
                             debugLog(
-                              `Rendering convo ${convo.conversationId}: isEditing = ${isEditingThisConversation}`,
+                              `Rendering convo ${convo.conversationId}: mode = ${currentMode}, isLoading = ${isActiveEditorLoading}`,
                             )
 
                             return (
                               <Paper
-                                key={convo.conversationId} // Use conversationId as key
+                                key={convo.conversationId}
                                 elevation={0}
-                                className={`overflow-hidden rounded-lg transition-all hover:bg-opacity-20 ${isEditingThisConversation ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-transparent' : ''}`}
+                                className={`overflow-visible rounded-lg transition-all hover:bg-opacity-20 ${isEditingThisConversation ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-transparent' : ''}`}
                                 sx={{
                                   backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                   '&:hover': {
                                     backgroundColor: 'rgba(255, 255, 255, 0.15)',
                                   },
-                                }}
-                                // Add double-click handler to initiate editing
-                                onDoubleClick={() =>
-                                  handleEditConversation(convo.conversationId, convo.documentId)
-                                }>
-                                <div className={`p-4 ${isExpanded ? 'pb-4' : 'pb-2'}`}>
-                                  <div className="flex items-start justify-between">
-                                    {/* Conversation Entries / Editor Container */}
-                                    <div className="flex-1 overflow-hidden pr-2 font-editor2 text-black/[.79]">
-                                      {' '}
-                                      {/* Wrapper for content/editor */}
-                                      {/* Render editor if editing, otherwise render conversation */}
+                                  position: 'relative', // Needed for sticky positioning context
+                                }}>
+                                {/* Sticky Control Bar */}
+                                <div
+                                  className="sticky top-0 z-10 flex items-center justify-end rounded-t-lg bg-white/10 px-2 py-1 backdrop-blur-sm"
+                                  style={{ background: 'rgba(255, 255, 255, 0.08)' }} // Slightly different background for visibility
+                                >
+                                  <Tooltip
+                                    title={
+                                      isEditingThisConversation
+                                        ? 'Switch to View Mode'
+                                        : 'Edit this Conversation'
+                                    }>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() =>
+                                        handleToggleEditorMode(convo.conversationId, convo.documentId)
+                                      }>
                                       {isEditingThisConversation ? (
-                                        isLoadingDocumentForEdit ? (
+                                        <VisibilityIcon fontSize="small" />
+                                      ) : (
+                                        <EditIcon fontSize="small" />
+                                      )}
+                                    </IconButton>
+                                  </Tooltip>
+                                </div>
+
+                                <div className={`p-4 ${isEditingThisConversation ? 'pt-2' : 'pt-4'}`}>
+                                  {' '}
+                                  {/* Adjust padding based on bar */}
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex-1 overflow-hidden pr-2 font-editor2 text-black/[.79]">
+                                      {isEditingThisConversation ? (
+                                        isActiveEditorLoading ? (
                                           <div className="flex h-20 items-center justify-center">
                                             <Loader />
                                           </div>
-                                        ) : editingDocumentContent ? (
-                                          // Render the actual EditorComponent
-                                          // Attach the ref to this wrapper div
+                                        ) : activeEditorInfo.content ? (
                                           <div ref={editorWrapperRef} className="editor-wrapper -mx-4 -my-2">
-                                            {' '}
-                                            {/* Attach ref here */}
                                             <EditorComponent
-                                              key={editingDocumentId}
-                                              content={editingDocumentContent}
+                                              key={activeEditorInfo.documentId} // Use active document ID
+                                              content={activeEditorInfo.content} // Use active content
                                               title={''}
                                               onUpdate={handleSaveEditedDocument}
                                               canEdit={true}
                                               hideFooter={true}
                                               hideTitle={true}
-                                              initialFocusConversationId={editingConversationId}
+                                              initialFocusConversationId={activeEditorInfo.conversationId} // Use active convo ID
                                               highlightCharacterName={character?.name}
                                             />
                                           </div>
@@ -665,14 +804,13 @@ const CharacterDetailPage = ({
                                           </Typography>
                                         )
                                       ) : (
-                                        // Render read-only conversation entries
+                                        // Render read-only view
                                         <div className="read-only-conversation font-editor2 text-[19px] md:text-[22px]">
                                           {convo.entries.map((entry, entryIndex) => (
                                             <div key={entryIndex} className="dialogue-line mb-1">
                                               <span className="character-name mr-1 font-semibold text-black/[.6]">
                                                 {entry.characterName}:
                                               </span>
-                                              {/* Ensure inline rendering flows correctly */}
                                               <TiptapJsonRenderer
                                                 node={entry.contentNode}
                                                 className="inline"
@@ -682,29 +820,16 @@ const CharacterDetailPage = ({
                                         </div>
                                       )}
                                     </div>
-                                    {/* Controls */}
+                                    {/* Controls (Keep MoreVertIcon) */}
                                     <div className="ml-3 flex shrink-0 flex-col items-end space-y-1">
-                                      {' '}
-                                      {/* Flex column for controls */}
-                                      {/* Keep MoreVertIcon for document actions */}
                                       <IconButton
                                         size="small"
-                                        onClick={e => handleOptionsClick(e, convo.documentId)} // Pass documentId
+                                        onClick={e => handleOptionsClick(e, convo.documentId)}
                                         sx={{ color: 'rgba(0, 0, 0, 0.6)' }}
                                         title="Go to Document">
                                         <MoreVertIcon fontSize="small" />
                                       </IconButton>
-                                      {/* Add Expand/Collapse - maybe not needed per conversation? */}
-                                      {/* If needed, adapt toggleConversationExpansion */}
-                                      {/* Example of how expansion toggle could be added back */}
-                                      {/*
-                                      <IconButton
-                                        size="small"
-                                        onClick={e => toggleConversationExpansion(convo.conversationId, e)} // Need to uncomment toggle function and state
-                                        sx={{ color: 'rgba(0, 0, 0, 0.6)' }}>
-                                         {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />} // Need to import icons
-                                      </IconButton>
-                                      */}
+                                      {/* Remove Expansion Toggle if it exists */}
                                     </div>
                                   </div>
                                 </div>
@@ -731,8 +856,8 @@ const CharacterDetailPage = ({
 
       {/* Menu for Options - Now triggers Go To Document */}
       <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
+        anchorEl={null}
+        open={false}
         onClose={handleOptionsClose}
         anchorOrigin={{
           vertical: 'bottom',
