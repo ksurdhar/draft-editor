@@ -200,11 +200,14 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
         console.log(
           'Clicked outside active editor wrapper (or event was not stopped), switching back to view mode.',
         )
+        const closingConversationId = activeEditorInfo.conversationId! // Capture id before state change
         setEditorModeMap(prevMap => ({
           ...prevMap,
-          [activeEditorInfo.conversationId!]: 'view',
+          [closingConversationId]: 'view',
         }))
         setActiveEditorInfo({ conversationId: null, documentId: null, content: null, isLoading: false })
+        // Reload conversations when exiting edit mode via click outside
+        loadConversations(characterName)
       }
     }
 
@@ -330,6 +333,8 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
       console.log(`Switching ${conversationId} from edit to view.`)
       setEditorModeMap(prevMap => ({ ...prevMap, [conversationId]: 'view' }))
       setActiveEditorInfo({ conversationId: null, documentId: null, content: null, isLoading: false })
+      // Reload conversations when exiting edit mode via toggle
+      loadConversations(characterName)
       return
     }
 
@@ -390,8 +395,8 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
         console.error('Cannot save: No active document/conversation ID.')
         return
       }
-      // const savedConversationId = activeEditorInfo.conversationId // Capture before async - No longer needed here
-      // We might not need the loading state here anymore if debounce feels smooth enough
+      // const savedConversationId = activeEditorInfo.conversationId // Store ID in case needed later, though maybe not
+      // REMOVED: Loading state updates that caused flicker after debounce
       // setActiveEditorInfo(prev => ({ ...prev, isLoading: true }))
 
       try {
@@ -399,12 +404,9 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
           content: updatedData.content,
           lastUpdated: Date.now(),
         })
-        // Only reload conversations if needed (complex change, skipping for now)
-        // Consider if loadConversations is truly necessary after every save
-        // await loadConversations(characterName)
         console.log('Document saved, skipping conversation reload for now.')
 
-        // Keep the loading state reset for the current editor instance
+        // REMOVED: Resetting loading state after save
         // setActiveEditorInfo(prev =>
         //   prev.conversationId === savedConversationId
         //     ? { ...prev, isLoading: false } // Stop loading indicator
@@ -412,11 +414,12 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
         // )
       } catch (error) {
         console.error('Error saving document:', error)
-        // setActiveEditorInfo(prev => ({ ...prev, isLoading: false })) // Stop loading on error
+        // REMOVED: Resetting loading state on error
+        // setActiveEditorInfo(prev => ({ ...prev, isLoading: false }))
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     },
-    [patch, activeEditorInfo.documentId, activeEditorInfo.conversationId, characterName],
+    [patch, activeEditorInfo.documentId, activeEditorInfo.conversationId],
   )
 
   // --- Rendering Logic --- //
