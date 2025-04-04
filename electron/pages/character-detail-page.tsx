@@ -1,4 +1,4 @@
-import CharacterDetailPage from '@components/character-detail-page'
+import CharacterDetailPage from '@components/character-detail'
 import { useEffect } from 'react'
 import { useLocation } from 'wouter'
 import useSWR from 'swr'
