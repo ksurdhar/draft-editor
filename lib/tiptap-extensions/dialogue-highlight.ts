@@ -6,16 +6,27 @@ export interface DialogueHighlightOptions {
   highlightClass: string
 }
 
+// Define the structure for the plugin's state
+interface DialogueHighlightState {
+  highlightAll: boolean // Flag for general highlighting
+  focusedConversationId: string | null
+  highlightCharacterName: string | null
+}
+
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     dialogueHighlight: {
+      /** Sets highlighting for all dialogue */
       setDialogueHighlight: (active: boolean) => ReturnType
-      unsetDialogueHighlight: () => ReturnType
+      /** Sets highlighting for a specific character within a conversation */
+      setDialogueHighlightCharacter: (conversationId: string, characterName: string) => ReturnType
+      /** Removes all dialogue highlighting */
+      clearDialogueHighlight: () => ReturnType // Renamed for clarity
     }
   }
 }
 
-export const dialogueHighlightPluginKey = new PluginKey('dialogue-highlight')
+export const dialogueHighlightPluginKey = new PluginKey<DialogueHighlightState>('dialogue-highlight')
 
 export const DialogueHighlight = Extension.create<DialogueHighlightOptions>({
   name: 'dialogueHighlight',
@@ -32,16 +43,36 @@ export const DialogueHighlight = Extension.create<DialogueHighlightOptions>({
         active =>
         ({ tr, dispatch }) => {
           if (dispatch) {
-            // Store the active flag in the plugin meta
-            tr.setMeta(dialogueHighlightPluginKey, { active })
+            tr.setMeta(dialogueHighlightPluginKey, {
+              highlightAll: active,
+              focusedConversationId: null, // Clear specific highlighting
+              highlightCharacterName: null,
+            })
           }
           return true
         },
-      unsetDialogueHighlight:
+      setDialogueHighlightCharacter:
+        (conversationId, characterName) =>
+        ({ tr, dispatch }) => {
+          if (dispatch) {
+            tr.setMeta(dialogueHighlightPluginKey, {
+              highlightAll: false, // Ensure general highlighting is off
+              focusedConversationId: conversationId,
+              highlightCharacterName: characterName,
+            })
+          }
+          return true
+        },
+      // Renamed command
+      clearDialogueHighlight:
         () =>
         ({ tr, dispatch }) => {
           if (dispatch) {
-            tr.setMeta(dialogueHighlightPluginKey, { active: false })
+            tr.setMeta(dialogueHighlightPluginKey, {
+              highlightAll: false,
+              focusedConversationId: null,
+              highlightCharacterName: null,
+            })
           }
           return true
         },
@@ -49,39 +80,65 @@ export const DialogueHighlight = Extension.create<DialogueHighlightOptions>({
   },
 
   addProseMirrorPlugins() {
-    const self = this
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const self = this // Necessary alias, disable linter warning
     return [
       new Plugin({
         key: dialogueHighlightPluginKey,
         state: {
-          init() {
-            return { active: false }
+          // Initialize state with highlighting off
+          init(): DialogueHighlightState {
+            return { highlightAll: false, focusedConversationId: null, highlightCharacterName: null }
           },
-          apply(tr, value) {
+          // Apply state changes from meta transactions
+          apply(tr, value): DialogueHighlightState {
             const meta = tr.getMeta(dialogueHighlightPluginKey)
-            if (meta && typeof meta.active === 'boolean') {
-              return { active: meta.active }
+            if (meta) {
+              return { ...value, ...meta } // Merge meta into existing state
             }
             return value
           },
         },
         props: {
           decorations(state) {
-            const pluginState = this.getState(state)
-            // Only compute decorations if dialogue highlighting is active
-            if (!pluginState.active) {
-              return DecorationSet.empty
+            const pluginState = dialogueHighlightPluginKey.getState(state)
+            if (!pluginState || (!pluginState.highlightAll && !pluginState.focusedConversationId)) {
+              return DecorationSet.empty // No highlighting active
             }
 
             const decorations: Decoration[] = []
+            const { highlightAll, focusedConversationId, highlightCharacterName } = pluginState
+
             state.doc.descendants((node, pos) => {
-              if (node.marks.some(mark => mark.type.name === 'dialogue')) {
-                decorations.push(
-                  Decoration.inline(pos, pos + node.nodeSize, {
-                    class: self.options.highlightClass,
-                  }),
-                )
-              }
+              if (!node.isText || node.marks.length === 0) return
+
+              node.marks.forEach(mark => {
+                if (mark.type.name === 'dialogue') {
+                  let shouldHighlight = false
+
+                  if (highlightAll) {
+                    // Mode 1: Highlight all dialogue marks
+                    shouldHighlight = true
+                  } else if (
+                    focusedConversationId &&
+                    highlightCharacterName &&
+                    mark.attrs.conversationId === focusedConversationId &&
+                    mark.attrs.character === highlightCharacterName
+                  ) {
+                    // Mode 2: Highlight specific character in specific conversation
+                    shouldHighlight = true
+                  }
+
+                  if (shouldHighlight) {
+                    decorations.push(
+                      Decoration.inline(pos, pos + node.nodeSize, {
+                        class: self.options.highlightClass,
+                      }),
+                    )
+                    return // Stop checking marks for this node once highlighted
+                  }
+                }
+              })
             })
             return DecorationSet.create(state.doc, decorations)
           },

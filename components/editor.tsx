@@ -58,6 +58,7 @@ type EditorProps = {
   diffMode?: boolean
   onEditorReady?: (editor: any) => void
   initialFocusConversationId?: string | null
+  highlightCharacterName?: string | null
 }
 
 const DEFAULT_CONTENT = {
@@ -81,6 +82,7 @@ const EditorComponent = ({
   diffMode,
   onEditorReady,
   initialFocusConversationId,
+  highlightCharacterName,
 }: EditorProps) => {
   const [inputValue, setInputValue] = useState(title === 'Untitled' ? '' : title)
   const [showFindPanel, setShowFindPanel] = useState(false)
@@ -124,9 +126,14 @@ const EditorComponent = ({
       if (onEditorReady) {
         onEditorReady(editor)
       }
-      // Set initial focus if ID is provided
+      // Set initial focus and optional character highlight
       if (initialFocusConversationId) {
         editor.commands.setDialogueFocus(initialFocusConversationId)
+        // If a specific character should be highlighted within the focused conversation
+        if (highlightCharacterName) {
+          // TODO: Verify/implement this command in the DialogueHighlight extension
+          editor.commands.setDialogueHighlightCharacter(initialFocusConversationId, highlightCharacterName)
+        }
       }
     },
   })

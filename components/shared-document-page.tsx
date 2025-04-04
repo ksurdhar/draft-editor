@@ -523,10 +523,10 @@ export default function SharedDocumentPage() {
         editor.commands.setDialogueHighlight(true)
       } else {
         console.log('unsetting dialogue highlight')
-        editor.commands.unsetDialogueHighlight()
+        editor.commands.clearDialogueHighlight()
       }
     }
-  }, [isDialogueMode])
+  }, [editor, isDialogueMode])
 
   const [dialogueDoc, setDialogueDoc] = useState<any>(documentContent)
 

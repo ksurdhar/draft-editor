@@ -656,6 +656,7 @@ const CharacterDetailPage = ({
                                               hideFooter={true}
                                               hideTitle={true}
                                               initialFocusConversationId={editingConversationId}
+                                              highlightCharacterName={character?.name}
                                             />
                                           </div>
                                         ) : (
