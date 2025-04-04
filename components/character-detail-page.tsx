@@ -120,7 +120,6 @@ const extractConversationsForCharacter = (
           conversationsMap[conversationId].entries.push({
             characterId: character,
             characterName: character, // Assuming name is same as ID for now
-            // content: content, // Remove old content field
             contentNode: { ...node }, // Store a copy of the text node with its marks
             documentId: documentId, // Add documentId to entry for context
             documentTitle: documentTitle, // Add documentTitle to entry for context
@@ -656,6 +655,7 @@ const CharacterDetailPage = ({
                                               canEdit={true}
                                               hideFooter={true}
                                               hideTitle={true}
+                                              initialFocusConversationId={editingConversationId}
                                             />
                                           </div>
                                         ) : (
@@ -665,7 +665,7 @@ const CharacterDetailPage = ({
                                         )
                                       ) : (
                                         // Render read-only conversation entries
-                                        <div className="read-only-conversation">
+                                        <div className="read-only-conversation font-editor2 text-[19px] md:text-[22px]">
                                           {convo.entries.map((entry, entryIndex) => (
                                             <div key={entryIndex} className="dialogue-line mb-1">
                                               <span className="character-name mr-1 font-semibold text-black/[.6]">

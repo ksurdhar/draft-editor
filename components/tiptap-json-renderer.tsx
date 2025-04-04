@@ -160,7 +160,7 @@ const TiptapJsonRenderer: React.FC<TiptapJsonRendererProps> = ({ node, className
   // Use prose classes for basic typography similar to the editor
   // Keep `tiptap-render-output` for potential specific overrides
   return (
-    <div className={`tiptap-render-output prose prose-sm max-w-none ${className || ''}`}>
+    <div className={`tiptap-render-output max-w-none ${className || ''}`}>
       {Array.isArray(node)
         ? node.map((n, index) => <React.Fragment key={index}>{renderNode(n)}</React.Fragment>)
         : renderNode(node)}

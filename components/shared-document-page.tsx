@@ -96,6 +96,7 @@ export default function SharedDocumentPage() {
   const [initAnimate, setInitAnimate] = useState(false)
   const [isDialogueMode, setIsDialogueMode] = useState(false)
   const [showDebugPanel, setShowDebugPanel] = useState(false)
+  const [focusedConversationId, setFocusedConversationId] = useState<string | null>(null)
 
   useEffect(() => {
     if (databaseDoc) {
@@ -349,6 +350,17 @@ export default function SharedDocumentPage() {
   const handleEditorReady = (editorInstance: any) => {
     setEditor(editorInstance)
   }
+
+  const toggleConversationFocus = useCallback(
+    (conversationId: string) => {
+      if (!editor) return
+
+      const newFocusedId = focusedConversationId === conversationId ? null : conversationId
+      setFocusedConversationId(newFocusedId)
+      editor.commands.setDialogueFocus(newFocusedId)
+    },
+    [editor, focusedConversationId],
+  )
 
   const handleConfirmDialogue = useCallback(
     (markId: string, newCharacter: string) => {
@@ -698,6 +710,8 @@ export default function SharedDocumentPage() {
                   onSyncDialogue={syncDialogue}
                   isSyncing={isSyncingDialogue}
                   onConfirmDialogue={handleConfirmDialogue}
+                  focusedConversationId={focusedConversationId}
+                  onToggleFocus={toggleConversationFocus}
                 />
               </div>
             </motion.div>

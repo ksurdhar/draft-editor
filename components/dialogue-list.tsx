@@ -6,6 +6,8 @@ import {
   CheckCircleIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  EyeIcon,
+  EyeOffIcon,
 } from '@heroicons/react/outline'
 import { ListItem } from './list-item'
 import { useDebouncedCallback } from 'use-debounce'
@@ -19,6 +21,8 @@ interface DialogueListProps {
   onSyncDialogue: () => Promise<void>
   isSyncing: boolean
   onConfirmDialogue: (markId: string, character: string, conversationId: string) => void
+  focusedConversationId: string | null
+  onToggleFocus: (conversationId: string) => void
 }
 
 interface DialogueMark {
@@ -49,6 +53,8 @@ const DialogueList = ({
   onSyncDialogue,
   isSyncing,
   onConfirmDialogue,
+  focusedConversationId,
+  onToggleFocus,
 }: DialogueListProps) => {
   const [validDialogueMarks, setValidDialogueMarks] = useState<ProcessedDialogueMark[]>([])
   const [expandedMarkId, setExpandedMarkId] = useState<string | null>(null)
@@ -259,9 +265,25 @@ const DialogueList = ({
           <div
             key={group.conversationId}
             className="mb-1 rounded-md border border-white/[.07] bg-white/[.01]">
-            <div className="px-3 py-2 text-xs font-medium text-black/40">
-              Conversation{' '}
-              {group.conversationId === 'unknown' ? 'Unknown' : group.conversationId.replace('conv', '')}
+            <div className="flex items-center justify-between px-3 py-2 text-xs font-medium text-black/40">
+              <span>
+                Conversation{' '}
+                {group.conversationId === 'unknown' ? 'Unknown' : group.conversationId.replace('conv', '')}
+              </span>
+              <button
+                onClick={() => onToggleFocus(group.conversationId)}
+                className={`rounded p-1 transition-colors ${focusedConversationId === group.conversationId ? 'bg-blue-500/20 text-blue-400' : 'text-black/40 hover:bg-white/[.05] hover:text-black/60'}`}
+                title={
+                  focusedConversationId === group.conversationId
+                    ? 'Unfocus conversation'
+                    : 'Focus conversation'
+                }>
+                {focusedConversationId === group.conversationId ? (
+                  <EyeOffIcon className="h-3.5 w-3.5" />
+                ) : (
+                  <EyeIcon className="h-3.5 w-3.5" />
+                )}
+              </button>
             </div>
             <div className="border-t border-white/[.07]">
               {group.dialogues.map((mark: ProcessedDialogueMark) => (

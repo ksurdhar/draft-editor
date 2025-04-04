@@ -11,6 +11,7 @@ import { SearchHighlight } from '../lib/tiptap-extensions/search-highlight'
 import { DiffHighlight } from '../lib/tiptap-extensions/diff-highlight'
 import { DialogueMark } from '../lib/tiptap-extensions/dialogue-mark'
 import { DialogueHighlight } from '../lib/tiptap-extensions/dialogue-highlight'
+import { DialogueFocus } from '../lib/tiptap-extensions/dialogue-focus'
 
 // Add styles to override ProseMirror defaults
 const editorStyles = `
@@ -39,6 +40,10 @@ const editorStyles = `
     background-color: rgba(147, 197, 253, 0.25); /* blue-300 with opacity */
     border-bottom: 1px solid rgba(147, 197, 253, 0.5);
   }
+  .dialogue-dimmed {
+    opacity: 0.5; /* Adjust opacity as needed */
+    transition: opacity 0.3s ease-in-out; /* Add a smooth transition */
+  }
 `
 
 type EditorProps = {
@@ -52,6 +57,7 @@ type EditorProps = {
   shouldFocusTitle?: boolean
   diffMode?: boolean
   onEditorReady?: (editor: any) => void
+  initialFocusConversationId?: string | null
 }
 
 const DEFAULT_CONTENT = {
@@ -74,6 +80,7 @@ const EditorComponent = ({
   shouldFocusTitle,
   diffMode,
   onEditorReady,
+  initialFocusConversationId,
 }: EditorProps) => {
   const [inputValue, setInputValue] = useState(title === 'Untitled' ? '' : title)
   const [showFindPanel, setShowFindPanel] = useState(false)
@@ -102,7 +109,7 @@ const EditorComponent = ({
   })()
 
   const editor = useEditor({
-    extensions: [StarterKit, SearchHighlight, DiffHighlight, DialogueMark, DialogueHighlight],
+    extensions: [StarterKit, SearchHighlight, DiffHighlight, DialogueMark, DialogueHighlight, DialogueFocus],
     content: initialContent,
     editable: canEdit && !diffMode,
     onUpdate: ({ editor }) => {
@@ -116,6 +123,10 @@ const EditorComponent = ({
     onCreate: ({ editor }) => {
       if (onEditorReady) {
         onEditorReady(editor)
+      }
+      // Set initial focus if ID is provided
+      if (initialFocusConversationId) {
+        editor.commands.setDialogueFocus(initialFocusConversationId)
       }
     },
   })
