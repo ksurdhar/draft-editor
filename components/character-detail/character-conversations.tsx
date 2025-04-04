@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Paper, Typography, IconButton, Tooltip, Menu, MenuItem } from '@mui/material'
 import EditIcon from '@mui/icons-material/Edit'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
@@ -12,6 +12,7 @@ import { debugLog } from '@lib/debug-logger'
 import TiptapJsonRenderer from '@components/tiptap-json-renderer'
 import EditorComponent from '@components/editor'
 import { DocumentData } from '@typez/globals'
+import { debounce } from '@lib/utils'
 
 // --- Type definitions copied or adapted from CharacterDetailPage ---
 
@@ -156,6 +157,16 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null)
   const [menuDocumentId, setMenuDocumentId] = useState<string | null>(null)
 
+  // Debounced save function
+  const debouncedSave = useMemo(
+    () =>
+      debounce((data: Partial<DocumentData>) => {
+        handleSaveEditedDocument(data)
+      }, 1500), // Debounce save by 1.5 seconds
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeEditorInfo.documentId, activeEditorInfo.conversationId, characterName], // Recreate if active doc/convo changes
+  )
+
   // Load conversations when character name changes
   useEffect(() => {
     if (characterName) {
@@ -166,12 +177,29 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
   // Click outside editor logic
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      // Log event details for debugging typing issue
+      console.log(`handleClickOutside triggered by event type: ${event.type}, target:`, event.target)
+
+      // Check if the click target is the toggle button itself (or inside it)
+      const targetElement = event.target as HTMLElement
+      const toggleButton = targetElement.closest('[data-testid^="toggle-editor-"]')
+
+      if (toggleButton) {
+        // Click was on the toggle button, let handleToggleEditorMode handle it.
+        console.log('Click detected on toggle button, ignoring for outside click logic.')
+        return
+      }
+
+      // Original logic: Check if the click is outside the editor wrapper
       if (
         activeEditorInfo.conversationId &&
         editorWrapperRef.current &&
-        !editorWrapperRef.current.contains(event.target as Node)
+        event.target instanceof Node &&
+        !editorWrapperRef.current.contains(event.target)
       ) {
-        console.log('Clicked outside active editor, switching back to view mode.')
+        console.log(
+          'Clicked outside active editor wrapper (or event was not stopped), switching back to view mode.',
+        )
         setEditorModeMap(prevMap => ({
           ...prevMap,
           [activeEditorInfo.conversationId!]: 'view',
@@ -181,75 +209,93 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
     }
 
     if (activeEditorInfo.conversationId) {
-      document.addEventListener('mousedown', handleClickOutside)
+      // Listen during the bubbling phase (default) instead of capture.
+      // No setTimeout needed now.
+      document.addEventListener('click', handleClickOutside)
+      console.log(`Attaching click outside listener (bubbling) for ${activeEditorInfo.conversationId}`)
+
+      // Cleanup function removes the listener
+      return () => {
+        document.removeEventListener('click', handleClickOutside)
+        console.log(
+          `Cleaning up click outside listener (bubbling) for ${activeEditorInfo.conversationId} during effect re-run or unmount`,
+        )
+      }
     } else {
-      document.removeEventListener('mousedown', handleClickOutside)
+      // Explicitly ensure listener is removed if no editor is active (redundant but safe)
+      document.removeEventListener('click', handleClickOutside)
+      console.log('Ensuring click outside listener (bubbling) is removed as no editor is active')
     }
 
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
+    // Cleanup logic is handled by the return function within the if block.
   }, [activeEditorInfo.conversationId])
 
   // Function to load conversations (extracted and adapted)
-  const loadConversations = async (charName: string) => {
-    setLoadingConversations(true)
-    setConversations([]) // Clear previous conversations
-    let updatedDocIdsMap = new Set<string>() // Track documents character appears in
+  const loadConversations = useCallback(
+    async (charName: string) => {
+      setLoadingConversations(true)
+      setConversations([]) // Clear previous conversations
+      let updatedDocIdsMap = new Set<string>() // Track documents character appears in
 
-    try {
-      const allDocuments = await get('/documents')
-      if (!allDocuments || allDocuments.length === 0) return
-
-      const allConversationGroups: ConversationGroup[] = []
-      for (const document of allDocuments) {
-        try {
-          let contentToParse = document.content
-          if (typeof contentToParse === 'string') {
-            try {
-              contentToParse = JSON.parse(contentToParse)
-            } catch (e) {
-              console.error(`Failed to parse content for document ${document._id}:`, e)
-              contentToParse = null
-            }
-          }
-
-          if (contentToParse) {
-            const groupsFromDoc = extractConversationsForCharacter(
-              contentToParse,
-              charName,
-              document.title || 'Untitled Document',
-              document._id,
-            )
-            if (groupsFromDoc.length > 0) {
-              allConversationGroups.push(...groupsFromDoc)
-              updatedDocIdsMap.add(document._id) // Add doc ID if character participates
-            }
-          }
-        } catch (error) {
-          console.error(`Error processing document ${document._id} for conversations:`, error)
+      try {
+        const allDocuments = await get('/documents')
+        if (!allDocuments || allDocuments.length === 0) {
+          setLoadingConversations(false) // Ensure loading stops
+          return
         }
-      }
 
-      allConversationGroups.sort((a, b) => {
-        if (a.documentTitle !== b.documentTitle) {
-          return (a.documentTitle || '').localeCompare(b.documentTitle || '')
+        const allConversationGroups: ConversationGroup[] = []
+        for (const document of allDocuments) {
+          try {
+            let contentToParse = document.content
+            if (typeof contentToParse === 'string') {
+              try {
+                contentToParse = JSON.parse(contentToParse)
+              } catch (e) {
+                console.error(`Failed to parse content for document ${document._id}:`, e)
+                contentToParse = null
+              }
+            }
+
+            if (contentToParse) {
+              const groupsFromDoc = extractConversationsForCharacter(
+                contentToParse,
+                charName,
+                document.title || 'Untitled Document',
+                document._id,
+              )
+              if (groupsFromDoc.length > 0) {
+                allConversationGroups.push(...groupsFromDoc)
+                updatedDocIdsMap.add(document._id) // Add doc ID if character participates
+              }
+            }
+          } catch (error) {
+            console.error(`Error processing document ${document._id} for conversations:`, error)
+          }
         }
-        return a.conversationId.localeCompare(b.conversationId)
-      })
 
-      setConversations(allConversationGroups)
+        allConversationGroups.sort((a, b) => {
+          if (a.documentTitle !== b.documentTitle) {
+            return (a.documentTitle || '').localeCompare(b.documentTitle || '')
+          }
+          return a.conversationId.localeCompare(b.conversationId)
+        })
 
-      // Inform parent about updated document IDs if callback provided
-      if (onCharacterDocumentUpdate) {
-        onCharacterDocumentUpdate(Array.from(updatedDocIdsMap))
+        setConversations(allConversationGroups)
+
+        // Inform parent about updated document IDs if callback provided
+        if (onCharacterDocumentUpdate) {
+          onCharacterDocumentUpdate(Array.from(updatedDocIdsMap))
+        }
+      } catch (error) {
+        console.error('Error loading conversation groups:', error)
+      } finally {
+        setLoadingConversations(false)
       }
-    } catch (error) {
-      console.error('Error loading conversation groups:', error)
-    } finally {
-      setLoadingConversations(false)
-    }
-  }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [get, onCharacterDocumentUpdate],
+  )
 
   // --- Event Handlers (extracted and adapted) ---
 
@@ -336,34 +382,52 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
     }
   }
 
-  const handleSaveEditedDocument = async (updatedData: Partial<DocumentData>) => {
-    if (!activeEditorInfo.documentId || !activeEditorInfo.conversationId) {
-      console.error('Cannot save: No active document/conversation ID.')
-      return
-    }
-    const savedConversationId = activeEditorInfo.conversationId // Capture before async
-    setActiveEditorInfo(prev => ({ ...prev, isLoading: true }))
+  // Original save function (now called by debounced version)
+  const handleSaveEditedDocument = useCallback(
+    async (updatedData: Partial<DocumentData>) => {
+      console.log('handleSaveEditedDocument triggered. Active editor:', activeEditorInfo.conversationId)
+      if (!activeEditorInfo.documentId || !activeEditorInfo.conversationId) {
+        console.error('Cannot save: No active document/conversation ID.')
+        return
+      }
+      // const savedConversationId = activeEditorInfo.conversationId // Capture before async - No longer needed here
+      // We might not need the loading state here anymore if debounce feels smooth enough
+      // setActiveEditorInfo(prev => ({ ...prev, isLoading: true }))
 
-    try {
-      await patch(`/documents/${activeEditorInfo.documentId}`, {
-        content: updatedData.content,
-        lastUpdated: Date.now(),
-      })
-      await loadConversations(characterName) // Reload convos on successful save
-      // Switch back to view mode for the saved conversation
-      setEditorModeMap(prevMap => ({ ...prevMap, [savedConversationId]: 'view' }))
-      setActiveEditorInfo(prev =>
-        prev.conversationId === savedConversationId
-          ? { conversationId: null, documentId: null, content: null, isLoading: false }
-          : prev,
-      )
-    } catch (error) {
-      console.error('Error saving document:', error)
-      setActiveEditorInfo(prev => ({ ...prev, isLoading: false })) // Stop loading on error
-    }
-  }
+      try {
+        await patch(`/documents/${activeEditorInfo.documentId}`, {
+          content: updatedData.content,
+          lastUpdated: Date.now(),
+        })
+        // Only reload conversations if needed (complex change, skipping for now)
+        // Consider if loadConversations is truly necessary after every save
+        // await loadConversations(characterName)
+        console.log('Document saved, skipping conversation reload for now.')
+
+        // Keep the loading state reset for the current editor instance
+        // setActiveEditorInfo(prev =>
+        //   prev.conversationId === savedConversationId
+        //     ? { ...prev, isLoading: false } // Stop loading indicator
+        //     : prev,
+        // )
+      } catch (error) {
+        console.error('Error saving document:', error)
+        // setActiveEditorInfo(prev => ({ ...prev, isLoading: false })) // Stop loading on error
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [patch, activeEditorInfo.documentId, activeEditorInfo.conversationId, characterName],
+  )
 
   // --- Rendering Logic --- //
+
+  // Log state just before rendering
+  console.log(
+    'Rendering CharacterConversations. Active Editor:',
+    activeEditorInfo.conversationId,
+    'Editor Mode Map:',
+    editorModeMap,
+  )
 
   return (
     <Paper
@@ -438,7 +502,8 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
                             }>
                             <IconButton
                               size="small"
-                              onClick={() => handleToggleEditorMode(convo.conversationId, convo.documentId)}>
+                              onClick={() => handleToggleEditorMode(convo.conversationId, convo.documentId)}
+                              data-testid={`toggle-editor-${convo.conversationId}`}>
                               {isEditingThisConversation ? (
                                 <VisibilityIcon fontSize="small" />
                               ) : (
@@ -465,17 +530,23 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
                                     <Loader />
                                   </div>
                                 ) : activeEditorInfo.content ? (
-                                  <div ref={editorWrapperRef} className="editor-wrapper -mx-4 -my-2">
+                                  <div
+                                    ref={editorWrapperRef}
+                                    className="editor-wrapper -mx-4 -my-2"
+                                    onClick={e => {
+                                      console.log('Clicked inside editor wrapper, stopping propagation.')
+                                      e.stopPropagation()
+                                    }}>
                                     <EditorComponent
-                                      key={activeEditorInfo.documentId} // Re-mount editor on doc change
+                                      key={activeEditorInfo.documentId}
                                       content={activeEditorInfo.content}
                                       title={''}
-                                      onUpdate={handleSaveEditedDocument}
+                                      onUpdate={debouncedSave}
                                       canEdit={true}
                                       hideFooter={true}
                                       hideTitle={true}
                                       initialFocusConversationId={activeEditorInfo.conversationId}
-                                      highlightCharacterName={characterName} // Pass name for highlighting
+                                      highlightCharacterName={characterName}
                                     />
                                   </div>
                                 ) : (
