@@ -206,8 +206,6 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
           [closingConversationId]: 'view',
         }))
         setActiveEditorInfo({ conversationId: null, documentId: null, content: null, isLoading: false })
-        // Reload conversations when exiting edit mode via click outside
-        loadConversations(characterName)
       }
     }
 
@@ -333,8 +331,6 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
       console.log(`Switching ${conversationId} from edit to view.`)
       setEditorModeMap(prevMap => ({ ...prevMap, [conversationId]: 'view' }))
       setActiveEditorInfo({ conversationId: null, documentId: null, content: null, isLoading: false })
-      // Reload conversations when exiting edit mode via toggle
-      loadConversations(characterName)
       return
     }
 
@@ -395,31 +391,55 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
         console.error('Cannot save: No active document/conversation ID.')
         return
       }
-      // const savedConversationId = activeEditorInfo.conversationId // Store ID in case needed later, though maybe not
-      // REMOVED: Loading state updates that caused flicker after debounce
-      // setActiveEditorInfo(prev => ({ ...prev, isLoading: true }))
-
       try {
-        await patch(`/documents/${activeEditorInfo.documentId}`, {
-          content: updatedData.content,
+        // Capture details needed before async operation
+        const docId = activeEditorInfo.documentId!
+        const convoId = activeEditorInfo.conversationId!
+        const savedContent = updatedData.content // Content that was just saved
+
+        await patch(`/documents/${docId}`, {
+          content: savedContent,
           lastUpdated: Date.now(),
         })
-        console.log('Document saved, skipping conversation reload for now.')
+        console.log(`Document ${docId} saved successfully.`)
 
-        // REMOVED: Resetting loading state after save
-        // setActiveEditorInfo(prev =>
-        //   prev.conversationId === savedConversationId
-        //     ? { ...prev, isLoading: false } // Stop loading indicator
-        //     : prev,
-        // )
+        // Now, update the local state *without* a full reload
+        setConversations(prevConversations => {
+          // Find the document title associated with this docId from existing state
+          const docTitle =
+            prevConversations.find(c => c.documentId === docId)?.documentTitle || 'Untitled Document'
+
+          // Re-extract conversation entries JUST from the saved content
+          const updatedGroups = extractConversationsForCharacter(
+            savedContent, // Use the content we just saved
+            characterName,
+            docTitle,
+            docId,
+          )
+
+          // Find the specific updated conversation group
+          const updatedGroup = updatedGroups.find(g => g.conversationId === convoId)
+
+          if (!updatedGroup) {
+            console.warn('Could not find updated conversation group after save, list might be stale.')
+            return prevConversations // Return previous state if extraction failed unexpectedly
+          }
+
+          // Map over the previous conversations and replace the updated one
+          return prevConversations.map(convo => {
+            if (convo.conversationId === convoId && convo.documentId === docId) {
+              console.log(`Updating conversation ${convoId} in local state.`)
+              return { ...convo, entries: updatedGroup.entries, lastUpdated: Date.now() } // Update entries and timestamp
+            }
+            return convo
+          })
+        })
       } catch (error) {
         console.error('Error saving document:', error)
-        // REMOVED: Resetting loading state on error
-        // setActiveEditorInfo(prev => ({ ...prev, isLoading: false }))
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     },
-    [patch, activeEditorInfo.documentId, activeEditorInfo.conversationId],
+    [patch, activeEditorInfo.documentId, activeEditorInfo.conversationId, characterName],
   )
 
   // --- Rendering Logic --- //
