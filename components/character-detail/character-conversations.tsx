@@ -171,6 +171,21 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
   useEffect(() => {
     if (characterName) {
       loadConversations(characterName)
+      // Pre-initialize the editor for smoother transitions
+      const preInitializeEditor = async () => {
+        const firstDocId = conversations[0]?.documentId
+        if (firstDocId) {
+          const fullDocument = await get(`/documents/${firstDocId}`)
+          if (fullDocument) {
+            setActiveEditorInfo(prev => ({
+              ...prev,
+              content: fullDocument.content,
+              isLoading: false,
+            }))
+          }
+        }
+      }
+      preInitializeEditor()
     }
   }, [characterName])
 
@@ -458,6 +473,17 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
     editorModeMap,
   )
 
+  const renderConversationEntries = (entries: DialogueEntry[]) => (
+    <div className="read-only-conversation font-editor2 text-[19px] md:text-[22px]">
+      {entries.map((entry, entryIndex) => (
+        <div key={entryIndex} className="dialogue-line mb-1">
+          <span className="character-name mr-1 font-semibold text-black/[.6]">{entry.characterName}:</span>
+          <TiptapJsonRenderer node={entry.contentNode} className="inline" />
+        </div>
+      ))}
+    </div>
+  )
+
   return (
     <Paper
       elevation={0}
@@ -522,11 +548,17 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
                       <Paper
                         key={convo.conversationId}
                         elevation={0}
-                        className={`overflow-visible rounded-lg transition-all hover:bg-opacity-20 ${isEditingThisConversation ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-transparent' : ''}`}
+                        className={`overflow-visible rounded-lg transition-all hover:bg-opacity-20 ${
+                          isEditingThisConversation
+                            ? 'ring-2 ring-blue-400 ring-offset-2 ring-offset-transparent'
+                            : ''
+                        }`}
                         sx={{
                           backgroundColor: 'rgba(255, 255, 255, 0.05)',
                           '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.15)' },
                           position: 'relative',
+                          minHeight: isEditingThisConversation ? '400px' : 'auto',
+                          transition: 'min-height 0.3s ease-in-out',
                         }}>
                         <div
                           className="sticky top-0 z-10 flex items-center justify-end rounded-t-lg bg-white/10 px-2 py-1 backdrop-blur-sm"
@@ -560,14 +592,14 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
                           <div className="flex items-start justify-between">
                             <div className="flex-1 overflow-hidden pr-2 font-editor2 text-black/[.79]">
                               {isEditingThisConversation ? (
-                                isActiveEditorLoading ? (
-                                  <div className="flex h-20 items-center justify-center">
-                                    <Loader />
-                                  </div>
-                                ) : activeEditorInfo.content ? (
+                                activeEditorInfo.content ? (
                                   <div
                                     ref={editorWrapperRef}
                                     className="editor-wrapper -mx-4 -my-2"
+                                    style={{
+                                      transition: 'opacity 0.3s ease-in-out, height 0.3s ease-in-out',
+                                      opacity: 1, // Always visible
+                                    }}
                                     onClick={e => {
                                       console.log('Clicked inside editor wrapper, stopping propagation.')
                                       e.stopPropagation()
@@ -585,19 +617,10 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
                                     />
                                   </div>
                                 ) : (
-                                  <Typography color="error">Failed to load content for editing.</Typography>
+                                  renderConversationEntries(convo.entries)
                                 )
                               ) : (
-                                <div className="read-only-conversation font-editor2 text-[19px] md:text-[22px]">
-                                  {convo.entries.map((entry, entryIndex) => (
-                                    <div key={entryIndex} className="dialogue-line mb-1">
-                                      <span className="character-name mr-1 font-semibold text-black/[.6]">
-                                        {entry.characterName}:
-                                      </span>
-                                      <TiptapJsonRenderer node={entry.contentNode} className="inline" />
-                                    </div>
-                                  ))}
-                                </div>
+                                renderConversationEntries(convo.entries)
                               )}
                             </div>
                             {/* MoreVertIcon moved to sticky bar */}
