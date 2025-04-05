@@ -5,6 +5,8 @@ import { Paper, Typography, IconButton, Tooltip, Menu, MenuItem } from '@mui/mat
 import EditIcon from '@mui/icons-material/Edit'
 import MoreVertIcon from '@mui/icons-material/MoreVert'
 import VisibilityIcon from '@mui/icons-material/Visibility'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import { useAPI } from '@components/providers'
 import { useNavigation } from '@components/providers'
 import { Loader } from '@components/loader'
@@ -156,6 +158,7 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
   const editorWrapperRef = useRef<HTMLDivElement>(null)
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null)
   const [menuDocumentId, setMenuDocumentId] = useState<string | null>(null)
+  const [expandedConversations, setExpandedConversations] = useState<Record<string, boolean>>({})
 
   // Debounced save function
   const debouncedSave = useMemo(
@@ -187,64 +190,8 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
       }
       preInitializeEditor()
     }
+    setExpandedConversations({}) // Reset expansion state on character change
   }, [characterName])
-
-  // Click outside editor logic
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      // Log event details for debugging typing issue
-      console.log(`handleClickOutside triggered by event type: ${event.type}, target:`, event.target)
-
-      // Check if the click target is the toggle button itself (or inside it)
-      const targetElement = event.target as HTMLElement
-      const toggleButton = targetElement.closest('[data-testid^="toggle-editor-"]')
-
-      if (toggleButton) {
-        // Click was on the toggle button, let handleToggleEditorMode handle it.
-        console.log('Click detected on toggle button, ignoring for outside click logic.')
-        return
-      }
-
-      // Original logic: Check if the click is outside the editor wrapper
-      if (
-        activeEditorInfo.conversationId &&
-        editorWrapperRef.current &&
-        event.target instanceof Node &&
-        !editorWrapperRef.current.contains(event.target)
-      ) {
-        console.log(
-          'Clicked outside active editor wrapper (or event was not stopped), switching back to view mode.',
-        )
-        const closingConversationId = activeEditorInfo.conversationId! // Capture id before state change
-        setEditorModeMap(prevMap => ({
-          ...prevMap,
-          [closingConversationId]: 'view',
-        }))
-        setActiveEditorInfo({ conversationId: null, documentId: null, content: null, isLoading: false })
-      }
-    }
-
-    if (activeEditorInfo.conversationId) {
-      // Listen during the bubbling phase (default) instead of capture.
-      // No setTimeout needed now.
-      document.addEventListener('click', handleClickOutside)
-      console.log(`Attaching click outside listener (bubbling) for ${activeEditorInfo.conversationId}`)
-
-      // Cleanup function removes the listener
-      return () => {
-        document.removeEventListener('click', handleClickOutside)
-        console.log(
-          `Cleaning up click outside listener (bubbling) for ${activeEditorInfo.conversationId} during effect re-run or unmount`,
-        )
-      }
-    } else {
-      // Explicitly ensure listener is removed if no editor is active (redundant but safe)
-      document.removeEventListener('click', handleClickOutside)
-      console.log('Ensuring click outside listener (bubbling) is removed as no editor is active')
-    }
-
-    // Cleanup logic is handled by the return function within the if block.
-  }, [activeEditorInfo.conversationId])
 
   // Function to load conversations (extracted and adapted)
   const loadConversations = useCallback(
@@ -439,6 +386,11 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
     setActiveEditorInfo({ conversationId, documentId, content: null, isLoading: true })
     setEditorModeMap(prevMap => ({ ...prevMap, [key]: 'edit' }))
 
+    // Ensure conversation is expanded when entering edit mode
+    if (!expandedConversations[key]) {
+      handleToggleExpand(key)
+    }
+
     try {
       const fullDocument = await get(`/documents/${documentId}`)
       if (fullDocument) {
@@ -592,6 +544,14 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
     return mergedContent
   }
 
+  // Handler to toggle conversation expansion
+  const handleToggleExpand = (key: string) => {
+    setExpandedConversations(prev => ({
+      ...prev,
+      [key]: !prev[key],
+    }))
+  }
+
   // --- Rendering Logic --- //
 
   // Log state just before rendering
@@ -686,38 +646,64 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
                           backgroundColor: 'rgba(255, 255, 255, 0.05)',
                           '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.15)' },
                           position: 'relative',
-                          minHeight: isEditingThisConversation ? '400px' : 'auto',
-                          transition: 'min-height 0.3s ease-in-out',
                         }}>
                         <div
-                          className="sticky top-0 z-10 flex items-center justify-end rounded-t-lg bg-white/10 px-2 py-1 backdrop-blur-sm"
-                          style={{ background: 'rgba(255, 255, 255, 0.08)' }}>
-                          <Tooltip
-                            title={
-                              isEditingThisConversation ? 'Switch to View Mode' : 'Edit this Conversation'
-                            }>
+                          className="sticky top-0 z-10 flex cursor-pointer items-center justify-between rounded-t-lg bg-white/10 px-2 py-1 backdrop-blur-sm"
+                          style={{ background: 'rgba(255, 255, 255, 0.08)' }}
+                          onClick={() => handleToggleExpand(key)}>
+                          <IconButton size="small" sx={{ visibility: 'hidden' }}>
+                            <ExpandMoreIcon fontSize="small" />
+                          </IconButton>
+                          <div className="flex items-center">
+                            <Tooltip
+                              title={
+                                isEditingThisConversation ? 'Switch to View Mode' : 'Edit this Conversation'
+                              }
+                              sx={{ color: 'rgba(0, 0, 0, 0.6)', marginLeft: '4px' }}>
+                              <IconButton
+                                size="small"
+                                onClick={e => {
+                                  e.stopPropagation()
+                                  handleToggleEditorMode(convo.conversationId, convo.documentId)
+                                }}
+                                data-testid={`toggle-editor-${convo.conversationId}`}>
+                                {isEditingThisConversation ? (
+                                  <VisibilityIcon fontSize="small" />
+                                ) : (
+                                  <EditIcon fontSize="small" />
+                                )}
+                              </IconButton>
+                            </Tooltip>
                             <IconButton
                               size="small"
-                              onClick={() => handleToggleEditorMode(convo.conversationId, convo.documentId)}
-                              data-testid={`toggle-editor-${convo.conversationId}`}>
-                              {isEditingThisConversation ? (
-                                <VisibilityIcon fontSize="small" />
+                              onClick={e => handleOptionsClick(e, convo.documentId)}
+                              sx={{ color: 'rgba(0, 0, 0, 0.6)', marginLeft: '4px' }}
+                              title="Document Options">
+                              <MoreVertIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              sx={{ color: 'rgba(0, 0, 0, 0.6)', marginLeft: '4px' }}
+                              title={expandedConversations[key] ? 'Collapse' : 'Expand'}>
+                              {expandedConversations[key] ? (
+                                <ExpandLessIcon fontSize="small" />
                               ) : (
-                                <EditIcon fontSize="small" />
+                                <ExpandMoreIcon fontSize="small" />
                               )}
                             </IconButton>
-                          </Tooltip>
-                          {/* Keep MoreVertIcon for document actions */}
-                          <IconButton
-                            size="small"
-                            onClick={e => handleOptionsClick(e, convo.documentId)}
-                            sx={{ color: 'rgba(0, 0, 0, 0.6)', marginLeft: '4px' }}
-                            title="Document Options">
-                            <MoreVertIcon fontSize="small" />
-                          </IconButton>
+                          </div>
                         </div>
 
-                        <div className={`p-4 ${isEditingThisConversation ? 'pt-2' : 'pt-4'}`}>
+                        <div
+                          style={{
+                            maxHeight: expandedConversations[key] ? '1000px' : '0px',
+                            overflow: 'hidden',
+                            transition: 'max-height 0.5s ease-in-out, padding 0.5s ease-in-out',
+                            paddingTop: expandedConversations[key] ? '1rem' : '0',
+                            paddingBottom: expandedConversations[key] ? '1rem' : '0',
+                            paddingLeft: '1rem',
+                            paddingRight: '1rem',
+                          }}>
                           <div className="flex items-start justify-between">
                             <div className="flex-1 overflow-hidden pr-2 font-editor2 text-black/[.79]">
                               {isEditingThisConversation ? (
@@ -727,7 +713,7 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
                                     className="editor-wrapper -mx-4 -my-2"
                                     style={{
                                       transition: 'opacity 0.3s ease-in-out, height 0.3s ease-in-out',
-                                      opacity: 1, // Always visible
+                                      opacity: 1,
                                     }}
                                     onClick={e => {
                                       console.log('Clicked inside editor wrapper, stopping propagation.')
@@ -753,7 +739,6 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
                                 renderConversationEntries(convo.entries)
                               )}
                             </div>
-                            {/* MoreVertIcon moved to sticky bar */}
                           </div>
                         </div>
                       </Paper>
