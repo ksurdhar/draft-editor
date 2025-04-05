@@ -1,4 +1,5 @@
 import { Mark, mergeAttributes } from '@tiptap/core'
+import { Node } from '@tiptap/pm/model'
 
 export interface DialogueMarkOptions {
   HTMLAttributes: Record<string, any>
@@ -10,9 +11,11 @@ declare module '@tiptap/core' {
       setDialogueMark: (attrs: {
         character: string
         conversationId: string
+        conversationName?: string
         userConfirmed?: boolean
       }) => ReturnType
       unsetDialogueMark: () => ReturnType
+      updateConversationName: (conversationId: string, newName: string) => ReturnType
     }
   }
 }
@@ -56,6 +59,19 @@ export const DialogueMark = Mark.create<DialogueMarkOptions>({
           }
         },
       },
+      conversationName: {
+        default: null,
+        rendered: true,
+        parseHTML: element => element.getAttribute('data-conversation-name'),
+        renderHTML: attributes => {
+          if (!attributes.conversationName) {
+            return {}
+          }
+          return {
+            'data-conversation-name': attributes.conversationName,
+          }
+        },
+      },
       userConfirmed: {
         default: false,
         rendered: true,
@@ -83,6 +99,7 @@ export const DialogueMark = Mark.create<DialogueMarkOptions>({
           const character = element.getAttribute('data-character')
           const conversationId = element.getAttribute('data-conversation-id')
           const userConfirmed = element.getAttribute('data-user-confirmed') === 'true'
+          const conversationName = element.getAttribute('data-conversation-name')
 
           if (!character || !conversationId) {
             return false
@@ -91,6 +108,7 @@ export const DialogueMark = Mark.create<DialogueMarkOptions>({
           return {
             character,
             conversationId,
+            conversationName,
             userConfirmed,
           }
         },
@@ -107,6 +125,9 @@ export const DialogueMark = Mark.create<DialogueMarkOptions>({
       class: 'dialogue-mark',
     }
 
+    if (HTMLAttributes.conversationName) {
+      renderAttributes['data-conversation-name'] = HTMLAttributes.conversationName
+    }
     if (HTMLAttributes.userConfirmed) {
       renderAttributes['data-user-confirmed'] = 'true'
     }
@@ -125,6 +146,35 @@ export const DialogueMark = Mark.create<DialogueMarkOptions>({
         () =>
         ({ commands }) => {
           return commands.unsetMark(this.name)
+        },
+      updateConversationName:
+        (conversationId, newName) =>
+        ({ tr, state, dispatch }) => {
+          if (!dispatch) return false
+
+          let modified = false
+          const { doc } = state
+          const markType = state.schema.marks[this.name]
+
+          doc.descendants((node: Node, pos: number) => {
+            if (!node.isText) return true
+
+            const marks = node.marks.filter(mark => mark.type === markType)
+            marks.forEach(mark => {
+              if (mark.attrs.conversationId === conversationId && mark.attrs.conversationName !== newName) {
+                const newAttrs = { ...mark.attrs, conversationName: newName }
+                tr.addMark(pos, pos + node.nodeSize, markType.create(newAttrs))
+                modified = true
+              }
+            })
+            return true
+          })
+
+          if (modified) {
+            dispatch(tr)
+          }
+
+          return modified
         },
     }
   },

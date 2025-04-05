@@ -23,6 +23,7 @@ interface DialogueListProps {
   onConfirmDialogue: (markId: string, character: string, conversationId: string) => void
   focusedConversationId: string | null
   onToggleFocus: (conversationId: string) => void
+  onUpdateConversationName: (conversationId: string, newName: string) => void
 }
 
 interface DialogueMark {
@@ -30,6 +31,7 @@ interface DialogueMark {
   attrs: {
     character: string
     conversationId: string
+    conversationName?: string
     userConfirmed?: boolean
   }
 }
@@ -39,11 +41,13 @@ interface ProcessedDialogueMark {
   character: string
   content: string
   conversationId: string | null
+  conversationName: string | null
   userConfirmed?: boolean
 }
 
 interface GroupedDialogue {
   conversationId: string
+  conversationName: string | null
   dialogues: ProcessedDialogueMark[]
 }
 
@@ -55,10 +59,13 @@ const DialogueList = ({
   onConfirmDialogue,
   focusedConversationId,
   onToggleFocus,
+  onUpdateConversationName,
 }: DialogueListProps) => {
   const [validDialogueMarks, setValidDialogueMarks] = useState<ProcessedDialogueMark[]>([])
   const [expandedMarkId, setExpandedMarkId] = useState<string | null>(null)
   const [editingCharacter, setEditingCharacter] = useState<string>('')
+  const [editingConversationId, setEditingConversationId] = useState<string | null>(null)
+  const [conversationNameInput, setConversationNameInput] = useState('')
 
   const dialogueMarks = useMemo(() => {
     if (!editor || !editor.state.doc) {
@@ -81,6 +88,7 @@ const DialogueList = ({
           const markInfo = {
             character: markAttrs.character,
             conversationId: markAttrs.conversationId || null,
+            conversationName: markAttrs.conversationName || null,
             userConfirmed: markAttrs.userConfirmed || false,
           }
 
@@ -88,6 +96,7 @@ const DialogueList = ({
             currentGroup &&
             currentGroup.character === markInfo.character &&
             currentGroup.conversationId === markInfo.conversationId &&
+            currentGroup.conversationName === markInfo.conversationName &&
             pos === parseInt(currentGroup.id.split('-')[1], 10)
           ) {
             currentGroup.content += text
@@ -105,6 +114,7 @@ const DialogueList = ({
               character: markInfo.character,
               content: text,
               conversationId: markInfo.conversationId,
+              conversationName: markInfo.conversationName,
               userConfirmed: markInfo.userConfirmed,
             }
           }
@@ -156,7 +166,8 @@ const DialogueList = ({
                 if (
                   dialogueMark &&
                   (dialogueMark.attrs.conversationId || null) === targetMark.conversationId &&
-                  dialogueMark.attrs.character === targetMark.character
+                  dialogueMark.attrs.character === targetMark.character &&
+                  (dialogueMark.attrs.conversationName || null) === targetMark.conversationName
                 ) {
                   found = true
                 }
@@ -175,7 +186,8 @@ const DialogueList = ({
                 if (
                   dialogueMark &&
                   (dialogueMark.attrs.conversationId || null) === targetMark.conversationId &&
-                  dialogueMark.attrs.character === targetMark.character
+                  dialogueMark.attrs.character === targetMark.character &&
+                  (dialogueMark.attrs.conversationName || null) === targetMark.conversationName
                 ) {
                   found = true
                 }
@@ -200,19 +212,27 @@ const DialogueList = ({
   }, [dialogueMarks, validateDialogueMarks, editor])
 
   const groupedDialogues = useMemo(() => {
-    const groups: Record<string, ProcessedDialogueMark[]> = {}
+    type GroupData = { dialogues: ProcessedDialogueMark[]; conversationName: string | null }
+    const groups: Record<string, GroupData> = {}
+
     validDialogueMarks.forEach(mark => {
       const convId = mark.conversationId ?? 'unknown'
       if (!groups[convId]) {
-        groups[convId] = []
+        groups[convId] = { dialogues: [], conversationName: null }
       }
-      groups[convId].push(mark)
+
+      if (groups[convId].conversationName === null && mark.conversationName) {
+        groups[convId].conversationName = mark.conversationName
+      }
+
+      groups[convId].dialogues.push(mark)
     })
 
-    const grouped = Object.entries(groups)
-      .map(([conversationId, dialogues]) => ({
+    const grouped: GroupedDialogue[] = Object.entries(groups)
+      .map(([conversationId, groupData]) => ({
         conversationId,
-        dialogues: dialogues.sort((a, b) => {
+        conversationName: groupData.conversationName,
+        dialogues: groupData.dialogues.sort((a, b) => {
           const [aStart] = a.id.split('-').map(Number)
           const [bStart] = b.id.split('-').map(Number)
           return aStart - bStart
@@ -234,6 +254,24 @@ const DialogueList = ({
       setExpandedMarkId(markId)
       setEditingCharacter(currentCharacter)
     }
+  }
+
+  const handleDoubleClickConversation = (convId: string, currentName: string | null) => {
+    setEditingConversationId(convId)
+    setConversationNameInput(currentName || '')
+  }
+
+  const handleSaveConversationName = () => {
+    if (!editingConversationId) return
+    const newName = conversationNameInput.trim()
+    onUpdateConversationName(editingConversationId, newName)
+    setEditingConversationId(null)
+    setConversationNameInput('')
+  }
+
+  const handleCancelEditConversationName = () => {
+    setEditingConversationId(null)
+    setConversationNameInput('')
   }
 
   const handleConfirm = (mark: ProcessedDialogueMark) => {
@@ -266,10 +304,53 @@ const DialogueList = ({
             key={group.conversationId}
             className="mb-1 rounded-md border border-white/[.07] bg-white/[.01]">
             <div className="flex items-center justify-between px-3 py-2 text-xs font-medium text-black/40">
-              <span>
-                Conversation{' '}
-                {group.conversationId === 'unknown' ? 'Unknown' : group.conversationId.replace('conv', '')}
-              </span>
+              {editingConversationId === group.conversationId ? (
+                <div className="flex flex-grow items-center gap-1">
+                  <input
+                    type="text"
+                    value={conversationNameInput}
+                    onChange={e => setConversationNameInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        handleSaveConversationName()
+                      } else if (e.key === 'Escape') {
+                        handleCancelEditConversationName()
+                      }
+                    }}
+                    className="flex-grow rounded border border-white/20 bg-white/10 px-1.5 py-0.5 text-xs text-black/80 focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                    placeholder="Conversation Name"
+                    autoFocus
+                    onBlur={handleCancelEditConversationName}
+                  />
+                </div>
+              ) : (
+                <span
+                  onDoubleClick={() =>
+                    handleDoubleClickConversation(group.conversationId, group.conversationName)
+                  }
+                  className="cursor-pointer rounded px-1 py-0.5 hover:bg-white/[.08]"
+                  title="Double-click to rename">
+                  {group.conversationName ? (
+                    <>
+                      {group.conversationName}{' '}
+                      <span className="text-black/30">
+                        (
+                        {group.conversationId === 'unknown'
+                          ? 'Unknown'
+                          : group.conversationId.replace('conv', '')}
+                        )
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      Conversation{' '}
+                      {group.conversationId === 'unknown'
+                        ? 'Unknown'
+                        : group.conversationId.replace('conv', '')}
+                    </>
+                  )}
+                </span>
+              )}
               <button
                 onClick={() => onToggleFocus(group.conversationId)}
                 className={`rounded p-1 transition-colors ${focusedConversationId === group.conversationId ? 'bg-blue-500/20 text-blue-400' : 'text-black/40 hover:bg-white/[.05] hover:text-black/60'}`}
@@ -317,6 +398,19 @@ const DialogueList = ({
                     theme="dark"
                     itemContainerProps={{
                       className: `transition-colors duration-150 ${expandedMarkId === mark.id ? 'bg-white/[.05]' : ''}`,
+                      onMouseEnter: () => {
+                        if (editor) {
+                          const [start, end] = mark.id.split('-').map(Number)
+                          if (!isNaN(start) && !isNaN(end)) {
+                            // Example: editor.commands.setHighlight({ from: start, to: end }, 'hover-highlight')
+                          }
+                        }
+                      },
+                      onMouseLeave: () => {
+                        if (editor) {
+                          // Example: editor.commands.unsetHighlight('hover-highlight')
+                        }
+                      },
                     }}
                   />
                   <AnimatePresence>

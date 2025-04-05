@@ -542,6 +542,19 @@ export default function SharedDocumentPage() {
     }
   }, [editor])
 
+  // Function to update the conversation name using the editor command
+  const handleUpdateConversationName = useCallback(
+    (conversationId: string, newName: string) => {
+      if (!editor) return
+      editor.chain().focus().updateConversationName(conversationId, newName).run()
+
+      // Trigger save after update
+      const currentEditorContent = editor.getJSON()
+      debouncedSave({ content: JSON.stringify(currentEditorContent) })
+    },
+    [editor, debouncedSave],
+  )
+
   return (
     <Layout documentId={id} onToggleGlobalSearch={handleToggleGlobalSearch}>
       {!skipAnimation && (
@@ -712,6 +725,7 @@ export default function SharedDocumentPage() {
                   onConfirmDialogue={handleConfirmDialogue}
                   focusedConversationId={focusedConversationId}
                   onToggleFocus={toggleConversationFocus}
+                  onUpdateConversationName={handleUpdateConversationName}
                 />
               </div>
             </motion.div>
