@@ -338,6 +338,81 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
     handleOptionsClose()
   }
 
+  const extractConversationNodes = (fullContent: any, conversationId: string): any => {
+    console.log('Extracting conversation nodes for ID:', conversationId)
+
+    // Parse the content if it's a string
+    let parsedContent = fullContent
+    if (typeof fullContent === 'string') {
+      try {
+        parsedContent = JSON.parse(fullContent)
+      } catch (e) {
+        console.error('Failed to parse content in extractConversationNodes:', e)
+        return {
+          type: 'doc',
+          content: [],
+        }
+      }
+    }
+
+    // Store paragraph indices that contain our conversation
+    const paragraphsWithConversation = new Set<number>()
+
+    // Helper function to check if a node or its children contain the conversation ID
+    const hasConversationMark = (node: any): boolean => {
+      // Check this node's marks
+      if (node.marks?.length) {
+        const hasDialogueMark = node.marks.some(
+          (mark: any) => mark.type === 'dialogue' && mark.attrs?.conversationId === conversationId,
+        )
+        if (hasDialogueMark) return true
+      }
+
+      // Check child nodes recursively
+      if (node.content?.length) {
+        return node.content.some((child: any) => hasConversationMark(child))
+      }
+
+      return false
+    }
+
+    // Check top-level paragraphs for conversation marks
+    if (parsedContent?.type === 'doc' && Array.isArray(parsedContent.content)) {
+      parsedContent.content.forEach((paragraph: any, index: number) => {
+        if (hasConversationMark(paragraph)) {
+          paragraphsWithConversation.add(index)
+          console.log(`Found paragraph ${index} with conversation ID ${conversationId}`)
+        }
+      })
+    }
+
+    // If no paragraphs found, return empty document
+    if (paragraphsWithConversation.size === 0) {
+      console.log('No paragraphs found containing dialogue nodes for conversationId:', conversationId)
+      return {
+        type: 'doc',
+        content: [],
+      }
+    }
+
+    // Get min and max paragraph indices to extract the full section
+    const paragraphIndices = Array.from(paragraphsWithConversation).sort((a, b) => a - b)
+    const minParagraphIndex = paragraphIndices[0]
+    const maxParagraphIndex = paragraphIndices[paragraphIndices.length - 1]
+
+    console.log(`Extracting paragraphs from ${minParagraphIndex} to ${maxParagraphIndex}`)
+
+    // Extract ALL paragraphs in the range, including those without conversation marks
+    const extractedParagraphs = parsedContent.content.slice(minParagraphIndex, maxParagraphIndex + 1)
+
+    console.log(`Extracted ${extractedParagraphs.length} paragraphs`)
+
+    return {
+      type: 'doc',
+      content: extractedParagraphs,
+    }
+  }
+
   const handleToggleEditorMode = async (conversationId: string, documentId: string) => {
     const key = `${conversationId}-${documentId}`
     const currentMode = editorModeMap[key] || 'view'
@@ -366,41 +441,21 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
 
     try {
       const fullDocument = await get(`/documents/${documentId}`)
-      setActiveEditorInfo(prev => {
-        if (`${prev.conversationId}-${prev.documentId}` === key) {
-          if (fullDocument) {
-            return { ...prev, content: fullDocument.content, isLoading: false }
-          } else {
-            console.error('Failed to fetch document content for editing.')
-            return { ...prev, isLoading: false }
-          }
-        } else {
-          console.log('Editor target changed during fetch, aborting content set.')
-          return prev
-        }
-      })
-      if (!fullDocument) {
-        setEditorModeMap(prevMap => {
-          if (prevMap[key] === 'edit') {
-            return { ...prevMap, [key]: 'view' }
-          }
-          return prevMap
-        })
+      if (fullDocument) {
+        const filteredContent = extractConversationNodes(fullDocument.content, conversationId)
+        console.log('Extracted conversation nodes:', filteredContent) // Log the extracted content
+        setActiveEditorInfo(prev => ({
+          ...prev,
+          content: filteredContent,
+          isLoading: false,
+        }))
+      } else {
+        console.error('Failed to fetch document content for editing.')
+        setActiveEditorInfo(prev => ({ ...prev, isLoading: false }))
       }
     } catch (error) {
       console.error('Error fetching document for editing:', error)
-      setActiveEditorInfo(prev => {
-        if (`${prev.conversationId}-${prev.documentId}` === key) {
-          return { ...prev, isLoading: false }
-        }
-        return prev
-      })
-      setEditorModeMap(prevMap => {
-        if (prevMap[key] === 'edit') {
-          return { ...prevMap, [key]: 'view' }
-        }
-        return prevMap
-      })
+      setActiveEditorInfo(prev => ({ ...prev, isLoading: false }))
     }
   }
 
@@ -413,44 +468,41 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
         return
       }
       try {
-        // Capture details needed before async operation
         const docId = activeEditorInfo.documentId!
         const convoId = activeEditorInfo.conversationId!
         const savedContent = updatedData.content // Content that was just saved
 
+        // Fetch the full document to merge the edited section
+        const fullDocument = await get(`/documents/${docId}`)
+        if (!fullDocument) {
+          console.error('Failed to fetch full document for merging edits.')
+          return
+        }
+
+        // Merge the edited section back into the full document
+        const mergedContent = mergeEditedSection(fullDocument.content, savedContent, convoId)
+
         await patch(`/documents/${docId}`, {
-          content: savedContent,
+          content: JSON.stringify(mergedContent),
           lastUpdated: Date.now(),
         })
         console.log(`Document ${docId} saved successfully.`)
 
-        // Now, update the local state *without* a full reload
+        // Update local state with the merged content
         setConversations(prevConversations => {
-          // Find the document title associated with this docId from existing state
-          const docTitle =
-            prevConversations.find(c => c.documentId === docId)?.documentTitle || 'Untitled Document'
-
-          // Re-extract conversation entries JUST from the saved content
           const updatedGroups = extractConversationsForCharacter(
-            savedContent, // Use the content we just saved
+            mergedContent,
             characterName,
-            docTitle,
+            fullDocument.title || 'Untitled Document',
             docId,
           )
-
-          // Find the specific updated conversation group
-          const updatedGroup = updatedGroups.find(g => g.conversationId === convoId)
-
-          if (!updatedGroup) {
-            console.warn('Could not find updated conversation group after save, list might be stale.')
-            return prevConversations // Return previous state if extraction failed unexpectedly
-          }
-
-          // Map over the previous conversations and replace the updated one
           return prevConversations.map(convo => {
             if (convo.conversationId === convoId && convo.documentId === docId) {
-              console.log(`Updating conversation ${convoId} in local state.`)
-              return { ...convo, entries: updatedGroup.entries, lastUpdated: Date.now() } // Update entries and timestamp
+              return {
+                ...convo,
+                entries: updatedGroups.find(g => g.conversationId === convoId)?.entries || [],
+                lastUpdated: Date.now(),
+              }
             }
             return convo
           })
@@ -458,10 +510,87 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
       } catch (error) {
         console.error('Error saving document:', error)
       }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     },
-    [patch, activeEditorInfo.documentId, activeEditorInfo.conversationId, characterName],
+    [patch, activeEditorInfo.documentId, activeEditorInfo.conversationId, characterName, get],
   )
+
+  const mergeEditedSection = (fullContent: any, editedSection: any, conversationId: string): any => {
+    // Parse the contents if they're strings
+    let parsedFullContent = fullContent
+    let parsedEditedSection = editedSection
+
+    if (typeof fullContent === 'string') {
+      try {
+        parsedFullContent = JSON.parse(fullContent)
+      } catch (e) {
+        console.error('Failed to parse full content in mergeEditedSection:', e)
+        return fullContent
+      }
+    }
+
+    if (typeof editedSection === 'string') {
+      try {
+        parsedEditedSection = JSON.parse(editedSection)
+      } catch (e) {
+        console.error('Failed to parse edited section in mergeEditedSection:', e)
+        return parsedFullContent
+      }
+    }
+
+    // Helper function to check if a node or its children contain the conversation ID
+    const hasConversationMark = (node: any): boolean => {
+      // Check this node's marks
+      if (node.marks?.length) {
+        const hasDialogueMark = node.marks.some(
+          (mark: any) => mark.type === 'dialogue' && mark.attrs?.conversationId === conversationId,
+        )
+        if (hasDialogueMark) return true
+      }
+
+      // Check child nodes recursively
+      if (node.content?.length) {
+        return node.content.some((child: any) => hasConversationMark(child))
+      }
+
+      return false
+    }
+
+    // Find paragraphs with conversation nodes in the full document
+    const paragraphsWithConversation = new Set<number>()
+
+    if (parsedFullContent?.type === 'doc' && Array.isArray(parsedFullContent.content)) {
+      parsedFullContent.content.forEach((paragraph: any, index: number) => {
+        if (hasConversationMark(paragraph)) {
+          paragraphsWithConversation.add(index)
+        }
+      })
+    }
+
+    // If no paragraphs found, return original content unchanged
+    if (paragraphsWithConversation.size === 0) {
+      console.warn('No paragraphs found to merge for conversationId:', conversationId)
+      return parsedFullContent
+    }
+
+    // Determine the range of paragraphs to replace
+    const paragraphIndices = Array.from(paragraphsWithConversation).sort((a, b) => a - b)
+    const minParagraphIndex = paragraphIndices[0]
+    const maxParagraphIndex = paragraphIndices[paragraphIndices.length - 1]
+
+    console.log(`Merging edited content into paragraphs ${minParagraphIndex} to ${maxParagraphIndex}`)
+
+    // Create merged content by replacing the section
+    const mergedContent = {
+      ...parsedFullContent,
+      content: [
+        ...parsedFullContent.content.slice(0, minParagraphIndex),
+        ...(parsedEditedSection.content || []),
+        ...parsedFullContent.content.slice(maxParagraphIndex + 1),
+      ],
+    }
+
+    return mergedContent
+  }
 
   // --- Rendering Logic --- //
 
@@ -614,6 +743,7 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
                                       hideTitle={true}
                                       initialFocusConversationId={activeEditorInfo.conversationId}
                                       highlightCharacterName={characterName}
+                                      filteredContent={activeEditorInfo.content}
                                     />
                                   </div>
                                 ) : (

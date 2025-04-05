@@ -59,6 +59,7 @@ type EditorProps = {
   onEditorReady?: (editor: any) => void
   initialFocusConversationId?: string | null
   highlightCharacterName?: string | null
+  filteredContent?: any
 }
 
 const DEFAULT_CONTENT = {
@@ -83,6 +84,7 @@ const EditorComponent = ({
   onEditorReady,
   initialFocusConversationId,
   highlightCharacterName,
+  filteredContent,
 }: EditorProps) => {
   const [inputValue, setInputValue] = useState(title === 'Untitled' ? '' : title)
   const [showFindPanel, setShowFindPanel] = useState(false)
@@ -100,8 +102,9 @@ const EditorComponent = ({
   // Parse the content JSON string or use default content
   const initialContent = (() => {
     try {
-      // Handle both string and object content
-      const parsed = typeof content === 'string' ? JSON.parse(content) : content
+      // Use filteredContent if provided, otherwise fall back to the full content
+      const contentToParse = filteredContent || content
+      const parsed = typeof contentToParse === 'string' ? JSON.parse(contentToParse) : contentToParse
       return parsed
     } catch (e) {
       console.error('Failed to parse editor content:', e)
