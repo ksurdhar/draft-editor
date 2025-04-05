@@ -324,29 +324,35 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
   }
 
   const handleToggleEditorMode = async (conversationId: string, documentId: string) => {
-    const currentMode = editorModeMap[conversationId] || 'view'
+    const key = `${conversationId}-${documentId}`
+    const currentMode = editorModeMap[key] || 'view'
     const isCurrentlyEditingThis = currentMode === 'edit'
 
     if (isCurrentlyEditingThis) {
-      console.log(`Switching ${conversationId} from edit to view.`)
-      setEditorModeMap(prevMap => ({ ...prevMap, [conversationId]: 'view' }))
+      console.log(`Switching ${key} from edit to view.`)
+      setEditorModeMap(prevMap => ({ ...prevMap, [key]: 'view' }))
       setActiveEditorInfo({ conversationId: null, documentId: null, content: null, isLoading: false })
       return
     }
 
-    console.log(`Switching ${conversationId} from view to edit.`)
-    if (activeEditorInfo.conversationId && activeEditorInfo.conversationId !== conversationId) {
-      console.log(`Closing previously active editor: ${activeEditorInfo.conversationId}`)
-      setEditorModeMap(prevMap => ({ ...prevMap, [activeEditorInfo.conversationId!]: 'view' }))
+    console.log(`Switching ${key} from view to edit.`)
+    if (
+      activeEditorInfo.conversationId &&
+      activeEditorInfo.documentId &&
+      `${activeEditorInfo.conversationId}-${activeEditorInfo.documentId}` !== key
+    ) {
+      const prevKey = `${activeEditorInfo.conversationId}-${activeEditorInfo.documentId}`
+      console.log(`Closing previously active editor: ${prevKey}`)
+      setEditorModeMap(prevMap => ({ ...prevMap, [prevKey]: 'view' }))
     }
 
     setActiveEditorInfo({ conversationId, documentId, content: null, isLoading: true })
-    setEditorModeMap(prevMap => ({ ...prevMap, [conversationId]: 'edit' }))
+    setEditorModeMap(prevMap => ({ ...prevMap, [key]: 'edit' }))
 
     try {
       const fullDocument = await get(`/documents/${documentId}`)
       setActiveEditorInfo(prev => {
-        if (prev.conversationId === conversationId) {
+        if (`${prev.conversationId}-${prev.documentId}` === key) {
           if (fullDocument) {
             return { ...prev, content: fullDocument.content, isLoading: false }
           } else {
@@ -360,8 +366,8 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
       })
       if (!fullDocument) {
         setEditorModeMap(prevMap => {
-          if (prevMap[conversationId] === 'edit') {
-            return { ...prevMap, [conversationId]: 'view' }
+          if (prevMap[key] === 'edit') {
+            return { ...prevMap, [key]: 'view' }
           }
           return prevMap
         })
@@ -369,14 +375,14 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
     } catch (error) {
       console.error('Error fetching document for editing:', error)
       setActiveEditorInfo(prev => {
-        if (prev.conversationId === conversationId) {
+        if (`${prev.conversationId}-${prev.documentId}` === key) {
           return { ...prev, isLoading: false }
         }
         return prev
       })
       setEditorModeMap(prevMap => {
-        if (prevMap[conversationId] === 'edit') {
-          return { ...prevMap, [conversationId]: 'view' }
+        if (prevMap[key] === 'edit') {
+          return { ...prevMap, [key]: 'view' }
         }
         return prevMap
       })
@@ -497,10 +503,16 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
                 </Typography>
                 <div className="space-y-3">
                   {convosInDoc.map((convo: ConversationGroup) => {
-                    const currentMode = editorModeMap[convo.conversationId] || 'view'
-                    const isEditingThisConversation = currentMode === 'edit'
+                    const key = `${convo.conversationId}-${convo.documentId}`
+                    const currentMode = editorModeMap[key] || 'view'
+                    const isEditingThisConversation =
+                      currentMode === 'edit' &&
+                      activeEditorInfo.conversationId === convo.conversationId &&
+                      activeEditorInfo.documentId === convo.documentId
                     const isActiveEditorLoading =
-                      activeEditorInfo.isLoading && activeEditorInfo.conversationId === convo.conversationId
+                      activeEditorInfo.isLoading &&
+                      activeEditorInfo.conversationId === convo.conversationId &&
+                      activeEditorInfo.documentId === convo.documentId
 
                     debugLog(
                       `Rendering convo ${convo.conversationId}: mode = ${currentMode}, isLoading = ${isActiveEditorLoading}`,
