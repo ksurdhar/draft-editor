@@ -250,19 +250,11 @@ const EditorComponent = ({
         <BubbleMenu
           editor={editor}
           tippyOptions={{ duration: 100, placement: 'bottom-start' }}
-          shouldShow={({ state, editor: _currentEditor }) => {
+          shouldShow={({ state, editor: _currentEditor, view: _view, oldState: _oldState }) => {
             const { selection } = state
             const { $from, $to } = selection
             const text = state.doc.textBetween($from.pos, $to.pos, ' ')
             const show = !!isDialogueMode && !selection.empty && text.trim().length > 0
-
-            console.log('[BubbleMenu shouldShow]', {
-              isDialogueMode,
-              isSelectionEmpty: selection.empty,
-              selectedText: text,
-              trimmedTextLength: text.trim().length,
-              show,
-            })
 
             return show
           }}>

@@ -364,7 +364,7 @@ export default function SharedDocumentPage() {
   )
 
   const handleConfirmDialogue = useCallback(
-    (markId: string, newCharacter: string) => {
+    (markId: string, character: string, conversationId: string, confirmed: boolean) => {
       if (!editor) return
 
       // The markId is expected to be "start-end"
@@ -377,28 +377,26 @@ export default function SharedDocumentPage() {
         return
       }
 
-      // Use Tiptap commands to update the mark
-      // We apply the update to the specific range identified by the ID
-      editor
-        .chain()
-        .focus() // Optional: focus the editor
-        .setTextSelection({ from: start, to: end }) // Select the text range
-        .setDialogueMark({
-          // We don't have conversationId here, but Tiptap merges attributes,
-          // so we only need to provide the ones we change + userConfirmed.
-          character: newCharacter,
-          userConfirmed: true,
-          // Tiptap should preserve existing conversationId attribute automatically
-        })
-        .run()
+      const { state } = editor
+      const { schema } = state
+      let tr = state.tr
 
-      // Trigger a save after the update
-      // Get the latest JSON content after the command runs
+      // 1. Remove any existing dialogue mark in the range
+      tr = tr.removeMark(start, end, schema.marks.dialogue)
+      // 2. Add the new mark with updated attributes
+      tr = tr.addMark(
+        start,
+        end,
+        schema.marks.dialogue.create({
+          character: character,
+          conversationId: conversationId === 'unknown' ? undefined : conversationId,
+          userConfirmed: confirmed,
+        }),
+      )
+
+      editor.view.dispatch(tr)
+
       const updatedContent = editor.getJSON()
-      // Update state immediately for reactivity
-      setDialogueDoc(updatedContent)
-      setCurrentContent(updatedContent) // Also update main content state if necessary
-      // Use debouncedSave to persist the changes
       debouncedSave({ content: updatedContent })
     },
     [editor, debouncedSave],

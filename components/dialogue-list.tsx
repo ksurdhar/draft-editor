@@ -1,16 +1,8 @@
 'use client'
 import { useMemo, useState, useEffect } from 'react'
-import {
-  ChatIcon,
-  RefreshIcon,
-  CheckCircleIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
-  EyeIcon,
-  EyeOffIcon,
-} from '@heroicons/react/outline'
+import { RefreshIcon, CheckCircleIcon, EyeIcon, EyeOffIcon } from '@heroicons/react/outline'
+import { CheckCircleIcon as CheckCircleIconSolid } from '@heroicons/react/solid'
 import { ListItem } from './list-item'
-import { AnimatePresence, motion } from 'framer-motion'
 import { Editor } from '@tiptap/react'
 
 interface DialogueListProps {
@@ -19,7 +11,7 @@ interface DialogueListProps {
   editor: Editor | null
   onSyncDialogue: () => Promise<void>
   isSyncing: boolean
-  onConfirmDialogue: (markId: string, character: string, conversationId: string) => void
+  onConfirmDialogue: (markId: string, character: string, conversationId: string, confirmed: boolean) => void
   focusedConversationId: string | null
   onToggleFocus: (conversationId: string) => void
   onUpdateConversationName: (conversationId: string, newName: string) => void
@@ -60,8 +52,6 @@ const DialogueList = ({
   onUpdateConversationName,
 }: DialogueListProps) => {
   const [processedMarks, setProcessedMarks] = useState<ProcessedDialogueMark[]>([])
-  const [expandedMarkId, setExpandedMarkId] = useState<string | null>(null)
-  const [editingCharacter, setEditingCharacter] = useState<string>('')
   const [editingConversationId, setEditingConversationId] = useState<string | null>(null)
   const [conversationNameInput, setConversationNameInput] = useState('')
 
@@ -146,7 +136,8 @@ const DialogueList = ({
     setProcessedMarks(calculateMarks())
 
     const handleTransaction = () => {
-      setProcessedMarks(calculateMarks())
+      const newMarks = calculateMarks()
+      setProcessedMarks(newMarks)
     }
 
     editor.on('transaction', handleTransaction)
@@ -192,15 +183,6 @@ const DialogueList = ({
     return grouped
   }, [processedMarks])
 
-  const handleToggleExpand = (markId: string, currentCharacter: string) => {
-    if (expandedMarkId === markId) {
-      setExpandedMarkId(null)
-    } else {
-      setExpandedMarkId(markId)
-      setEditingCharacter(currentCharacter)
-    }
-  }
-
   const handleDoubleClickConversation = (convId: string, currentName: string | null) => {
     setEditingConversationId(convId)
     setConversationNameInput(currentName || '')
@@ -217,11 +199,6 @@ const DialogueList = ({
   const handleCancelEditConversationName = () => {
     setEditingConversationId(null)
     setConversationNameInput('')
-  }
-
-  const handleConfirm = (mark: ProcessedDialogueMark) => {
-    onConfirmDialogue(mark.id, editingCharacter, mark.conversationId ?? 'unknown')
-    setExpandedMarkId(null)
   }
 
   return (
@@ -316,33 +293,40 @@ const DialogueList = ({
                 <div key={mark.id} className="border-b border-white/[.05] last:border-b-0">
                   <ListItem
                     label={
-                      <div className="flex items-center gap-2">
-                        {mark.userConfirmed && (
-                          <div title="Speaker confirmed by user">
-                            <CheckCircleIcon className="h-3.5 w-3.5 flex-shrink-0 text-green-400/80" />
-                          </div>
-                        )}
-                        <span>
-                          <span className="font-medium text-black/70">{mark.character}:</span>{' '}
-                          <span className="text-black/60">
-                            {mark.content.substring(0, 50)}
-                            {mark.content.length > 50 ? '...' : ''}
-                          </span>
+                      <div className="flex min-w-0 items-baseline">
+                        <span className="mr-1 flex-shrink-0 font-medium text-black/70">
+                          {mark.character}:
+                        </span>
+                        <span className="block overflow-hidden text-ellipsis whitespace-nowrap text-black/60">
+                          {mark.content}
                         </span>
                       </div>
                     }
-                    leftIcon={<ChatIcon className="mt-1 h-4 w-4 flex-shrink-0 text-black/40" />}
-                    onClick={() => handleToggleExpand(mark.id, mark.character)}
-                    rightIcon={
-                      expandedMarkId === mark.id ? (
-                        <ChevronUpIcon className="h-4 w-4 text-black/40" />
-                      ) : (
-                        <ChevronDownIcon className="h-4 w-4 text-black/40" />
-                      )
+                    leftIcon={
+                      <button
+                        onClick={e => {
+                          e.stopPropagation()
+                          onConfirmDialogue(
+                            mark.id,
+                            mark.character,
+                            mark.conversationId ?? 'unknown',
+                            !mark.userConfirmed,
+                          )
+                        }}
+                        className="mr-2 rounded p-0.5 transition-colors hover:bg-white/[.1]"
+                        title={mark.userConfirmed ? 'Mark as unconfirmed' : 'Mark as confirmed'}>
+                        {mark.userConfirmed ? (
+                          <CheckCircleIconSolid className="h-4 w-4 text-green-400/80" />
+                        ) : (
+                          <CheckCircleIcon className="h-4 w-4 text-black/40" />
+                        )}
+                      </button>
                     }
+                    onClick={undefined}
+                    rightIcon={null}
                     theme="dark"
                     itemContainerProps={{
-                      className: `transition-colors duration-150 ${expandedMarkId === mark.id ? 'bg-white/[.05]' : ''}`,
+                      className: 'transition-colors duration-150',
                       onMouseEnter: () => {
                         if (editor) {
                           const [start, end] = mark.id.split('-').map(Number)
@@ -358,38 +342,6 @@ const DialogueList = ({
                       },
                     }}
                   />
-                  <AnimatePresence>
-                    {expandedMarkId === mark.id && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2, ease: 'easeInOut' }}
-                        className="overflow-hidden bg-black/[.03]">
-                        <div className="p-3">
-                          <label className="mb-1 block text-xs font-medium text-black/60">
-                            Confirm Speaker
-                          </label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              value={editingCharacter}
-                              onChange={e => setEditingCharacter(e.target.value)}
-                              className="flex-grow rounded border border-white/10 bg-white/5 px-2 py-1 text-sm text-black/80 placeholder-black/40 focus:border-blue-500/50 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
-                              placeholder="Enter speaker name"
-                            />
-                            <button
-                              onClick={() => handleConfirm(mark)}
-                              disabled={!editingCharacter.trim()}
-                              className="rounded bg-green-600/80 px-2.5 py-1 text-xs font-medium text-white shadow-sm transition-colors hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-50"
-                              title="Confirm this speaker">
-                              Confirm
-                            </button>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
                 </div>
               ))}
             </div>
