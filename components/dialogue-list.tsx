@@ -313,7 +313,7 @@ const DialogueList = ({
                             !mark.userConfirmed,
                           )
                         }}
-                        className="mr-2 rounded p-0.5 transition-colors hover:bg-white/[.1]"
+                        className="mr-2 rounded p-1 transition-colors hover:bg-white/[.1]"
                         title={mark.userConfirmed ? 'Mark as unconfirmed' : 'Mark as confirmed'}>
                         {mark.userConfirmed ? (
                           <CheckCircleIconSolid className="h-4 w-4 text-green-400/80" />

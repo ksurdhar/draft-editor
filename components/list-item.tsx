@@ -185,7 +185,7 @@ export const ListItem = ({
         <div className="flex min-w-0 items-center gap-2">
           {leftIcon && (
             <div className="flex items-center gap-1">
-              <div className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">{leftIcon}</div>
+              <div className="flex shrink-0 items-center justify-center">{leftIcon}</div>
             </div>
           )}
           <div
