@@ -4,6 +4,7 @@ import React from 'react'
 import { Paper, Typography, Chip, Box, IconButton, Tooltip } from '@mui/material'
 import EditIcon from '@mui/icons-material/Edit'
 import { useNavigation } from '@components/providers' // Keep navigation if needed for doc links
+import { Button } from '@components/ui/button' // Correct import based on components.json
 
 // Minimal necessary CharacterData definition for props
 interface CharacterData {
@@ -100,6 +101,11 @@ const CharacterDetails: React.FC<CharacterDetailsProps> = ({ character, onEditCl
           </div>
         </Box>
       )}
+
+      {/* Add the button here */}
+      <div className="mt-5">
+        <Button>Test Shadcn Button</Button>
+      </div>
     </Paper>
   )
 }
