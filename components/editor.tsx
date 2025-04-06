@@ -238,7 +238,7 @@ const EditorComponent = ({
       </div>
       <div className="flex w-full flex-1 justify-center">
         <div className="w-full max-w-[740px] px-4">
-          <div ref={containerRef} className="prose w-full max-w-none">
+          <div ref={containerRef} className="prose w-full max-w-none font-editor2">
             <EditorContent
               editor={editor}
               className="h-full min-h-[calc(100vh-200px)] w-[692px] rounded-md px-4 pb-4 text-[19px] focus:outline-none focus:ring-0 md:text-[22px] [&_*]:focus:outline-none [&_*]:focus:ring-0"

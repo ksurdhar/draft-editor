@@ -1,10 +1,14 @@
 'use client'
 
 import React from 'react'
-import { Paper, Typography, Chip, Box, IconButton, Tooltip } from '@mui/material'
-import EditIcon from '@mui/icons-material/Edit'
-import { useNavigation } from '@components/providers' // Keep navigation if needed for doc links
-import { Button } from '@components/ui/button' // Correct import based on components.json
+// Remove MUI imports not needed anymore
+// import { Paper, Chip, Box, IconButton, Tooltip } from '@mui/material'
+import { Typography } from '@mui/material' // Keep for text elements for now
+// import EditIcon from '@mui/icons-material/Edit' // Edit button is handled differently
+import { useNavigation } from '@components/providers'
+// Import Shadcn Badge and Button
+import { Badge } from '@components/ui/badge'
+import { Button } from '@components/ui/button'
 
 // Minimal necessary CharacterData definition for props
 interface CharacterData {
@@ -18,95 +22,84 @@ interface CharacterData {
 
 interface CharacterDetailsProps {
   character: CharacterData | null
-  onEditClick: () => void
+  onEditClick: () => void // Keep prop to trigger modal from parent sheet
 }
 
 const CharacterDetails: React.FC<CharacterDetailsProps> = ({ character, onEditClick }) => {
   const { navigateTo } = useNavigation()
 
   if (!character) {
-    // Optionally handle the null character case here, though the parent likely handles it
     return null
   }
 
   return (
-    <Paper
-      elevation={0}
-      className="sticky top-[54px] overflow-hidden rounded-lg p-5"
-      sx={{
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        backdropFilter: 'blur(10px)',
-        height: 'fit-content',
-        maxHeight: 'calc(100vh - 120px)', // Adjust based on parent layout if needed
-        overflowY: 'auto',
-      }}>
-      <div className="mb-4 flex items-center justify-between">
-        <Typography variant="h4" className="font-bold">
-          {character.name}
+    // Remove Paper wrapper, component will render directly into SheetContent
+    <div className="space-y-4">
+      {/* Character Name is likely in SheetHeader, but keep details here */}
+      {/* Removed Edit icon button, edit is triggered differently now */}
+
+      <div>
+        <Typography variant="subtitle1" className="text-muted-foreground font-semibold">
+          Motivation:
         </Typography>
-        <Tooltip title="Edit Character">
-          <IconButton onClick={onEditClick} size="small">
-            <EditIcon />
-          </IconButton>
-        </Tooltip>
+        <Typography variant="body1" className="text-foreground">
+          {character.motivation || 'No motivation specified'}
+        </Typography>
       </div>
 
-      <Typography variant="subtitle1" className="mb-4 text-black/[.7]">
-        <span className="font-semibold">Motivation:</span> {character.motivation || 'No motivation specified'}
-      </Typography>
-
-      <Typography variant="body1" className="mb-5 text-black/[.8]">
-        {character.description || 'No description available'}
-      </Typography>
+      <div>
+        <Typography variant="subtitle1" className="text-muted-foreground font-semibold">
+          Description:
+        </Typography>
+        <Typography variant="body1" className="text-foreground">
+          {character.description || 'No description available'}
+        </Typography>
+      </div>
 
       {character.traits && character.traits.length > 0 && (
-        <Box className="mb-5">
-          <Typography variant="subtitle2" className="mb-2 font-semibold">
+        <div>
+          <Typography variant="subtitle1" className="text-muted-foreground mb-2 font-semibold">
             Traits:
           </Typography>
           <div className="flex flex-wrap gap-1">
             {character.traits.map((trait, index) => (
-              <Chip
-                key={index}
-                label={trait}
-                size="small"
-                color="primary"
-                variant="outlined"
-                sx={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
-              />
+              <Badge key={index} variant="secondary">
+                {trait}
+              </Badge>
             ))}
           </div>
-        </Box>
+        </div>
       )}
 
-      {/* Document links - Keep navigation logic here if tied to this component */}
       {character.documentIds && character.documentIds.length > 0 && (
-        <Box>
-          <Typography variant="subtitle2" className="mb-2 font-semibold">
+        <div>
+          <Typography variant="subtitle1" className="text-muted-foreground mb-2 font-semibold">
             Appears in:
           </Typography>
           <div className="flex flex-wrap gap-2">
             {character.documentIds.map((docId, index) => (
-              // Find a better way to get document titles later if possible
-              <Chip
-                key={docId} // Use docId for key
-                label={`Document ${index + 1}`} // Placeholder label
-                size="small"
-                color="secondary"
-                variant="outlined"
-                onClick={() => navigateTo(`/documents/${docId}`)}
-                sx={{ backgroundColor: 'rgba(255, 255, 255, 0.2)', cursor: 'pointer' }}
-              />
+              <Badge
+                key={docId}
+                variant="outline"
+                className="hover:bg-accent cursor-pointer"
+                onClick={() => navigateTo(`/documents/${docId}`)}>
+                {/* TODO: Fetch document titles if possible, maybe store on character? */}
+                {`Document ${index + 1}`}
+              </Badge>
             ))}
           </div>
-        </Box>
+        </div>
       )}
 
-      {/* Add the button here */}
-      <div className="mt-5">
-        <Button>Test Shadcn Button</Button>
+      {/* Add the Edit button here to trigger the modal via onEditClick */}
+      <div className="mt-6 border-t pt-4">
+        <Button onClick={onEditClick} variant="outline" size="sm">
+          Edit Character Details
+        </Button>
       </div>
-    </Paper>
+      {/* Remove the old test button */}
+      {/* <div className="mt-5"><Button>Test Shadcn Button</Button></div> */}
+    </div>
   )
 }
 
