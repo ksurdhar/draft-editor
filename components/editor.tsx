@@ -1,5 +1,5 @@
 'use client'
-import { useEditor, EditorContent } from '@tiptap/react'
+import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { DocumentData } from '../types/globals'
 import { useEffect, useRef, useState } from 'react'
@@ -12,6 +12,8 @@ import { DiffHighlight } from '../lib/tiptap-extensions/diff-highlight'
 import { DialogueMark } from '../lib/tiptap-extensions/dialogue-mark'
 import { DialogueHighlight } from '../lib/tiptap-extensions/dialogue-highlight'
 import { DialogueFocus } from '../lib/tiptap-extensions/dialogue-focus'
+import BubbleMenuExtension from '@tiptap/extension-bubble-menu'
+import DialogueBubbleMenu from './dialogue-bubble-menu'
 
 // Add styles to override ProseMirror defaults
 const editorStyles = `
@@ -60,6 +62,7 @@ type EditorProps = {
   initialFocusConversationId?: string | null
   highlightCharacterName?: string | null
   filteredContent?: any
+  isDialogueEditMode?: boolean
 }
 
 const DEFAULT_CONTENT = {
@@ -85,6 +88,7 @@ const EditorComponent = ({
   initialFocusConversationId,
   highlightCharacterName,
   filteredContent,
+  isDialogueEditMode,
 }: EditorProps) => {
   const [inputValue, setInputValue] = useState(title === 'Untitled' ? '' : title)
   const [showFindPanel, setShowFindPanel] = useState(false)
@@ -113,33 +117,47 @@ const EditorComponent = ({
     }
   })()
 
-  const editor = useEditor({
-    extensions: [StarterKit, SearchHighlight, DiffHighlight, DialogueMark, DialogueHighlight, DialogueFocus],
-    content: initialContent,
-    editable: canEdit && !diffMode,
-    onUpdate: ({ editor }) => {
-      if (diffMode) return // Prevent updates in diff mode
-      const json = editor.getJSON()
-      onUpdate({
-        content: JSON.stringify(json),
-        title: inputValue || 'Untitled',
-      })
-    },
-    onCreate: ({ editor }) => {
-      if (onEditorReady) {
-        onEditorReady(editor)
-      }
-      // Set initial focus and optional character highlight
-      if (initialFocusConversationId) {
-        editor.commands.setDialogueFocus(initialFocusConversationId)
-        // If a specific character should be highlighted within the focused conversation
-        if (highlightCharacterName) {
-          // TODO: Verify/implement this command in the DialogueHighlight extension
-          editor.commands.setDialogueHighlightCharacter(initialFocusConversationId, highlightCharacterName)
+  const editor = useEditor(
+    {
+      extensions: [
+        StarterKit,
+        SearchHighlight,
+        DiffHighlight,
+        DialogueMark,
+        DialogueHighlight,
+        DialogueFocus,
+        BubbleMenuExtension.configure({
+          pluginKey: 'dialogueBubbleMenu',
+          tippyOptions: { duration: 100 },
+        }),
+      ],
+      content: initialContent,
+      editable: canEdit && !diffMode,
+      onUpdate: ({ editor }) => {
+        if (diffMode) return // Prevent updates in diff mode
+        const json = editor.getJSON()
+        onUpdate({
+          content: JSON.stringify(json),
+          title: inputValue || 'Untitled',
+        })
+      },
+      onCreate: ({ editor }) => {
+        if (onEditorReady) {
+          onEditorReady(editor)
         }
-      }
+        // Set initial focus and optional character highlight
+        if (initialFocusConversationId) {
+          editor.commands.setDialogueFocus(initialFocusConversationId)
+          // If a specific character should be highlighted within the focused conversation
+          if (highlightCharacterName) {
+            // TODO: Verify/implement this command in the DialogueHighlight extension
+            editor.commands.setDialogueHighlightCharacter(initialFocusConversationId, highlightCharacterName)
+          }
+        }
+      },
     },
-  })
+    [isDialogueEditMode, content, diffMode, canEdit],
+  )
 
   // Track content prop changes
   useEffect(() => {
@@ -228,6 +246,29 @@ const EditorComponent = ({
           </div>
         </div>
       </div>
+      {editor && (
+        <BubbleMenu
+          editor={editor}
+          tippyOptions={{ duration: 100, placement: 'bottom-start' }}
+          shouldShow={({ state, editor: _currentEditor }) => {
+            const { selection } = state
+            const { $from, $to } = selection
+            const text = state.doc.textBetween($from.pos, $to.pos, ' ')
+            const show = !!isDialogueEditMode && !selection.empty && text.trim().length > 0
+
+            console.log('[BubbleMenu shouldShow]', {
+              isDialogueEditMode,
+              isSelectionEmpty: selection.empty,
+              selectedText: text,
+              trimmedTextLength: text.trim().length,
+              show,
+            })
+
+            return show
+          }}>
+          <DialogueBubbleMenu editor={editor} />
+        </BubbleMenu>
+      )}
       {showFindPanel && editor && <FindPanel editor={editor} onClose={() => setShowFindPanel(false)} />}
       {!hideFooter && <Footer editor={editor} initFadeIn={initFadeIn} fadeOut={fadeOut} />}
     </div>

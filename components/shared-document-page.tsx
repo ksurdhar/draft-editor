@@ -13,7 +13,15 @@ import { useCallback, useEffect, useState, useMemo } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useDebouncedCallback } from 'use-debounce'
 import { motion, AnimatePresence } from 'framer-motion'
-import { EyeIcon, EyeOffIcon, ClockIcon, SearchIcon, ChatIcon, CodeIcon } from '@heroicons/react/outline'
+import {
+  EyeIcon,
+  EyeOffIcon,
+  ClockIcon,
+  SearchIcon,
+  ChatIcon,
+  CodeIcon,
+  PencilAltIcon,
+} from '@heroicons/react/outline'
 import VersionList from '@components/version-list'
 import GlobalFind from '@components/global-find'
 import DialogueList from '@components/dialogue-list'
@@ -207,6 +215,8 @@ export default function SharedDocumentPage() {
   const [diffContent, setDiffContent] = useState<any>(null)
   const [showInitialLoader, setShowInitialLoader] = useState(false)
   const [isSyncingDialogue, setIsSyncingDialogue] = useState(false)
+  const [dialogueDoc, setDialogueDoc] = useState<any>(null)
+  const [isDialogueEditMode, setIsDialogueEditMode] = useState(false)
 
   const debouncedSave = useDebouncedCallback((data: Partial<DocumentData>) => {
     mutate(`/documents/${documentId}/versions`)
@@ -528,20 +538,6 @@ export default function SharedDocumentPage() {
     }
   }, [editor, isDialogueMode])
 
-  const [dialogueDoc, setDialogueDoc] = useState<any>(documentContent)
-
-  useEffect(() => {
-    if (editor) {
-      const updateDialogueDoc = () => {
-        setDialogueDoc(editor.getJSON())
-      }
-      editor.on('transaction', updateDialogueDoc)
-      return () => {
-        editor.off('transaction', updateDialogueDoc)
-      }
-    }
-  }, [editor])
-
   // Function to update the conversation name using the editor command
   const handleUpdateConversationName = useCallback(
     (conversationId: string, newName: string) => {
@@ -628,6 +624,14 @@ export default function SharedDocumentPage() {
                 className="rounded-lg p-1.5 transition-colors hover:bg-white/[.1]"
                 title={showDialogue ? 'Hide dialogue' : 'Show dialogue'}>
                 <ChatIcon className="h-4 w-4 text-black/70" />
+              </button>
+              <button
+                onClick={() => setIsDialogueEditMode(!isDialogueEditMode)}
+                className={`rounded-lg p-1.5 transition-colors hover:bg-white/[.1] ${
+                  isDialogueEditMode ? 'bg-blue-500/20 text-blue-400' : 'text-black/70'
+                }`}
+                title={isDialogueEditMode ? 'Disable Dialogue Editing' : 'Enable Dialogue Editing'}>
+                <PencilAltIcon className="h-4 w-4" />
               </button>
               <button
                 onClick={() => setShowDebugPanel(!showDebugPanel)}
@@ -768,6 +772,7 @@ export default function SharedDocumentPage() {
                         canEdit={!diffContent}
                         hideFooter={!!diffContent}
                         onEditorReady={handleEditorReady}
+                        isDialogueEditMode={isDialogueEditMode}
                       />
                     </motion.div>
                   )}
