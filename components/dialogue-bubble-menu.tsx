@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Editor } from '@tiptap/react'
 import { nanoid } from 'nanoid'
 import { Node as ProseMirrorNode } from 'prosemirror-model'
-import { PlusIcon } from '@heroicons/react/solid' // For the add button
+import { PlusIcon, XCircleIcon } from '@heroicons/react/solid' // Added XCircleIcon
 
 interface DialogueBubbleMenuProps {
   editor: Editor
@@ -47,6 +47,7 @@ const DialogueBubbleMenu: React.FC<DialogueBubbleMenuProps> = ({ editor }) => {
   const [existingSpeakers, setExistingSpeakers] = useState<string[]>([])
   const [showNewSpeakerInput, setShowNewSpeakerInput] = useState(false)
   const [newSpeakerName, setNewSpeakerName] = useState('')
+  const [selectionHasDialogueMark, setSelectionHasDialogueMark] = useState(false) // State for mark detection
 
   // Fetch existing speakers when the editor updates
   useEffect(() => {
@@ -59,6 +60,34 @@ const DialogueBubbleMenu: React.FC<DialogueBubbleMenuProps> = ({ editor }) => {
       editor.off('transaction', updateSpeakers)
     }
   }, [editor])
+
+  // Check selection for dialogue mark on transaction/selection update
+  useEffect(() => {
+    const checkSelection = () => {
+      const { selection } = editor.state
+      const { from, to, empty } = selection
+      let foundMark = false
+
+      if (!empty) {
+        editor.state.doc.nodesBetween(from, to, node => {
+          if (node.marks.some(mark => mark.type.name === 'dialogue')) {
+            foundMark = true
+            return false // Stop iterating once found
+          }
+          return true
+        })
+      }
+      setSelectionHasDialogueMark(foundMark)
+    }
+
+    // Check on initial mount and subsequent updates
+    checkSelection()
+    editor.on('transaction', checkSelection) // Covers content and selection changes
+
+    return () => {
+      editor.off('transaction', checkSelection)
+    }
+  }, [editor]) // Re-run if editor instance changes (though unlikely)
 
   const applyMark = (speaker: string) => {
     const finalSpeaker = speaker.trim()
@@ -86,6 +115,12 @@ const DialogueBubbleMenu: React.FC<DialogueBubbleMenuProps> = ({ editor }) => {
   const handleNewSpeakerSubmit = (e?: React.FormEvent<HTMLFormElement>) => {
     e?.preventDefault() // Prevent form submission if used in a form
     applyMark(newSpeakerName)
+  }
+
+  const handleRemoveDialogue = () => {
+    editor.chain().focus().unsetDialogueMark().run()
+    // No need to manually set selectionHasDialogueMark to false here,
+    // the transaction listener in the useEffect will handle it.
   }
 
   return (
@@ -136,6 +171,18 @@ const DialogueBubbleMenu: React.FC<DialogueBubbleMenuProps> = ({ editor }) => {
           </form>
         )}
       </div>
+
+      {/* Remove Dialogue Button - Conditionally Rendered */}
+      {selectionHasDialogueMark && (
+        <div className="mt-1 border-t border-gray-200 pt-2">
+          <button
+            onClick={handleRemoveDialogue}
+            className="flex w-full items-center justify-center gap-1 rounded bg-red-100 px-2 py-1 text-xs text-red-700 transition-colors hover:bg-red-200">
+            <XCircleIcon className="h-3.5 w-3.5" />
+            Remove Dialogue
+          </button>
+        </div>
+      )}
 
       {/* Conversation Name Input Removed */}
     </div>
