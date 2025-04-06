@@ -10,7 +10,6 @@ import {
   EyeOffIcon,
 } from '@heroicons/react/outline'
 import { ListItem } from './list-item'
-import { useDebouncedCallback } from 'use-debounce'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Editor } from '@tiptap/react'
 
@@ -52,7 +51,6 @@ interface GroupedDialogue {
 }
 
 const DialogueList = ({
-  currentContent,
   editor,
   onSyncDialogue,
   isSyncing,
@@ -61,161 +59,108 @@ const DialogueList = ({
   onToggleFocus,
   onUpdateConversationName,
 }: DialogueListProps) => {
-  const [validDialogueMarks, setValidDialogueMarks] = useState<ProcessedDialogueMark[]>([])
+  const [processedMarks, setProcessedMarks] = useState<ProcessedDialogueMark[]>([])
   const [expandedMarkId, setExpandedMarkId] = useState<string | null>(null)
   const [editingCharacter, setEditingCharacter] = useState<string>('')
   const [editingConversationId, setEditingConversationId] = useState<string | null>(null)
   const [conversationNameInput, setConversationNameInput] = useState('')
 
-  const dialogueMarks = useMemo(() => {
-    if (!editor || !editor.state.doc) {
-      return []
+  useEffect(() => {
+    if (!editor) {
+      setProcessedMarks([])
+      return
     }
 
-    const doc = editor.state.doc
+    const calculateMarks = (): ProcessedDialogueMark[] => {
+      if (!editor.state.doc) return []
 
-    const marks: ProcessedDialogueMark[] = []
-    let currentGroup: ProcessedDialogueMark | null = null
+      const doc = editor.state.doc
+      const marks: ProcessedDialogueMark[] = []
+      let currentGroup: ProcessedDialogueMark | null = null
 
-    doc.descendants((node, pos) => {
-      if (node.isText && node.text) {
-        const text = node.text
-        const nodeEndPos = pos + node.nodeSize
-        const dialogueMarkData = node.marks.find(mark => mark.type.name === 'dialogue')
+      doc.descendants((node, pos) => {
+        if (node.isText && node.text) {
+          const text = node.text
+          const nodeEndPos = pos + node.nodeSize
+          const dialogueMarkData = node.marks.find(mark => mark.type.name === 'dialogue')
 
-        if (dialogueMarkData) {
-          const markAttrs = dialogueMarkData.attrs as DialogueMark['attrs']
-          const markInfo = {
-            character: markAttrs.character,
-            conversationId: markAttrs.conversationId || null,
-            conversationName: markAttrs.conversationName || null,
-            userConfirmed: markAttrs.userConfirmed || false,
-          }
+          if (dialogueMarkData) {
+            const markAttrs = dialogueMarkData.attrs as DialogueMark['attrs']
+            const markInfo = {
+              character: markAttrs.character,
+              conversationId: markAttrs.conversationId || null,
+              conversationName: markAttrs.conversationName || null,
+              userConfirmed: markAttrs.userConfirmed || false,
+            }
 
-          if (
-            currentGroup &&
-            currentGroup.character === markInfo.character &&
-            currentGroup.conversationId === markInfo.conversationId &&
-            currentGroup.conversationName === markInfo.conversationName &&
-            pos === parseInt(currentGroup.id.split('-')[1], 10)
-          ) {
-            currentGroup.content += text
-            const [start] = currentGroup.id.split('-').map(Number)
-            currentGroup.id = `${start}-${nodeEndPos}`
-            if (markInfo.userConfirmed) {
-              currentGroup.userConfirmed = true
+            if (
+              currentGroup &&
+              currentGroup.character === markInfo.character &&
+              currentGroup.conversationId === markInfo.conversationId &&
+              currentGroup.conversationName === markInfo.conversationName &&
+              pos === parseInt(currentGroup.id.split('-')[1], 10)
+            ) {
+              currentGroup.content += text
+              const [start] = currentGroup.id.split('-').map(Number)
+              currentGroup.id = `${start}-${nodeEndPos}`
+              if (markInfo.userConfirmed) {
+                currentGroup.userConfirmed = true
+              }
+            } else {
+              if (currentGroup) {
+                marks.push(currentGroup)
+              }
+              currentGroup = {
+                id: `${pos}-${nodeEndPos}`,
+                character: markInfo.character,
+                content: text,
+                conversationId: markInfo.conversationId,
+                conversationName: markInfo.conversationName,
+                userConfirmed: markInfo.userConfirmed,
+              }
             }
           } else {
             if (currentGroup) {
               marks.push(currentGroup)
-            }
-            currentGroup = {
-              id: `${pos}-${nodeEndPos}`,
-              character: markInfo.character,
-              content: text,
-              conversationId: markInfo.conversationId,
-              conversationName: markInfo.conversationName,
-              userConfirmed: markInfo.userConfirmed,
+              currentGroup = null
             }
           }
+          return true
         } else {
           if (currentGroup) {
             marks.push(currentGroup)
             currentGroup = null
           }
+          return true
         }
-        return true
-      } else {
-        if (currentGroup) {
-          marks.push(currentGroup)
-          currentGroup = null
-        }
-        return true
-      }
-    })
+      })
 
-    if (currentGroup) {
-      marks.push(currentGroup)
+      if (currentGroup) {
+        marks.push(currentGroup)
+      }
+
+      const filteredMarks = marks.filter(mark => mark.content.trim().length > 0)
+      return filteredMarks
     }
 
-    const filteredMarks = marks.filter(mark => mark.content.trim().length > 0)
-    return filteredMarks
-  }, [editor, currentContent])
+    setProcessedMarks(calculateMarks())
 
-  const validateDialogueMarks = useDebouncedCallback(
-    () => {
-      const doc = editor?.state.doc
-      const contentToCheck = doc ? { type: 'doc', content: doc.content } : currentContent
+    const handleTransaction = () => {
+      setProcessedMarks(calculateMarks())
+    }
 
-      if (!contentToCheck?.content) {
-        setValidDialogueMarks([])
-        return
-      }
-      const checkNodeForMarkPresence = (targetMark: ProcessedDialogueMark): boolean => {
-        let found = false
-        const [start, end] = targetMark.id.split('-').map(Number)
-        if (isNaN(start) || isNaN(end)) return false
+    editor.on('transaction', handleTransaction)
 
-        if (doc) {
-          doc.descendants((node, pos) => {
-            if (found) return false
-            if (node.isText) {
-              const nodeEnd = pos + node.nodeSize
-              if (pos < end && nodeEnd > start) {
-                const dialogueMark = node.marks.find(m => m.type.name === 'dialogue')
-                if (
-                  dialogueMark &&
-                  (dialogueMark.attrs.conversationId || null) === targetMark.conversationId &&
-                  dialogueMark.attrs.character === targetMark.character &&
-                  (dialogueMark.attrs.conversationName || null) === targetMark.conversationName
-                ) {
-                  found = true
-                }
-              }
-            }
-            return !found
-          })
-        } else {
-          console.warn('validateDialogueMarks: using currentContent fallback')
-          contentToCheck?.content?.descendants((node: any, pos: number) => {
-            if (found) return false
-            if (node.isText) {
-              const nodeEnd = pos + node.nodeSize
-              if (pos < end && nodeEnd > start) {
-                const dialogueMark = node.marks.find((m: any) => m.type === 'dialogue')
-                if (
-                  dialogueMark &&
-                  (dialogueMark.attrs.conversationId || null) === targetMark.conversationId &&
-                  dialogueMark.attrs.character === targetMark.character &&
-                  (dialogueMark.attrs.conversationName || null) === targetMark.conversationName
-                ) {
-                  found = true
-                }
-              }
-            }
-            return true
-          })
-        }
-        return found
-      }
-
-      const stillValidMarks = dialogueMarks.filter(checkNodeForMarkPresence)
-      setValidDialogueMarks(stillValidMarks)
-    },
-    500,
-    { leading: false, trailing: true },
-  )
-
-  useEffect(() => {
-    setValidDialogueMarks(dialogueMarks)
-    validateDialogueMarks()
-  }, [dialogueMarks, validateDialogueMarks, editor])
+    return () => {
+      editor.off('transaction', handleTransaction)
+    }
+  }, [editor])
 
   const groupedDialogues = useMemo(() => {
     type GroupData = { dialogues: ProcessedDialogueMark[]; conversationName: string | null }
     const groups: Record<string, GroupData> = {}
 
-    validDialogueMarks.forEach(mark => {
+    processedMarks.forEach(mark => {
       const convId = mark.conversationId ?? 'unknown'
       if (!groups[convId]) {
         groups[convId] = { dialogues: [], conversationName: null }
@@ -245,7 +190,7 @@ const DialogueList = ({
       })
 
     return grouped
-  }, [validDialogueMarks])
+  }, [processedMarks])
 
   const handleToggleExpand = (markId: string, currentCharacter: string) => {
     if (expandedMarkId === markId) {
@@ -292,7 +237,7 @@ const DialogueList = ({
         </button>
       </div>
 
-      {validDialogueMarks.length === 0 ? (
+      {processedMarks.length === 0 ? (
         <div className="flex h-full items-center justify-center py-10">
           <div className="text-center text-xs text-black/50">
             {isSyncing ? 'Scanning for dialogue...' : 'No dialogue detected or Sync needed.'}
