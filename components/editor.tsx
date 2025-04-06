@@ -62,7 +62,7 @@ type EditorProps = {
   initialFocusConversationId?: string | null
   highlightCharacterName?: string | null
   filteredContent?: any
-  isDialogueEditMode?: boolean
+  isDialogueMode?: boolean
 }
 
 const DEFAULT_CONTENT = {
@@ -88,7 +88,7 @@ const EditorComponent = ({
   initialFocusConversationId,
   highlightCharacterName,
   filteredContent,
-  isDialogueEditMode,
+  isDialogueMode,
 }: EditorProps) => {
   const [inputValue, setInputValue] = useState(title === 'Untitled' ? '' : title)
   const [showFindPanel, setShowFindPanel] = useState(false)
@@ -156,7 +156,7 @@ const EditorComponent = ({
         }
       },
     },
-    [isDialogueEditMode, content, diffMode, canEdit],
+    [content, diffMode, canEdit, isDialogueMode],
   )
 
   // Track content prop changes
@@ -254,10 +254,10 @@ const EditorComponent = ({
             const { selection } = state
             const { $from, $to } = selection
             const text = state.doc.textBetween($from.pos, $to.pos, ' ')
-            const show = !!isDialogueEditMode && !selection.empty && text.trim().length > 0
+            const show = !!isDialogueMode && !selection.empty && text.trim().length > 0
 
             console.log('[BubbleMenu shouldShow]', {
-              isDialogueEditMode,
+              isDialogueMode,
               isSelectionEmpty: selection.empty,
               selectedText: text,
               trimmedTextLength: text.trim().length,

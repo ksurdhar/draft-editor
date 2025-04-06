@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Editor } from '@tiptap/react'
 import { nanoid } from 'nanoid'
 import { Node as ProseMirrorNode } from 'prosemirror-model'
-import { PlusIcon, XCircleIcon } from '@heroicons/react/solid' // Added XCircleIcon
+import { PlusIcon, XCircleIcon } from '@heroicons/react/solid'
 
 interface DialogueBubbleMenuProps {
   editor: Editor
@@ -42,6 +42,8 @@ function getColorFromHashCode(hashCode: number): string {
   const hue = Math.abs(hashCode) % 360
   return `hsl(${hue}, 70%, 80%)` // Use HSL for pastel-like colors
 }
+
+// --- End Helper Functions ---
 
 const DialogueBubbleMenu: React.FC<DialogueBubbleMenuProps> = ({ editor }) => {
   const [existingSpeakers, setExistingSpeakers] = useState<string[]>([])
@@ -90,24 +92,99 @@ const DialogueBubbleMenu: React.FC<DialogueBubbleMenuProps> = ({ editor }) => {
   }, [editor]) // Re-run if editor instance changes (though unlikely)
 
   const applyMark = (speaker: string) => {
+    console.log('[applyMark] Called with speaker:', speaker)
     const finalSpeaker = speaker.trim()
     if (!finalSpeaker) return
 
-    const finalConversationId = `conv-${nanoid(6)}`
+    const { state } = editor
+    const { selection } = state
+    const { from, to } = selection
+    const doc = state.doc
 
-    editor
+    let conversationIdToUse: string | null = null
+    console.log('[applyMark] Starting range search for nearest conversation...')
+
+    let closestIdBefore: string | null = null
+    let closestPosBefore = -1
+    let closestIdAfter: string | null = null
+    let closestPosAfter = Infinity
+
+    try {
+      doc.nodesBetween(0, doc.content.size, (node, pos) => {
+        if (!node.isText) return true // Only check text nodes
+
+        const dialogueMark = node.marks.find(m => m.type.name === 'dialogue')
+        // Check for both potential attribute casings, prioritizing camelCase
+        const currentId = dialogueMark?.attrs.conversationId || dialogueMark?.attrs.conversationid || null
+
+        if (dialogueMark && currentId) {
+          // Check if we found an ID in either casing
+          const nodeEndPos = pos + node.nodeSize
+
+          console.log(
+            `[applyMark] Found mark in range search at pos ${pos}-${nodeEndPos} with ID: ${currentId} (case: ${dialogueMark?.attrs.conversationId ? 'camel' : 'lower'})`,
+          )
+
+          // Check if this node overlaps or is *before* the selection start
+          // We consider positions up to 'from' itself
+          if (nodeEndPos <= from) {
+            // Node ends before or at the selection start
+            if (pos >= closestPosBefore) {
+              // Found one closer (or same pos, take latest)
+              closestIdBefore = currentId
+              closestPosBefore = pos
+              console.log(` -> Storing as closestBefore (pos ${pos})`)
+            }
+          } else if (pos >= to) {
+            // Node starts at or after the selection end
+            if (pos <= closestPosAfter) {
+              // Found one closer (or same pos, take earliest)
+              closestIdAfter = currentId
+              closestPosAfter = pos
+              console.log(` -> Storing as closestAfter (pos ${pos})`)
+            }
+          }
+          // Note: This logic currently ignores marks *within* the selection range (from, to)
+          // because we usually want to connect to neighbors, not overwrite the middle.
+        }
+        return true // Continue searching
+      })
+    } catch (error) {
+      console.error('[applyMark] Error during nodesBetween search:', error)
+    }
+
+    // Prioritize the conversation found before the selection
+    if (closestIdBefore) {
+      conversationIdToUse = closestIdBefore
+      console.log('[applyMark] Prioritizing closestBefore result:', conversationIdToUse)
+    } else if (closestIdAfter) {
+      conversationIdToUse = closestIdAfter
+      console.log('[applyMark] Using closestAfter result:', conversationIdToUse)
+    } else {
+      console.log('[applyMark] No conversation found within search range.')
+    }
+
+    // Generate new ID if none found nearby
+    const finalConversationId = conversationIdToUse || `conv-${nanoid(6)}`
+    console.log('[applyMark] Using finalConversationId:', finalConversationId)
+
+    // Apply the mark
+    console.log('[applyMark] Attempting to set mark...')
+    const result = editor
       .chain()
-      .focus() // Ensure editor has focus before applying mark
+      .focus()
       .setDialogueMark({
         character: finalSpeaker,
         conversationId: finalConversationId,
         conversationName: undefined,
         userConfirmed: true,
       })
-      // Optional: Extend selection to applied mark? Or clear selection?
+      .setTextSelection(to) // Move cursor to end of original selection
       .run()
+    console.log('[applyMark] Mark setting result:', result)
 
     // Reset related state
+    console.log('[applyMark] Resetting local state...')
     setShowNewSpeakerInput(false)
     setNewSpeakerName('')
   }

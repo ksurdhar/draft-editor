@@ -13,15 +13,7 @@ import { useCallback, useEffect, useState, useMemo } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useDebouncedCallback } from 'use-debounce'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  EyeIcon,
-  EyeOffIcon,
-  ClockIcon,
-  SearchIcon,
-  ChatIcon,
-  CodeIcon,
-  PencilAltIcon,
-} from '@heroicons/react/outline'
+import { EyeIcon, EyeOffIcon, ClockIcon, SearchIcon, ChatIcon, CodeIcon } from '@heroicons/react/outline'
 import VersionList from '@components/version-list'
 import GlobalFind from '@components/global-find'
 import DialogueList from '@components/dialogue-list'
@@ -216,7 +208,6 @@ export default function SharedDocumentPage() {
   const [showInitialLoader, setShowInitialLoader] = useState(false)
   const [isSyncingDialogue, setIsSyncingDialogue] = useState(false)
   const [dialogueDoc, setDialogueDoc] = useState<any>(null)
-  const [isDialogueEditMode, setIsDialogueEditMode] = useState(false)
 
   const debouncedSave = useDebouncedCallback((data: Partial<DocumentData>) => {
     mutate(`/documents/${documentId}/versions`)
@@ -626,14 +617,6 @@ export default function SharedDocumentPage() {
                 <ChatIcon className="h-4 w-4 text-black/70" />
               </button>
               <button
-                onClick={() => setIsDialogueEditMode(!isDialogueEditMode)}
-                className={`rounded-lg p-1.5 transition-colors hover:bg-white/[.1] ${
-                  isDialogueEditMode ? 'bg-blue-500/20 text-blue-400' : 'text-black/70'
-                }`}
-                title={isDialogueEditMode ? 'Disable Dialogue Editing' : 'Enable Dialogue Editing'}>
-                <PencilAltIcon className="h-4 w-4" />
-              </button>
-              <button
                 onClick={() => setShowDebugPanel(!showDebugPanel)}
                 className="rounded-lg p-1.5 transition-colors hover:bg-white/[.1]"
                 title={showDebugPanel ? 'Hide Debug Panel' : 'Show Debug Panel'}>
@@ -738,7 +721,9 @@ export default function SharedDocumentPage() {
 
         {/* ---- Debug Panel ---- */}
         <AnimatePresence>
-          {showDebugPanel && <DebugPanel content={dialogueDoc} onClose={() => setShowDebugPanel(false)} />}
+          {showDebugPanel && (
+            <DebugPanel content={documentContent} onClose={() => setShowDebugPanel(false)} />
+          )}
         </AnimatePresence>
 
         {/* Editor Container */}
@@ -772,7 +757,7 @@ export default function SharedDocumentPage() {
                         canEdit={!diffContent}
                         hideFooter={!!diffContent}
                         onEditorReady={handleEditorReady}
-                        isDialogueEditMode={isDialogueEditMode}
+                        isDialogueMode={isDialogueMode}
                       />
                     </motion.div>
                   )}
