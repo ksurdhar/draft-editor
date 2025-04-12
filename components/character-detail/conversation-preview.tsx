@@ -6,7 +6,7 @@ import { Button } from '@components/ui/button' // Add Button for toggle
 import { Typography } from '@mui/material'
 import TiptapJsonRenderer from '@components/tiptap-json-renderer'
 import EditorComponent from '@components/editor' // Import Editor
-import { useAPI } from '@components/providers' // Import API hook
+import { useAPI, useNavigation } from '@components/providers' // Import API hook and useNavigation
 import { Loader } from '@components/loader' // Import Loader
 import { debounce } from '@lib/utils' // Import debounce
 import { DocumentData } from '@typez/globals' // Import DocumentData type
@@ -202,6 +202,7 @@ const mergeEditedSection = (fullContent: any, editedSection: any, conversationId
 // --- Component ---
 const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation /*, characterName */ }) => {
   const { get, patch } = useAPI()
+  const { navigateTo } = useNavigation() // Add navigation hook
   const [isEditing, setIsEditing] = useState(false)
   const [editorContent, setEditorContent] = useState<any>(null)
   const [isLoadingEditor, setIsLoadingEditor] = useState(false)
@@ -329,7 +330,10 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation 
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
           <CardTitle>Conversation: {currentConversationData.conversationId}</CardTitle>
-          <Typography variant="caption" className="text-muted-foreground">
+          <Typography
+            variant="caption"
+            className="cursor-pointer text-muted-foreground/75 hover:text-muted-foreground hover:underline"
+            onClick={() => navigateTo(`/documents/${currentConversationData.documentId}`)}>
             From: {currentConversationData.documentTitle}
           </Typography>
         </div>
