@@ -157,7 +157,7 @@ const CharacterDetailPageContainer = ({
     <Layout>
       <div className="gradient-editor fixed left-0 top-0 z-[-1] h-screen w-screen" />
       <div
-        className={`gradient fixed left-0 top-0 z-[-1] h-screen w-screen transition-opacity duration-[3000ms] ease-in-out ${
+        className={`gradient duration-[3000ms] fixed left-0 top-0 z-[-1] h-screen w-screen transition-opacity ease-in-out ${
           initAnimate ? 'opacity-100' : 'opacity-0'
         }`}
       />
@@ -186,7 +186,7 @@ const CharacterDetailPageContainer = ({
         </div>
 
         <div className="mx-auto grid w-11/12 max-w-[1600px] flex-1 grid-cols-1 gap-6 overflow-hidden px-4 md:grid-cols-2">
-          <div className="bg-card text-card-foreground col-span-1 flex flex-col overflow-hidden rounded-lg border shadow-sm">
+          <div className="col-span-1 flex flex-col overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm">
             <CharacterConversations
               key={character.name}
               characterName={character.name}
@@ -196,7 +196,7 @@ const CharacterDetailPageContainer = ({
               selectedConversationId={selectedConversation?.conversationId}
             />
           </div>
-          <div className="bg-card text-card-foreground not-prose col-span-1 flex flex-col overflow-hidden rounded-lg border shadow-sm">
+          <div className="col-span-1 flex flex-col overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm">
             <ConversationPreview conversation={selectedConversation} characterName={character.name} />
           </div>
         </div>
