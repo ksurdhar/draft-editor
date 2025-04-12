@@ -315,9 +315,12 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation 
   if (!currentConversationData) {
     return (
       <Card className="flex h-full items-center justify-center">
-        <CardContent>
-          <Typography variant="body2" className="text-muted-foreground">
+        <CardContent className="flex flex-col items-center justify-center">
+          <Typography variant="body1" className="mb-2 text-center text-muted-foreground">
             Select a conversation to view its details.
+          </Typography>
+          <Typography variant="caption" className="max-w-md text-center text-muted-foreground/75">
+            Choose a conversation from the list on the left to see the dialogue and participants here.
           </Typography>
         </CardContent>
       </Card>
