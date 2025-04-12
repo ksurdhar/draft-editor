@@ -32,6 +32,7 @@ interface DialogueEntry {
 }
 interface ConversationGroup {
   conversationId: string
+  conversationName?: string | null
   documentId: string
   documentTitle: string
   entries: DialogueEntry[]
@@ -41,7 +42,51 @@ interface ConversationGroup {
 // --- Component Props ---
 interface ConversationPreviewProps {
   conversation: ConversationGroup | null
-  characterName: string // Needed for re-extracting after save
+  // characterName: string // Removed - No longer needed
+}
+
+// --- Helper: Extract Specific Conversation Entries ---
+const extractConversationEntries = (documentContent: any, targetConversationId: string): DialogueEntry[] => {
+  const entries: DialogueEntry[] = []
+
+  const processNode = (node: TiptapNode) => {
+    if (node.type === 'text' && node.marks) {
+      node.marks.forEach((mark: TiptapMark) => {
+        if (
+          mark.type === 'dialogue' &&
+          mark.attrs?.conversationId === targetConversationId &&
+          mark.attrs?.character &&
+          node.text
+        ) {
+          const { character } = mark.attrs
+          entries.push({
+            characterId: character,
+            characterName: character,
+            contentNode: { ...node }, // Store the text node itself
+          })
+        }
+      })
+    }
+    if (node.content && Array.isArray(node.content)) {
+      node.content.forEach(processNode)
+    }
+  }
+
+  let parsedContent = documentContent
+  if (typeof documentContent === 'string') {
+    try {
+      parsedContent = JSON.parse(documentContent)
+    } catch (e) {
+      console.error('Failed to parse content in extractConversationEntries:', e)
+      return []
+    }
+  }
+
+  if (parsedContent && parsedContent.type === 'doc') {
+    processNode(parsedContent)
+  }
+
+  return entries
 }
 
 // --- Helper: Extract Conversation Nodes (Re-added) ---
@@ -155,7 +200,7 @@ const mergeEditedSection = (fullContent: any, editedSection: any, conversationId
 }
 
 // --- Component ---
-const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation, characterName }) => {
+const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation /*, characterName */ }) => {
   const { get, patch } = useAPI()
   const [isEditing, setIsEditing] = useState(false)
   const [editorContent, setEditorContent] = useState<any>(null)
@@ -164,6 +209,8 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation,
   const [currentConversationData, setCurrentConversationData] = useState<ConversationGroup | null>(
     conversation,
   )
+  // Add loading state for view mode refresh
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false)
 
   // Update local state if the conversation prop changes from parent
   useEffect(() => {
@@ -179,6 +226,32 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation,
       // Switching from Edit to View
       setIsEditing(false)
       setEditorContent(null) // Clear editor content
+      // --- ADD REFRESH LOGIC HERE ---
+      // Fetch the latest data to update the view mode
+      const refreshView = async () => {
+        if (!currentConversationData) return
+        setIsLoadingPreview(true)
+        try {
+          const updatedDocument = await get(`/documents/${currentConversationData.documentId}`)
+          if (updatedDocument && updatedDocument.content) {
+            const updatedEntries = extractConversationEntries(
+              updatedDocument.content,
+              currentConversationData.conversationId,
+            )
+            setCurrentConversationData(prevData =>
+              prevData ? { ...prevData, entries: updatedEntries } : null,
+            )
+          } else {
+            console.error('Failed to fetch updated document content for view refresh.')
+          }
+        } catch (error) {
+          console.error('Error refreshing conversation view:', error)
+        } finally {
+          setIsLoadingPreview(false)
+        }
+      }
+      refreshView()
+      // --- END REFRESH LOGIC ---
     } else {
       // Switching from View to Edit
       setIsLoadingEditor(true)
@@ -236,12 +309,32 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation,
 
         // Update local state after save
         setEditorContent(updatedEditorContent)
-        // TODO: Ideally, re-extract and update `currentConversationData.entries` for view mode
+        // --- REFRESH VIEW DATA ---
+        // Fetch the full document again to get the definitive state
+        try {
+          const updatedDocument = await get(`/documents/${currentConversationData.documentId}`)
+          if (updatedDocument && updatedDocument.content) {
+            const updatedEntries = extractConversationEntries(
+              updatedDocument.content,
+              currentConversationData.conversationId,
+            )
+            // Update the conversation data state used for the view mode
+            setCurrentConversationData(prevData =>
+              prevData ? { ...prevData, entries: updatedEntries } : null,
+            )
+            console.log('Conversation view data refreshed after save.')
+          } else {
+            console.error('Failed to fetch updated document content after save.')
+          }
+        } catch (fetchError) {
+          console.error('Error fetching updated document after save:', fetchError)
+        }
+        // --- END REFRESH VIEW DATA ---
       } catch (error) {
         console.error('Error saving document:', error)
       }
     },
-    [currentConversationData, get, patch, characterName],
+    [currentConversationData, get, patch],
   )
 
   const debouncedSave = useMemo(() => debounce(handleSave, 1500), [handleSave])
@@ -273,7 +366,11 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation,
         </Button>
       </CardHeader>
       <CardContent className="flex-1 overflow-y-auto">
-        {isEditing ? (
+        {isLoadingPreview ? ( // Show loader while refreshing view
+          <div className="flex h-full items-center justify-center">
+            <Loader />
+          </div>
+        ) : isEditing ? (
           isLoadingEditor ? (
             <div className="flex h-full items-center justify-center">
               <Loader />
@@ -305,14 +402,20 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation,
           )
         ) : (
           <div className="read-only-conversation prose w-full max-w-none space-y-2 font-editor2 text-[18px] dark:prose-invert">
-            {currentConversationData.entries.map((entry, entryIndex) => (
-              <div key={entryIndex} className="dialogue-line">
-                <span className="character-name mr-1 font-semibold text-black/[.65]">
-                  {entry.characterName}:
-                </span>
-                <TiptapJsonRenderer node={entry.contentNode} className="inline" />
-              </div>
-            ))}
+            {currentConversationData.entries.length > 0 ? (
+              currentConversationData.entries.map((entry, entryIndex) => (
+                <div key={entryIndex} className="dialogue-line">
+                  <span className="character-name mr-1 font-semibold text-black/[.65]">
+                    {entry.characterName}:
+                  </span>
+                  <TiptapJsonRenderer node={entry.contentNode} className="inline" />
+                </div>
+              ))
+            ) : (
+              <Typography variant="body2" className="text-muted-foreground">
+                This conversation appears empty after the edit.
+              </Typography>
+            )}
           </div>
         )}
       </CardContent>

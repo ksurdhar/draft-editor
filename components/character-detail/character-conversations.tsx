@@ -1,12 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Typography } from '@mui/material'
 import { useAPI } from '@components/providers'
 import { useNavigation } from '@components/providers'
 import { Loader } from '@components/loader'
-import { debugLog } from '@lib/debug-logger'
-import { DocumentData } from '@typez/globals'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@components/ui/table'
 import { Badge } from '@components/ui/badge'
 
@@ -146,7 +144,9 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
   selectedConversationId,
 }) => {
   const { get } = useAPI()
-  const { navigateTo } = useNavigation()
+  const {
+    /* navigateTo */
+  } = useNavigation() // Removed unused variable
   const [conversations, setConversations] = useState<ConversationGroup[]>([])
   const [loadingConversations, setLoadingConversations] = useState(false)
 
@@ -248,7 +248,7 @@ const CharacterConversations: React.FC<CharacterConversationsProps> = ({
           </div>
         ) : conversations.length === 0 ? (
           <div className="flex h-full items-center justify-center">
-            <Typography variant="body2" className="text-muted-foreground text-center">
+            <Typography variant="body2" className="text-center text-muted-foreground">
               No conversations found involving this character.
             </Typography>
           </div>
