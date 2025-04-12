@@ -310,9 +310,9 @@ const SharedDocumentsPage = ({
     <Layout>
       <div className="gradient-editor fixed left-0 top-0 z-[-1] h-screen w-screen" />
       <div
-        className={`gradient fixed left-0 top-0 z-[-1] h-screen w-screen transition-opacity duration-[3000ms] ease-in-out ${initAnimate ? 'opacity-100' : 'opacity-0'}`}
+        className={`gradient duration-[3000ms] fixed left-0 top-0 z-[-1] h-screen w-screen transition-opacity ease-in-out ${initAnimate ? 'opacity-100' : 'opacity-0'}`}
       />
-      <div className="relative top-[44px] flex h-[calc(100vh_-_44px)] justify-center pb-10">
+      <div className="relative top-[44px] flex h-[calc(100vh_-_80px)] justify-center pb-10">
         <div className="flex w-11/12 max-w-[740px] flex-col justify-center sm:w-9/12">
           <div className="mb-4 flex justify-end gap-2">
             <div className="flex gap-0.5 rounded-lg bg-white/[.05]">

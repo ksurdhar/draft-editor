@@ -554,7 +554,7 @@ export default function SharedDocumentPage() {
           <CloudIcon className="h-[20px] w-[20px] animate-bounce self-center fill-black/[.10] md:h-[24px] md:w-[24px] md:fill-black/[.15]" />
         </div>
       )}
-      <div className="flex h-screen">
+      <div className="flex h-[calc(100vh_-_40px)]">
         {/* Left Sidebar Container */}
         <div className="h-screen w-[320px] shrink-0 pt-[60px] lg:fixed lg:left-0 lg:top-0">
           {/* Control Buttons */}

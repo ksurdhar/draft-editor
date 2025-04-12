@@ -138,8 +138,8 @@ const ConversationsPage = () => {
           initAnimate ? 'opacity-100' : 'opacity-0'
         }`}
       />
-      <div className="relative top-[44px] flex h-[calc(100vh_-_44px)] flex-col items-center pb-5">
-        <div className="mb-4 w-11/12 max-w-[1600px] px-4 py-3">
+      <div className="fixed top-[44px] flex h-[calc(100vh_-_44px)] w-full flex-col overflow-hidden">
+        <div className="flex w-full flex-col items-center p-4">
           <Typography variant="h5" className="mb-4 text-center">
             Conversations
           </Typography>
@@ -149,7 +149,6 @@ const ConversationsPage = () => {
             </div>
           ) : (
             <div className="mb-4">
-              {/* Basic Character Selector - Placeholder UI */}
               <select
                 value={selectedCharacterId ?? ''}
                 onChange={handleCharacterSelect}
@@ -168,10 +167,9 @@ const ConversationsPage = () => {
           )}
         </div>
 
-        {/* Render Conversation Components - Always render the grid now */}
         {!showSpinner && ( // Keep spinner check
-          <div className="mx-auto grid w-11/12 max-w-[1600px] flex-1 grid-cols-1 gap-6 overflow-hidden px-4 md:grid-cols-2">
-            <div className="col-span-1 flex flex-col overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm">
+          <div className="mx-auto grid h-[calc(100%_-_100px)] w-11/12 max-w-[1600px] grid-cols-1 gap-6 overflow-hidden px-4 md:grid-cols-2">
+            <div className="col-span-1 flex h-full flex-col overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm">
               <CharacterConversations
                 key={selectedCharacter?._id ?? 'no-char'} // Use a key that changes
                 characterName={selectedCharacter?.name ?? ''} // Pass name or empty string
@@ -181,19 +179,11 @@ const ConversationsPage = () => {
                 selectedConversationId={selectedConversation?.conversationId}
               />
             </div>
-            <div className="col-span-1 flex flex-col overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm">
+            <div className="col-span-1 flex h-full flex-col overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm">
               <ConversationPreview conversation={selectedConversation} />
             </div>
           </div>
         )}
-        {/* Message when no character is selected - REMOVED */}
-        {/* {!selectedCharacterId && !showSpinner && (
-          <div className="flex flex-1 items-center justify-center">
-            <Typography variant="h6" className="text-black/60">
-              Please select a character to view conversations.
-            </Typography>
-          </div>
-        )} */}
       </div>
     </Layout>
   )
