@@ -16,9 +16,17 @@
   font-style: normal;
 }
 
+@font-face {
+  font-family: 'Geist';
+  src: url('../styles/fonts/Geist/Geist-VariableFont_wght.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
 :root {
   --font-ibarra: 'Ibarra Real Nova', serif;
   --font-mukta: 'Mukta', sans-serif;
+  --font-geist: 'Geist', sans-serif;
 }
 
 /* Add styles for the transparent title bar */

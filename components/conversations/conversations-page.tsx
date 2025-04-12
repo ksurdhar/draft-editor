@@ -168,14 +168,14 @@ const ConversationsPage = () => {
           )}
         </div>
 
-        {/* Render Conversation Components */}
-        {selectedCharacterId && !showSpinner && selectedCharacter && (
+        {/* Render Conversation Components - Always render the grid now */}
+        {!showSpinner && ( // Keep spinner check
           <div className="mx-auto grid w-11/12 max-w-[1600px] flex-1 grid-cols-1 gap-6 overflow-hidden px-4 md:grid-cols-2">
             <div className="col-span-1 flex flex-col overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm">
               <CharacterConversations
-                key={selectedCharacter._id}
-                characterName={selectedCharacter.name}
-                characterId={selectedCharacter._id}
+                key={selectedCharacter?._id ?? 'no-char'} // Use a key that changes
+                characterName={selectedCharacter?.name ?? ''} // Pass name or empty string
+                characterId={selectedCharacter?._id} // Pass id or undefined
                 onCharacterDocumentUpdate={handleCharacterDocumentUpdate}
                 onConversationSelect={handleConversationSelect}
                 selectedConversationId={selectedConversation?.conversationId}
@@ -186,14 +186,14 @@ const ConversationsPage = () => {
             </div>
           </div>
         )}
-        {/* Message when no character is selected */}
-        {!selectedCharacterId && !showSpinner && (
+        {/* Message when no character is selected - REMOVED */}
+        {/* {!selectedCharacterId && !showSpinner && (
           <div className="flex flex-1 items-center justify-center">
             <Typography variant="h6" className="text-black/60">
               Please select a character to view conversations.
             </Typography>
           </div>
-        )}
+        )} */}
       </div>
     </Layout>
   )

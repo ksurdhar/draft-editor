@@ -22,6 +22,8 @@ const mukta = Mukta({
   weight: ['400'],
 })
 
+// Might need to import Geist font from google here
+
 export default function Layout({ children }: { children: ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
