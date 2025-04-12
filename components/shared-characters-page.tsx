@@ -24,7 +24,6 @@ import { useAPI } from '@components/providers'
 import { useUser } from '@wrappers/auth-wrapper-client'
 import { mutate } from 'swr'
 import CharacterModal from '@components/character-modal'
-import { useNavigation } from '@components/providers'
 import { DocumentData } from '@typez/globals'
 // Character type definition
 interface CharacterData {
@@ -78,17 +77,16 @@ const SharedCharactersPage = ({
   isLoading: charactersLoading,
   onCharactersChange,
   documents,
-  onDocumentsChange,
+  _onDocumentsChange,
 }: {
   characters: CharacterData[]
   isLoading?: boolean
   onCharactersChange: (characters: CharacterData[]) => void
   documents: DocumentData[]
-  onDocumentsChange: (docs: DocumentData[]) => void
+  _onDocumentsChange: (docs: DocumentData[]) => void
 }) => {
   const { post, patch, destroy } = useAPI()
   const { user, isLoading: userLoading } = useUser()
-  const { navigateTo } = useNavigation()
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null)
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [renameModalOpen, setRenameModalOpen] = useState(false)
@@ -281,11 +279,6 @@ const SharedCharactersPage = ({
     }
   }
 
-  const handleCharacterClick = (id: string) => {
-    console.log('Character Click - Navigating to:', `/characters/${id}`)
-    navigateTo(`/characters/${id}`)
-  }
-
   // Add keyboard shortcut for delete
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -315,7 +308,7 @@ const SharedCharactersPage = ({
     <Layout>
       <div className="gradient-editor fixed left-0 top-0 z-[-1] h-screen w-screen" />
       <div
-        className={`gradient fixed left-0 top-0 z-[-1] h-screen w-screen transition-opacity duration-[3000ms] ease-in-out ${initAnimate ? 'opacity-100' : 'opacity-0'}`}
+        className={`gradient duration-[3000ms] fixed left-0 top-0 z-[-1] h-screen w-screen transition-opacity ease-in-out ${initAnimate ? 'opacity-100' : 'opacity-0'}`}
       />
       <div className="relative top-[44px] flex h-[calc(100vh_-_44px)] justify-center pb-10">
         <div className="flex w-11/12 max-w-[740px] flex-col justify-center sm:w-9/12">
@@ -350,12 +343,13 @@ const SharedCharactersPage = ({
                         },
                       }}>
                       <ListItem
-                        button={character.isOfficial as any}
-                        onClick={
-                          character.isOfficial && character._id
-                            ? () => handleCharacterClick(character._id!)
-                            : undefined
-                        }
+                        // Make list item non-interactive for navigation
+                        // button={character.isOfficial as any}
+                        // onClick={
+                        //   character.isOfficial && character._id
+                        //     ? () => handleCharacterClick(character._id!)
+                        //     : undefined
+                        // }
                         className="py-3">
                         <ListItemText
                           primary={

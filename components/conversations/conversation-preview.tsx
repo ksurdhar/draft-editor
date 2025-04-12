@@ -42,7 +42,6 @@ interface ConversationGroup {
 // --- Component Props ---
 interface ConversationPreviewProps {
   conversation: ConversationGroup | null
-  // characterName: string // Removed - No longer needed
 }
 
 // --- Helper: Extract Specific Conversation Entries ---
@@ -200,7 +199,7 @@ const mergeEditedSection = (fullContent: any, editedSection: any, conversationId
 }
 
 // --- Component ---
-const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation /*, characterName */ }) => {
+const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation }) => {
   const { get, patch } = useAPI()
   const { navigateTo } = useNavigation() // Add navigation hook
   const [isEditing, setIsEditing] = useState(false)

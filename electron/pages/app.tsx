@@ -5,7 +5,7 @@ import { useLocation, Route, Switch } from 'wouter'
 import LandingPage from './landing-page'
 import ElectronDocumentsPage from './documents-page'
 import ElectronCharactersPage from './characters-page'
-import ElectronCharacterDetailPage from './character-detail-page'
+import ConversationsPage from '../../components/conversations/conversations-page'
 import DebugPanel from '@components/debug-panel'
 
 interface Profile {
@@ -133,7 +133,7 @@ function ElectronApp() {
               <Route path="/documents" component={ElectronDocumentsPage} />
               <Route path="/characters" component={ElectronCharactersPage} />
               <Route path="/documents/:id" component={SharedDocumentPage} />
-              <Route path="/characters/:id" component={ElectronCharacterDetailPage} />
+              <Route path="/conversations" component={ConversationsPage} />
             </Switch>
             {/* Network status indicator */}
             <NetworkStatus />

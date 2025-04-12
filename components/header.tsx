@@ -226,10 +226,10 @@ const HeaderComponent = ({ id }: HeaderProps) => {
                 <ListItem disablePadding>
                   <ListItemButton
                     onClick={() => {
-                      navigateTo('/characters')
+                      navigateTo('/conversations')
                       setMenuOpen(!menuOpen)
                     }}>
-                    <ListItemText primary={'Characters'} />
+                    <ListItemText primary={'Conversations'} />
                   </ListItemButton>
                 </ListItem>
                 <ListItem disablePadding>
