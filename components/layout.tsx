@@ -34,7 +34,7 @@ const Layout = ({ children, documentId, onToggleGlobalSearch }: Props): ReactNod
 
   return (
     <div
-      className={`absolute h-screen w-screen font-index lowercase ${contentPadding}`}
+      className={`absolute h-screen w-screen font-index ${contentPadding}`}
       onMouseMove={e => onMouseMove(e.clientY)}>
       <HeaderComponent id={documentId || ''} />
       {children}
