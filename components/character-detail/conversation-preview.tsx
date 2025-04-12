@@ -219,39 +219,36 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation 
     setEditorContent(null)
   }, [conversation])
 
+  const refreshConversationView = useCallback(async () => {
+    if (!currentConversationData) return
+    setIsLoadingPreview(true)
+    try {
+      const updatedDocument = await get(`/documents/${currentConversationData.documentId}`)
+      if (updatedDocument && updatedDocument.content) {
+        const updatedEntries = extractConversationEntries(
+          updatedDocument.content,
+          currentConversationData.conversationId,
+        )
+        setCurrentConversationData(prevData => (prevData ? { ...prevData, entries: updatedEntries } : null))
+        console.log('Conversation view refreshed.')
+      } else {
+        console.error('Failed to fetch updated document content for view refresh.')
+      }
+    } catch (error) {
+      console.error('Error refreshing conversation view:', error)
+    } finally {
+      setIsLoadingPreview(false)
+    }
+  }, [get, currentConversationData])
+
   const handleToggleEdit = useCallback(async () => {
     if (!currentConversationData) return
 
     if (isEditing) {
       // Switching from Edit to View
       setIsEditing(false)
-      setEditorContent(null) // Clear editor content
-      // --- ADD REFRESH LOGIC HERE ---
-      // Fetch the latest data to update the view mode
-      const refreshView = async () => {
-        if (!currentConversationData) return
-        setIsLoadingPreview(true)
-        try {
-          const updatedDocument = await get(`/documents/${currentConversationData.documentId}`)
-          if (updatedDocument && updatedDocument.content) {
-            const updatedEntries = extractConversationEntries(
-              updatedDocument.content,
-              currentConversationData.conversationId,
-            )
-            setCurrentConversationData(prevData =>
-              prevData ? { ...prevData, entries: updatedEntries } : null,
-            )
-          } else {
-            console.error('Failed to fetch updated document content for view refresh.')
-          }
-        } catch (error) {
-          console.error('Error refreshing conversation view:', error)
-        } finally {
-          setIsLoadingPreview(false)
-        }
-      }
-      refreshView()
-      // --- END REFRESH LOGIC ---
+      setEditorContent(null)
+      refreshConversationView()
     } else {
       // Switching from View to Edit
       setIsLoadingEditor(true)
@@ -259,13 +256,11 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation 
       try {
         const fullDocument = await get(`/documents/${currentConversationData.documentId}`)
         if (fullDocument && fullDocument.content) {
-          // --- CHANGE HERE: Use extractConversationNodes again ---
           const extractedContent = extractConversationNodes(
             fullDocument.content,
             currentConversationData.conversationId,
           )
           setEditorContent(extractedContent)
-          // --- End Change ---
         } else {
           console.error('Failed to fetch document content for editing.')
           setEditorContent({ type: 'doc', content: [] }) // Set empty doc on error
@@ -277,7 +272,7 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation 
         setIsLoadingEditor(false)
       }
     }
-  }, [isEditing, currentConversationData, get])
+  }, [isEditing, currentConversationData, get, refreshConversationView])
 
   const handleSave = useCallback(
     async (updatedData: Partial<DocumentData>) => {
@@ -307,29 +302,7 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation 
         await patch(`/documents/${currentConversationData.documentId}`, patchData)
         console.log(`Document ${currentConversationData.documentId} saved successfully.`)
 
-        // Update local state after save
         setEditorContent(updatedEditorContent)
-        // --- REFRESH VIEW DATA ---
-        // Fetch the full document again to get the definitive state
-        try {
-          const updatedDocument = await get(`/documents/${currentConversationData.documentId}`)
-          if (updatedDocument && updatedDocument.content) {
-            const updatedEntries = extractConversationEntries(
-              updatedDocument.content,
-              currentConversationData.conversationId,
-            )
-            // Update the conversation data state used for the view mode
-            setCurrentConversationData(prevData =>
-              prevData ? { ...prevData, entries: updatedEntries } : null,
-            )
-            console.log('Conversation view data refreshed after save.')
-          } else {
-            console.error('Failed to fetch updated document content after save.')
-          }
-        } catch (fetchError) {
-          console.error('Error fetching updated document after save:', fetchError)
-        }
-        // --- END REFRESH VIEW DATA ---
       } catch (error) {
         console.error('Error saving document:', error)
       }
@@ -339,7 +312,6 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation 
 
   const debouncedSave = useMemo(() => debounce(handleSave, 1500), [handleSave])
 
-  // Render logic
   if (!currentConversationData) {
     return (
       <Card className="flex h-full items-center justify-center">
