@@ -160,6 +160,7 @@ const ConversationsPage = () => {
   const [selectedCharacterIds, setSelectedCharacterIds] = useState<string[]>([])
   const [selectedConversation, setSelectedConversation] = useState<ConversationGroup | null>(null)
   const [allConversations, setAllConversations] = useState<ConversationGroup[]>([])
+  const [isEditing, setIsEditing] = useState(false)
 
   // Basic loading spinner logic
   const showSpinner = useSpinner(charactersLoading || documentsLoading)
@@ -280,9 +281,13 @@ const ConversationsPage = () => {
     setSelectedConversation(null)
   }
 
-  const handleConversationSelect = useCallback((conversation: ConversationGroup | null) => {
-    setSelectedConversation(conversation)
-  }, [])
+  const handleConversationSelect = useCallback(
+    (conversation: ConversationGroup | null) => {
+      setIsEditing(false)
+      setSelectedConversation(conversation)
+    },
+    [setIsEditing],
+  )
 
   const nonArchivedCharacters = useMemo(() => {
     return (characters || []).filter(c => !c.isArchived).sort((a, b) => a.name.localeCompare(b.name))
@@ -320,7 +325,11 @@ const ConversationsPage = () => {
                 <span className="font-semibold">Conversation Preview</span>
               </header>
               <div className="flex flex-1 flex-col overflow-hidden bg-card/60 backdrop-blur-md">
-                <ConversationPreview conversation={selectedConversation} />
+                <ConversationPreview
+                  conversation={selectedConversation}
+                  isEditing={isEditing}
+                  setIsEditing={setIsEditing}
+                />
               </div>
             </SidebarInset>
           </SidebarProvider>

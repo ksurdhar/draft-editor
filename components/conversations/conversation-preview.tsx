@@ -42,6 +42,8 @@ interface ConversationGroup {
 // --- Component Props ---
 interface ConversationPreviewProps {
   conversation: ConversationGroup | null
+  isEditing: boolean
+  setIsEditing: React.Dispatch<React.SetStateAction<boolean>>
 }
 
 // --- Helper: Extract Specific Conversation Entries ---
@@ -199,10 +201,13 @@ const mergeEditedSection = (fullContent: any, editedSection: any, conversationId
 }
 
 // --- Component ---
-const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation }) => {
+const ConversationPreview: React.FC<ConversationPreviewProps> = ({
+  conversation,
+  isEditing,
+  setIsEditing,
+}) => {
   const { get, patch } = useAPI()
   const { navigateTo } = useNavigation() // Add navigation hook
-  const [isEditing, setIsEditing] = useState(false)
   const [editorContent, setEditorContent] = useState<any>(null)
   const [isLoadingEditor, setIsLoadingEditor] = useState(false)
   // State to hold the potentially updated conversation data after save
@@ -215,16 +220,12 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation 
   // Update local state if the conversation prop changes from parent,
   // but ONLY if we are not currently editing.
   useEffect(() => {
-    // If we are currently editing, don't reset the state based on prop changes.
-    // Let the editor manage its state until the user explicitly saves or cancels.
-    if (!isEditing) {
+    // If the conversation prop changes, update the local data.
+    if (conversation?.conversationId !== currentConversationData?.conversationId) {
       setCurrentConversationData(conversation)
-      setIsEditing(false) // Ensure edit mode is reset if conversation changes externally
-      setEditorContent(null) // Clear any stale editor content if not editing
-    } else {
+      setEditorContent(null)
     }
-    // Dependency array includes isEditing to re-evaluate when editing mode changes.
-  }, [conversation, isEditing, currentConversationData?.conversationId])
+  }, [conversation, currentConversationData?.conversationId]) // Removed isEditing dependency
 
   const refreshConversationView = useCallback(async () => {
     if (!currentConversationData) return
@@ -279,7 +280,7 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation 
         setIsLoadingEditor(false)
       }
     }
-  }, [isEditing, currentConversationData, get, refreshConversationView])
+  }, [isEditing, currentConversationData, get, refreshConversationView, setIsEditing])
 
   const handleSave = useCallback(
     async (updatedData: Partial<DocumentData>) => {
@@ -386,13 +387,11 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation 
             </div>
           )
         ) : (
-          <div className="read-only-conversation prose w-full max-w-none space-y-2 font-editor2 text-[18px] dark:prose-invert">
+          <div className="read-only-conversation mx-auto w-full max-w-2xl space-y-4 p-6 font-editor2 text-[18px]">
             {currentConversationData.entries.length > 0 ? (
               currentConversationData.entries.map((entry, entryIndex) => (
                 <div key={entryIndex} className="dialogue-line">
-                  <span className="character-name mr-1 font-semibold text-black/[.65]">
-                    {entry.characterName}:
-                  </span>
+                  <span className="character-name mr-1 font-bold text-black">{entry.characterName}:</span>
                   <TiptapJsonRenderer node={entry.contentNode} className="inline" />
                 </div>
               ))
