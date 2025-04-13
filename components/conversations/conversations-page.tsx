@@ -3,22 +3,10 @@ import { Loader } from '@components/loader'
 import { useSpinner } from '@lib/hooks'
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import useSWR from 'swr'
-import { Typography } from '@mui/material'
-import CharacterConversations from '@components/conversations/character-conversations'
 import ConversationPreview from '@components/conversations/conversation-preview'
-import { Checkbox } from '@components/ui/checkbox'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@components/ui/popover'
-import { Button } from '@components/ui/button'
-import { Check, ChevronsUpDown, X, Filter } from 'lucide-react'
-import { Badge } from '@components/ui/badge'
+import { SidebarProvider, SidebarInset, SidebarTrigger } from '@components/ui/sidebar'
+import ConversationsSidebar from './conversations-sidebar'
+import { Separator } from '@components/ui/separator'
 
 // Re-use the CharacterData interface (consider moving to a shared types file later)
 interface CharacterData {
@@ -172,7 +160,6 @@ const ConversationsPage = () => {
   const [selectedCharacterIds, setSelectedCharacterIds] = useState<string[]>([])
   const [selectedConversation, setSelectedConversation] = useState<ConversationGroup | null>(null)
   const [allConversations, setAllConversations] = useState<ConversationGroup[]>([])
-  const [commandOpen, setCommandOpen] = useState(false)
 
   // Basic loading spinner logic
   const showSpinner = useSpinner(charactersLoading || documentsLoading)
@@ -272,15 +259,12 @@ const ConversationsPage = () => {
 
   const handleCharacterSelectionChange = (characterId: string) => {
     setSelectedCharacterIds(prev => {
-      // If character is already selected, remove it; otherwise add it
       if (prev.includes(characterId)) {
         return prev.filter(id => id !== characterId)
       } else {
         return [...prev, characterId]
       }
     })
-
-    // Clear conversation selection when changing character filter
     setSelectedConversation(null)
   }
 
@@ -291,9 +275,7 @@ const ConversationsPage = () => {
 
   const handleSelectAllCharacters = () => {
     if (!characters) return
-
     const nonArchivedCharacterIds = characters.filter(c => !c.isArchived).map(c => c._id)
-
     setSelectedCharacterIds(nonArchivedCharacterIds)
     setSelectedConversation(null)
   }
@@ -306,14 +288,6 @@ const ConversationsPage = () => {
     return (characters || []).filter(c => !c.isArchived).sort((a, b) => a.name.localeCompare(b.name))
   }, [characters])
 
-  // Get selected character names for display
-  const selectedCharacterNames = useMemo(() => {
-    if (!characters) return []
-    return selectedCharacterIds
-      .map(id => characters.find(c => c._id === id)?.name || '')
-      .filter(name => name !== '')
-  }, [selectedCharacterIds, characters])
-
   return (
     <Layout>
       <div className="gradient-editor fixed left-0 top-0 z-[-1] h-screen w-screen" />
@@ -323,121 +297,34 @@ const ConversationsPage = () => {
         }`}
       />
       <div className="fixed top-[44px] flex h-[calc(100vh_-_44px)] w-full flex-col overflow-hidden">
-        <div className="flex w-full flex-col items-center p-4">
-          {showSpinner ? (
-            <div className="flex justify-center pt-10">
-              <Loader />
-            </div>
-          ) : (
-            <div className="mx-auto grid h-[calc(100vh_-_80px)] w-11/12 max-w-[1600px] grid-cols-1 gap-6 overflow-hidden px-4 md:grid-cols-2">
-              <div className="col-span-1 flex h-full flex-col overflow-hidden rounded-lg border bg-card/80 text-card-foreground shadow-sm backdrop-blur-md">
-                <div className="border-b bg-card/20 p-4 backdrop-blur-lg">
-                  <Typography variant="h6" className="mb-4 font-semibold">
-                    Conversations
-                  </Typography>
-
-                  <div className="mb-1 flex w-full items-center justify-between gap-2">
-                    <Popover open={commandOpen} onOpenChange={setCommandOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          aria-expanded={commandOpen}
-                          className="min-w-[200px] justify-between">
-                          <Filter className="mr-2 h-4 w-4" />
-                          Filter by characters
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[300px] p-0" align="start">
-                        <Command>
-                          <CommandInput placeholder="Search characters..." />
-                          <CommandList>
-                            <CommandEmpty>No characters found.</CommandEmpty>
-                            <CommandGroup heading="Characters">
-                              <div className="border-b px-2 py-1.5">
-                                <div className="flex items-center">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={handleSelectAllCharacters}
-                                    className="mr-1 h-7">
-                                    Select all
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={handleClearFilters}
-                                    className="ml-1 h-7">
-                                    Clear
-                                  </Button>
-                                </div>
-                              </div>
-                              {nonArchivedCharacters.map(character => (
-                                <CommandItem
-                                  key={character._id}
-                                  onSelect={() => handleCharacterSelectionChange(character._id)}
-                                  className="flex items-center justify-between">
-                                  <div className="flex items-center">
-                                    <Checkbox
-                                      id={`character-${character._id}`}
-                                      checked={selectedCharacterIds.includes(character._id)}
-                                      onCheckedChange={() => handleCharacterSelectionChange(character._id)}
-                                      className="mr-2"
-                                    />
-                                    {character.name}
-                                  </div>
-                                  {selectedCharacterIds.includes(character._id) && (
-                                    <Check className="h-4 w-4" />
-                                  )}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-
-                    <div className="flex flex-wrap items-center gap-1">
-                      {selectedCharacterNames.length > 0 ? (
-                        <>
-                          {selectedCharacterNames.map(name => (
-                            <Badge key={name} variant="secondary" className="flex items-center gap-1">
-                              {name}
-                              <X
-                                className="h-3 w-3 cursor-pointer"
-                                onClick={() => {
-                                  const charId = characters?.find(c => c.name === name)?._id
-                                  if (charId) handleCharacterSelectionChange(charId)
-                                }}
-                              />
-                            </Badge>
-                          ))}
-                          <Button variant="ghost" size="sm" onClick={handleClearFilters} className="h-6 px-2">
-                            Clear all
-                          </Button>
-                        </>
-                      ) : (
-                        <Typography variant="caption" className="text-muted-foreground">
-                          Showing all conversations
-                        </Typography>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <CharacterConversations
-                  key={`conversation-list-${selectedCharacterIds.join('-')}`}
-                  allConversations={filteredConversations}
-                  onConversationSelect={handleConversationSelect}
-                  selectedConversationId={selectedConversation?.conversationId}
-                />
-              </div>
-              <div className="col-span-1 flex h-full flex-col overflow-hidden rounded-lg border bg-card/60 text-card-foreground shadow-sm backdrop-blur-md">
+        {showSpinner ? (
+          <div className="flex h-full items-center justify-center pt-10">
+            <Loader />
+          </div>
+        ) : (
+          <SidebarProvider style={{ '--sidebar-width': '300px' } as React.CSSProperties}>
+            <ConversationsSidebar
+              allCharacters={nonArchivedCharacters}
+              filteredConversations={filteredConversations}
+              selectedCharacterIds={selectedCharacterIds}
+              selectedConversationId={selectedConversation?.conversationId ?? null}
+              onCharacterSelectionChange={handleCharacterSelectionChange}
+              onClearFilters={handleClearFilters}
+              onSelectAllCharacters={handleSelectAllCharacters}
+              onConversationSelect={handleConversationSelect}
+            />
+            <SidebarInset>
+              <header className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b bg-background/80 p-3 backdrop-blur-md">
+                <SidebarTrigger className="-ml-1" />
+                <Separator orientation="vertical" className="h-6" />
+                <span className="font-semibold">Conversation Preview</span>
+              </header>
+              <div className="flex flex-1 flex-col overflow-hidden bg-card/60 backdrop-blur-md">
                 <ConversationPreview conversation={selectedConversation} />
               </div>
-            </div>
-          )}
-        </div>
+            </SidebarInset>
+          </SidebarProvider>
+        )}
       </div>
     </Layout>
   )
