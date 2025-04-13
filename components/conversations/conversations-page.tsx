@@ -204,7 +204,6 @@ const ConversationsPage = () => {
     revalidateOnFocus: true,
     focusThrottleInterval: 30000,
     dedupingInterval: 10000,
-    revalidateIfStale: false,
   })
 
   const [selectedCharacterIds, setSelectedCharacterIds] = useState<string[]>([])
