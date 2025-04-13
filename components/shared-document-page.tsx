@@ -454,8 +454,19 @@ export default function SharedDocumentPage() {
         const matches = findAllMatches(editor.state.doc, dialogue.snippet)
         for (const match of matches) {
           const rangeKey = `${match.from}-${match.to}`
+          // Construct the unique conversation ID
+          const uniqueConversationId = dialogue.conversationId
+            ? `${documentId}-${dialogue.conversationId}`
+            : `${documentId}-unknown`
           if (confirmedRanges.has(rangeKey)) {
-            console.log('Skipping confirmed dialogue:', dialogue.snippet)
+            // If confirmed, ensure its ID matches what we expect, otherwise log potential issue
+            const confirmedAttrs = confirmedRanges.get(rangeKey)
+            if (confirmedAttrs?.conversationId !== uniqueConversationId) {
+              console.warn(
+                `Confirmed range ${rangeKey} has ID ${confirmedAttrs?.conversationId}, but new detection suggests ${uniqueConversationId} for snippet "${dialogue.snippet}". Keeping confirmed ID.`,
+              )
+            }
+            // console.log('Skipping confirmed dialogue:', dialogue.snippet)
             continue
           }
           tr = tr.addMark(
@@ -463,7 +474,7 @@ export default function SharedDocumentPage() {
             match.to,
             editor.schema.marks.dialogue.create({
               character: dialogue.character,
-              conversationId: dialogue.conversationId,
+              conversationId: uniqueConversationId, // Use unique ID
               userConfirmed: false,
             }),
           )
@@ -473,14 +484,20 @@ export default function SharedDocumentPage() {
       // 3. Re-apply confirmed marks
       confirmedRanges.forEach((attrs, rangeKey) => {
         const [from, to] = rangeKey.split('-').map(Number)
+        // Construct the unique conversation ID expected for the confirmed mark
+        const uniqueConversationId = attrs.conversationId
+          ? `${documentId}-${attrs.conversationId}`
+          : `${documentId}-unknown`
         let needsReapply = true
         editor.state.doc.nodesBetween(from, to, (node: ProseMirrorNode, pos: number) => {
+          // Check if a confirmed mark with the *correct unique ID* already exists
           if (pos === from && node.isText) {
             const existingMark = node.marks.find(m => m.type.name === 'dialogue')
             if (
               existingMark &&
               existingMark.attrs.userConfirmed &&
-              existingMark.attrs.character === attrs.character
+              existingMark.attrs.character === attrs.character &&
+              existingMark.attrs.conversationId === uniqueConversationId // Check unique ID
             ) {
               needsReapply = false
             }
@@ -488,7 +505,16 @@ export default function SharedDocumentPage() {
         })
 
         if (needsReapply && !isNaN(from) && !isNaN(to)) {
-          tr = tr.addMark(from, to, editor.schema.marks.dialogue.create({ ...attrs, userConfirmed: true }))
+          // Apply the mark with the unique ID
+          tr = tr.addMark(
+            from,
+            to,
+            editor.schema.marks.dialogue.create({
+              ...attrs,
+              conversationId: uniqueConversationId,
+              userConfirmed: true,
+            }),
+          )
         }
       })
 

@@ -55,6 +55,19 @@ const DialogueList = ({
   const [editingConversationId, setEditingConversationId] = useState<string | null>(null)
   const [conversationNameInput, setConversationNameInput] = useState('')
 
+  // Helper function to get the display part of the conversation ID
+  const getBaseConvDisplay = (uniqueId: string | null): string => {
+    if (!uniqueId || uniqueId === 'unknown') {
+      return 'Unknown'
+    }
+    const parts = uniqueId.split('-')
+    const lastPart = parts[parts.length - 1]
+    if (lastPart.startsWith('conv')) {
+      return lastPart.substring(4) // Remove 'conv'
+    }
+    return lastPart // Fallback if format is unexpected
+  }
+
   useEffect(() => {
     if (!editor) {
       setProcessedMarks([])
@@ -259,7 +272,7 @@ const DialogueList = ({
                         (
                         {group.conversationId === 'unknown'
                           ? 'Unknown'
-                          : group.conversationId.replace('conv', '')}
+                          : getBaseConvDisplay(group.conversationId)}
                         )
                       </span>
                     </>
@@ -268,7 +281,7 @@ const DialogueList = ({
                       Conversation{' '}
                       {group.conversationId === 'unknown'
                         ? 'Unknown'
-                        : group.conversationId.replace('conv', '')}
+                        : getBaseConvDisplay(group.conversationId)}
                     </>
                   )}
                 </span>
