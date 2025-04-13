@@ -39,7 +39,7 @@ const CharacterDetails: React.FC<CharacterDetailsProps> = ({ character, onEditCl
       {/* Removed Edit icon button, edit is triggered differently now */}
 
       <div>
-        <Typography variant="subtitle1" className="text-muted-foreground font-semibold">
+        <Typography variant="subtitle1" className="font-semibold text-muted-foreground">
           Motivation:
         </Typography>
         <Typography variant="body1" className="text-foreground">
@@ -48,7 +48,7 @@ const CharacterDetails: React.FC<CharacterDetailsProps> = ({ character, onEditCl
       </div>
 
       <div>
-        <Typography variant="subtitle1" className="text-muted-foreground font-semibold">
+        <Typography variant="subtitle1" className="font-semibold text-muted-foreground">
           Description:
         </Typography>
         <Typography variant="body1" className="text-foreground">
@@ -58,7 +58,7 @@ const CharacterDetails: React.FC<CharacterDetailsProps> = ({ character, onEditCl
 
       {character.traits && character.traits.length > 0 && (
         <div>
-          <Typography variant="subtitle1" className="text-muted-foreground mb-2 font-semibold">
+          <Typography variant="subtitle1" className="mb-2 font-semibold text-muted-foreground">
             Traits:
           </Typography>
           <div className="flex flex-wrap gap-1">
@@ -73,7 +73,7 @@ const CharacterDetails: React.FC<CharacterDetailsProps> = ({ character, onEditCl
 
       {character.documentIds && character.documentIds.length > 0 && (
         <div>
-          <Typography variant="subtitle1" className="text-muted-foreground mb-2 font-semibold">
+          <Typography variant="subtitle1" className="mb-2 font-semibold text-muted-foreground">
             Appears in:
           </Typography>
           <div className="flex flex-wrap gap-2">
@@ -81,7 +81,7 @@ const CharacterDetails: React.FC<CharacterDetailsProps> = ({ character, onEditCl
               <Badge
                 key={docId}
                 variant="outline"
-                className="hover:bg-accent cursor-pointer"
+                className="cursor-pointer hover:bg-accent"
                 onClick={() => navigateTo(`/documents/${docId}`)}>
                 {/* TODO: Fetch document titles if possible, maybe store on character? */}
                 {`Document ${index + 1}`}

@@ -77,13 +77,11 @@ const SharedCharactersPage = ({
   isLoading: charactersLoading,
   onCharactersChange,
   documents,
-  _onDocumentsChange,
 }: {
   characters: CharacterData[]
   isLoading?: boolean
   onCharactersChange: (characters: CharacterData[]) => void
   documents: DocumentData[]
-  _onDocumentsChange: (docs: DocumentData[]) => void
 }) => {
   const { post, patch, destroy } = useAPI()
   const { user, isLoading: userLoading } = useUser()

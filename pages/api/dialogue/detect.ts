@@ -1,8 +1,23 @@
-import { OpenAI } from 'openai'
+import { generateObject } from 'ai'
+import { createOpenAI } from '@ai-sdk/openai'
+import { z } from 'zod'
 import type { NextApiRequest, NextApiResponse } from 'next'
 
-const openai = new OpenAI({
+// Create OpenAI client with API key from environment
+const openai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+})
+
+// Define the expected response schema using Zod
+const DialogueResponseSchema = z.object({
+  dialogues: z.array(
+    z.object({
+      character: z.string(),
+      confidence: z.number(),
+      snippet: z.string(),
+      conversationId: z.string(),
+    }),
+  ),
 })
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -17,36 +32,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'No text provided' })
     }
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4',
+    // Use generateObject with the defined schema
+    const { object } = await generateObject({
+      model: openai('gpt-4o'), // Using gpt-4o as in the electron service
+      mode: 'json',
+      schema: DialogueResponseSchema,
+      schemaName: 'DialogueDetection',
+      schemaDescription:
+        'Detect dialogue sections in text with character and conversation identification. Return the exact dialogue text without any surrounding context.',
       messages: [
         {
           role: 'system',
           content: `You are a dialogue detection system. Analyze the provided text and identify dialogue sections.
-          For each dialogue section, determine:
-          1. The character speaking
-          2. ONLY the exact dialogue text (the precise words spoken)
-          3. A conversation ID to group related dialogue (use conv1, conv2, etc.)
-          4. Your confidence in the character identification (0-1)
-          
+          For each dialogue section:
+          1. Determine the character speaking
+          2. Extract ONLY the exact dialogue text (the precise words spoken, without any surrounding context or narration)
+          3. Assign a conversation ID to group related dialogue together
+          4. Assess your confidence in the character identification (0-1)
+
+          Group dialogue into conversations based on:
+          - Proximity of dialogue segments
+          - Character interactions
+          - Natural breaks in conversation (scene changes, etc.)
+
+          Use incrementing conversation IDs (conv1, conv2, etc.) for different conversations.
+          Keep the same conversation ID for back-and-forth dialogue between characters.
+
           IMPORTANT: For the dialogue snippet, include ONLY the exact words spoken by the character.
           Do NOT include any surrounding context, narration, or speaker attribution.
           For example, from the text: 'John said "Hello there!" with a smile'
           Return ONLY: "Hello there!" as the snippet.
-          
-          Return only valid JSON in the following format:
-          {
-            "dialogues": [
-              {
-                "character": "character name",
-                "snippet": "exact dialogue text only",
-                "confidence": 0.95,
-                "conversationId": "conv1"
-              }
-            ]
-          }
-          
-          If no dialogue is found, return: {"dialogues": []}`,
+
+          *** VERY IMPORTANT RULE ***
+          If a single character's speech is interrupted by narration (e.g., "Go away," he said, "now."), you MUST return TWO SEPARATE dialogue objects for that speech turn.
+          - The first object's snippet would be "Go away,"
+          - The second object's snippet would be "now."
+          - Both objects should have the same character and conversationId.
+          DO NOT combine interrupted dialogue into a single snippet. Always split it based on the interruption.`,
         },
         {
           role: 'user',
@@ -54,44 +76,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
       ],
       temperature: 0.1,
-      response_format: { type: 'json_object' },
     })
 
-    const result = completion.choices[0].message.content
-    if (!result) {
-      return res.status(500).json({ error: 'No response from OpenAI' })
-    }
-
-    let parsed
-    try {
-      parsed = JSON.parse(result)
-    } catch (parseError) {
-      console.error('Failed to parse OpenAI response:', result)
-      return res.status(500).json({ error: 'Invalid JSON response from OpenAI' })
-    }
-
-    if (!parsed || !Array.isArray(parsed.dialogues)) {
-      console.error('Invalid response structure:', parsed)
-      return res.status(500).json({ error: 'Invalid response structure from OpenAI' })
-    }
-
-    // Validate each dialogue entry
-    const dialogues = parsed.dialogues
-      .map((dialogue: any) => {
-        if (!dialogue.snippet || !dialogue.character || !dialogue.conversationId) {
-          console.warn('Invalid dialogue entry:', dialogue)
-          return null
-        }
-        return dialogue
-      })
-      .filter(Boolean) // Remove any null entries
-
-    return res.status(200).json({ dialogues })
+    // The 'object' is already validated against the schema
+    return res.status(200).json(object)
   } catch (error: any) {
     console.error('Dialogue detection error:', error)
+
+    // Provide a more generic error message, but log details
+    let errorMessage = 'Failed to detect dialogue'
+    if (error instanceof Error) {
+      errorMessage = error.message
+    }
+
+    // Check for specific AI SDK related errors if needed, otherwise send generic message
     return res.status(500).json({
-      error: error.message || 'Failed to detect dialogue',
-      details: error.response?.data || error.toString(),
+      error: 'An error occurred during dialogue detection.',
+      details: errorMessage, // Optionally include more detail in non-production environments
     })
   }
 }

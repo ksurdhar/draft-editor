@@ -39,16 +39,16 @@ const ElectronCharactersPage = () => {
   })
 
   // Fetch documents data
-  const {
-    data: documents,
-    mutate: mutateDocuments,
-    isLoading: docsLoading,
-  } = useSWR<DocumentData[]>('/documents', window.electronAPI.get, {
-    revalidateOnFocus: false,
-    focusThrottleInterval: 30000,
-    dedupingInterval: 10000,
-    revalidateIfStale: false,
-  })
+  const { data: documents, mutate: mutateDocuments } = useSWR<DocumentData[]>(
+    '/documents',
+    window.electronAPI.get,
+    {
+      revalidateOnFocus: false,
+      focusThrottleInterval: 30000,
+      dedupingInterval: 10000,
+      revalidateIfStale: false,
+    },
+  )
 
   // Listen for sync updates from main process
   useEffect(() => {
@@ -95,7 +95,6 @@ const ElectronCharactersPage = () => {
       isLoading={charactersLoading}
       onCharactersChange={chars => mutateCharacters(chars, { revalidate: false })}
       documents={(documents || []).filter(doc => doc && typeof doc === 'object' && doc._id)}
-      onDocumentsChange={docs => mutateDocuments(docs, { revalidate: false })}
     />
   )
 }
