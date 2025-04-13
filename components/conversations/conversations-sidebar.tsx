@@ -242,24 +242,24 @@ const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
                 return (
                   <SidebarMenuItem
                     key={`${convo.documentId}-${convo.conversationId}`}
-                    className="list-none p-0">
+                    className="list-none border-b p-0 last:border-b-0">
                     <SidebarMenuButton
                       onClick={() => onConversationSelect(convo)}
                       isActive={isSelected}
-                      className={`group h-auto flex-col items-start gap-1 whitespace-nowrap p-3 text-sm leading-tight data-[collapsed=true]:h-12 data-[collapsed=true]:items-center data-[collapsed=true]:justify-center data-[state=active]:bg-muted/80 data-[collapsed=true]:p-2`}
+                      className={`group h-auto flex-col items-start gap-2 whitespace-nowrap px-3 py-4 leading-tight data-[collapsed=true]:h-12 data-[collapsed=true]:items-center data-[collapsed=true]:justify-center data-[collapsed=true]:gap-1 data-[state=active]:bg-muted/80 data-[collapsed=true]:p-2`}
                       tooltip={{
                         children: conversationDisplayName,
                         side: 'right',
                         sideOffset: 10,
                       }}>
-                      <div className="w-full data-[collapsed=true]:hidden">
+                      <div className="flex w-full flex-col gap-1.5 data-[collapsed=true]:hidden">
+                        <span className="text-sm font-semibold">{conversationDisplayName}</span>
                         <div className="flex w-full items-center justify-between gap-2 text-xs text-muted-foreground">
                           <span className="truncate" title={convo.documentTitle || 'Untitled Document'}>
                             {convo.documentTitle || 'Untitled Document'}
                           </span>
                         </div>
-                        <span className="font-medium">{conversationDisplayName}</span>
-                        <div className="flex flex-wrap gap-1">
+                        <div className="mt-1 flex flex-wrap gap-1">
                           {uniqueCharacters.map(name => (
                             <Badge key={name} variant="secondary">
                               {name}
