@@ -212,12 +212,19 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation 
   // Add loading state for view mode refresh
   const [isLoadingPreview, setIsLoadingPreview] = useState(false)
 
-  // Update local state if the conversation prop changes from parent
+  // Update local state if the conversation prop changes from parent,
+  // but ONLY if we are not currently editing.
   useEffect(() => {
-    setCurrentConversationData(conversation)
-    setIsEditing(false) // Reset edit mode if conversation changes
-    setEditorContent(null)
-  }, [conversation])
+    // If we are currently editing, don't reset the state based on prop changes.
+    // Let the editor manage its state until the user explicitly saves or cancels.
+    if (!isEditing) {
+      setCurrentConversationData(conversation)
+      setIsEditing(false) // Ensure edit mode is reset if conversation changes externally
+      setEditorContent(null) // Clear any stale editor content if not editing
+    } else {
+    }
+    // Dependency array includes isEditing to re-evaluate when editing mode changes.
+  }, [conversation, isEditing, currentConversationData?.conversationId])
 
   const refreshConversationView = useCallback(async () => {
     if (!currentConversationData) return
@@ -277,6 +284,7 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation 
   const handleSave = useCallback(
     async (updatedData: Partial<DocumentData>) => {
       const updatedEditorContent = updatedData.content
+
       if (!currentConversationData || !updatedEditorContent) {
         console.error('Cannot save: Missing data.')
         return
@@ -299,10 +307,9 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation 
           content: JSON.stringify(mergedContent),
           lastUpdated: Date.now(),
         }
+
         await patch(`/documents/${currentConversationData.documentId}`, patchData)
         console.log(`Document ${currentConversationData.documentId} saved successfully.`)
-
-        setEditorContent(updatedEditorContent)
       } catch (error) {
         console.error('Error saving document:', error)
       }
