@@ -314,7 +314,7 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation 
 
   if (!currentConversationData) {
     return (
-      <Card className="flex h-full items-center justify-center">
+      <Card className="flex h-full items-center justify-center bg-transparent backdrop-blur-none">
         <CardContent className="flex flex-col items-center justify-center">
           <Typography variant="body1" className="mb-2 text-center text-muted-foreground">
             Select a conversation to view its details.
@@ -328,8 +328,8 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({ conversation 
   }
 
   return (
-    <Card className="flex h-full flex-col">
-      <CardHeader className="flex flex-row items-center justify-between">
+    <Card className="flex h-full flex-col bg-transparent">
+      <CardHeader className="flex flex-row items-center justify-between border-b bg-card/90 backdrop-blur-lg">
         <div>
           <CardTitle>Conversation: {currentConversationData.conversationId}</CardTitle>
           <Typography

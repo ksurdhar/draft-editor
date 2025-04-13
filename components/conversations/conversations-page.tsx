@@ -330,8 +330,8 @@ const ConversationsPage = () => {
             </div>
           ) : (
             <div className="mx-auto grid h-[calc(100vh_-_80px)] w-11/12 max-w-[1600px] grid-cols-1 gap-6 overflow-hidden px-4 md:grid-cols-2">
-              <div className="col-span-1 flex h-full flex-col overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm">
-                <div className="border-b p-4">
+              <div className="col-span-1 flex h-full flex-col overflow-hidden rounded-lg border bg-card/80 text-card-foreground shadow-sm backdrop-blur-md">
+                <div className="border-b bg-card/20 p-4 backdrop-blur-lg">
                   <Typography variant="h6" className="mb-4 font-semibold">
                     Conversations
                   </Typography>
@@ -432,7 +432,7 @@ const ConversationsPage = () => {
                   selectedConversationId={selectedConversation?.conversationId}
                 />
               </div>
-              <div className="col-span-1 flex h-full flex-col overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm">
+              <div className="col-span-1 flex h-full flex-col overflow-hidden rounded-lg border bg-card/60 text-card-foreground shadow-sm backdrop-blur-md">
                 <ConversationPreview conversation={selectedConversation} />
               </div>
             </div>
