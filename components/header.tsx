@@ -135,9 +135,6 @@ const HeaderComponent = ({ id }: HeaderProps) => {
     event.target.value = ''
   }
 
-  // Determine the padding based on whether we're in Electron or not
-  const headerPadding = isElectron ? 'pt-8 p-5 pb-[0px]' : 'p-5 pb-[0px]'
-
   // Adjust the hamburger menu position for Electron
   const hamburgerTopPosition = isElectron ? 'top-[28px]' : 'top-[20px]'
 
@@ -154,22 +151,24 @@ const HeaderComponent = ({ id }: HeaderProps) => {
           multiple: true,
         } as DirectoryInputProps)}
       />
-      <header
+      <div
         className={`${initFadeIn ? 'header-gradient' : 'bg-transparent'} ${
           fadeOut && !menuOpen ? 'opacity-0' : 'opacity-100'
-        } fixed top-0 z-[39] flex w-[100vw] flex-row justify-between ${headerPadding} transition-opacity duration-700 hover:opacity-100`}>
-        <h1 className="lowercase">
-          {user ? (
-            <button onClick={() => navigateTo('/documents')} className="hover:opacity-80">
-              whetstone
-            </button>
-          ) : (
-            <button onClick={() => navigateTo('/')} className="hover:opacity-80">
-              whetstone
-            </button>
-          )}
-        </h1>
-      </header>
+        } pointer-events-none fixed left-0 top-[16px] z-[39] p-5 pb-[0px] transition-opacity duration-700 hover:opacity-100`}>
+        <div className="pointer-events-auto">
+          <h1 className="lowercase">
+            {user ? (
+              <button onClick={() => navigateTo('/documents')} className="hover:opacity-80">
+                whetstone
+              </button>
+            ) : (
+              <button onClick={() => navigateTo('/')} className="hover:opacity-80">
+                whetstone
+              </button>
+            )}
+          </h1>
+        </div>
+      </div>
 
       <div
         className={`${

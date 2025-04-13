@@ -201,13 +201,12 @@ const ConversationsPage = () => {
   })
 
   const { data: documents, isLoading: documentsLoading } = useSWR('/documents', window.electronAPI.get, {
-    revalidateOnFocus: false,
+    revalidateOnFocus: true,
     focusThrottleInterval: 30000,
     dedupingInterval: 10000,
     revalidateIfStale: false,
   })
 
-  const [initAnimate, setInitAnimate] = useState(false)
   const [selectedCharacterIds, setSelectedCharacterIds] = useState<string[]>([])
   const [selectedConversation, setSelectedConversation] = useState<ConversationGroup | null>(null)
   const [allConversations, setAllConversations] = useState<ConversationGroup[]>([])
@@ -215,13 +214,6 @@ const ConversationsPage = () => {
 
   // Basic loading spinner logic
   const showSpinner = useSpinner(charactersLoading || documentsLoading)
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setInitAnimate(true)
-    }, 50)
-    return () => clearTimeout(timer)
-  }, [])
 
   // Extract all conversations from all documents
   useEffect(() => {
@@ -417,12 +409,8 @@ const ConversationsPage = () => {
   return (
     <Layout>
       <div className="gradient-editor fixed left-0 top-0 z-[-1] h-screen w-screen" />
-      <div
-        className={`gradient duration-[3000ms] fixed left-0 top-0 z-[-1] h-screen w-screen transition-opacity ease-in-out ${
-          initAnimate ? 'opacity-100' : 'opacity-0'
-        }`}
-      />
-      <div className="fixed top-[44px] flex h-[calc(100vh_-_44px)] w-full flex-col overflow-hidden">
+
+      <div className="fixed flex h-[100vh] w-full flex-col overflow-hidden">
         {showSpinner ? (
           <div className="flex h-full items-center justify-center pt-10">
             <Loader />

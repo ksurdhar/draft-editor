@@ -130,9 +130,7 @@ const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton className="justify-start px-0" asChild>
-              <Typography variant="h6" className="font-semibold">
-                Conversations
-              </Typography>
+              <Typography variant="h6" className="font-semibold"></Typography>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -196,7 +194,7 @@ const ConversationsSidebar: React.FC<ConversationsSidebarProps> = ({
             {selectedCharacterNames.length > 0 ? (
               <>
                 {selectedCharacterNames.map(name => (
-                  <Badge key={name} variant="secondary" className="flex items-center gap-1">
+                  <Badge key={name} className="flex items-center gap-1">
                     {name}
                     <X
                       className="h-3 w-3 cursor-pointer"

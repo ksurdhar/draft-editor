@@ -4,8 +4,8 @@ import HeaderComponent from './header'
 import { useMouse } from './providers'
 
 // Direct detection method for Electron environment
-const isBrowser = typeof window !== 'undefined'
-const isElectron = isBrowser && window.hasOwnProperty('electronAPI')
+// const isBrowser = typeof window !== 'undefined'
+// const isElectron = isBrowser && window.hasOwnProperty('electronAPI')
 
 type Props = {
   children?: React.ReactNode
@@ -30,12 +30,10 @@ const Layout = ({ children, documentId, onToggleGlobalSearch }: Props): ReactNod
   }, [onToggleGlobalSearch])
 
   // Apply additional padding to the content if in Electron
-  const contentPadding = isElectron ? 'pt-2' : ''
+  // const contentPadding = isElectron ? 'pt-2' : ''
 
   return (
-    <div
-      className={`font-geist absolute w-screen ${contentPadding}`}
-      onMouseMove={e => onMouseMove(e.clientY)}>
+    <div className={`absolute w-screen font-geist`} onMouseMove={e => onMouseMove(e.clientY)}>
       <HeaderComponent id={documentId || ''} />
       {children}
     </div>
