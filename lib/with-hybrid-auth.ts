@@ -29,7 +29,7 @@ const getPublicKey = async (kid: string): Promise<string> => {
 const extractBearerToken = async (req: ExtendedApiRequest): Promise<Claims | null> => {
   // First try the direct authorization header
   let authHeader = req.headers.authorization
-  console.log('Direct authorization header:', authHeader ? 'found' : 'not found')
+  // console.log('Direct authorization header:', authHeader ? 'found' : 'not found')
 
   // Then try custom header that might bypass Vercel's header handling
   if (!authHeader && req.headers['x-whetstone-authorization']) {
@@ -50,14 +50,14 @@ const extractBearerToken = async (req: ExtendedApiRequest): Promise<Claims | nul
     }
   }
 
-  console.log('Final authorization header:', authHeader ? `${authHeader.substring(0, 20)}...` : 'none')
+  // console.log('Final authorization header:', authHeader ? `${authHeader.substring(0, 20)}...` : 'none')
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.log('Authorization header validation failed:', {
-      exists: !!authHeader,
-      startsWith: authHeader ? authHeader.startsWith('Bearer ') : false,
-      value: authHeader ? `${authHeader.substring(0, 20)}...` : 'none',
-    })
+    // console.log('Authorization header validation failed:', {
+    //   exists: !!authHeader,
+    //   startsWith: authHeader ? authHeader.startsWith('Bearer ') : false,
+    //   value: authHeader ? `${authHeader.substring(0, 20)}...` : 'none',
+    // })
     return null
   }
 
@@ -114,7 +114,7 @@ const withHybridAuth = (handler: (req: ExtendedApiRequest, res: NextApiResponse)
         req.user = userFromToken
         await handler(req, res)
       } else {
-        console.log('no user from token, using session-based authentication')
+        // console.log('no user from token, using session-based authentication')
         const session = await getSession(req, res)
         req.user = session?.user
         if (!req.user) {

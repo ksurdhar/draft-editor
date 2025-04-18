@@ -512,7 +512,10 @@ async function syncCollectionToLocal(config: CollectionConfig, cloudData: Collec
             await performCloudOperation('patch', `/${config.name}/${localItem._id}`, localItem)
             cloudCreatedCount++ // Reuse this counter for updates too
           } catch (error) {
-            console.error(`Error updating ${getSingular(config.name)} ${localItem._id} in cloud:`, error)
+            console.error(
+              `Error updating ${getSingular(config.name)} ${localItem._id} in cloud:`,
+              error?.data,
+            )
           }
         }
       }
@@ -732,9 +735,7 @@ async function performCloudOperation(
   } catch (error: any) {
     console.error('API request failed:', {
       status: error.response?.status,
-      statusText: error.response?.statusText,
       data: error.response?.data,
-      headers: error.response?.headers,
     })
 
     // Check if this is a network connectivity error

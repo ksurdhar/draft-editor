@@ -61,9 +61,9 @@ export class MongoStorageAdapter implements StorageAdapter {
   }
 
   async create(collection: string, data: Omit<Document, '_id'>): Promise<Document> {
-    console.log('\n=== MongoStorageAdapter.create ===')
-    console.log('Collection:', collection)
-    console.log('Data:', data)
+    // console.log('\n=== MongoStorageAdapter.create ===')
+    // console.log('Collection:', collection)
+    // console.log('Data:', data)
 
     try {
       const col = await this.getCollection(collection)
@@ -82,9 +82,9 @@ export class MongoStorageAdapter implements StorageAdapter {
   }
 
   async findById(collection: string, id: string): Promise<Document | null> {
-    console.log('\n=== MongoStorageAdapter.findById ===')
-    console.log('Collection:', collection)
-    console.log('ID:', id)
+    // console.log('\n=== MongoStorageAdapter.findById ===')
+    // console.log('Collection:', collection)
+    // console.log('ID:', id)
 
     try {
       const col = await this.getCollection(collection)
@@ -97,13 +97,26 @@ export class MongoStorageAdapter implements StorageAdapter {
   }
 
   async find(collection: string, query: Record<string, any> = {}): Promise<Document[]> {
-    console.log('\n=== MongoStorageAdapter.find ===')
-    console.log('Collection:', collection)
-    console.log('Query:', query)
+    // console.log('\n=== MongoStorageAdapter.find ===')
+    // console.log('Collection:', collection)
+    // console.log('Query:', query)
 
     try {
       const col = await this.getCollection(collection)
-      const results = await col.find(query).toArray()
+
+      // Convert string _id to ObjectId if present in the query
+      const processedQuery = { ...query }
+      if (processedQuery._id && typeof processedQuery._id === 'string') {
+        try {
+          processedQuery._id = new ObjectId(processedQuery._id)
+        } catch (e) {
+          console.warn(`Invalid ObjectId string passed to find query: ${processedQuery._id}`)
+          // If conversion fails, maybe it's intentional? Or return empty?
+          // For now, let the original query proceed, which will likely find nothing.
+        }
+      }
+
+      const results = await col.find(processedQuery).toArray()
       return results.map(doc => this.toDocument(doc))
     } catch (error) {
       console.error('Error finding documents:', error)
@@ -112,10 +125,10 @@ export class MongoStorageAdapter implements StorageAdapter {
   }
 
   async update(collection: string, id: string, data: Partial<Document>): Promise<Document | null> {
-    console.log('\n=== MongoStorageAdapter.update ===')
-    console.log('Collection:', collection)
-    console.log('ID:', id)
-    console.log('Update data:', data)
+    // console.log('\n=== MongoStorageAdapter.update ===')
+    // console.log('Collection:', collection)
+    // console.log('ID:', id)
+    // console.log('Update data:', data)
 
     try {
       const col = await this.getCollection(collection)
@@ -138,9 +151,9 @@ export class MongoStorageAdapter implements StorageAdapter {
   }
 
   async delete(collection: string, query: Record<string, any>): Promise<boolean> {
-    console.log('\n=== MongoStorageAdapter.delete ===')
-    console.log('Collection:', collection)
-    console.log('Query:', query)
+    // console.log('\n=== MongoStorageAdapter.delete ===')
+    // console.log('Collection:', collection)
+    // console.log('Query:', query)
 
     try {
       const col = await this.getCollection(collection)

@@ -7,27 +7,19 @@ import { createPermission } from '@lib/mongo-utils'
 
 const handlers = {
   async POST(req: ExtendedApiRequest, res: NextApiResponse) {
-    console.log('\n=== Creating New Document ===')
-
-    // Prepare content as stringified JSON
     let content = req.body.content
 
     if (!content) {
       console.log('Using default content')
-      // Stringify the default content
       content = JSON.stringify(DEFAULT_DOCUMENT_CONTENT)
     } else if (typeof content === 'object') {
-      // If content is an object, stringify it
       console.log('Stringifying object content')
       content = JSON.stringify(content)
     } else if (typeof content === 'string') {
-      // If it's already a string, make sure it's valid JSON
       try {
-        // Try to parse it to validate, but keep it as a string
         JSON.parse(content)
         console.log('Content is already a valid JSON string')
       } catch (e) {
-        // If it's not valid JSON, wrap it as a string value in JSON
         console.log('Content is not valid JSON, wrapping as string value')
         content = JSON.stringify(content)
       }
@@ -85,14 +77,8 @@ const handlers = {
   },
 
   async GET(req: ExtendedApiRequest, res: NextApiResponse) {
-    console.log('\n=== Fetching Documents ===')
-    console.log('User ID:', req.user!.sub)
-
     const { metadataOnly } = req.query
-    console.log('Metadata only:', metadataOnly)
-
     const documents = await storage.find('documents', { userId: req.user!.sub })
-    console.log('Found documents:', documents.length)
 
     // Process documents and parse stringified JSON
     const docsWithPermissions = await Promise.all(
@@ -129,9 +115,6 @@ const handlers = {
 
 export default withHybridAuth(async function documentsHandler(req: ExtendedApiRequest, res: NextApiResponse) {
   const { method, user } = req
-
-  console.log('req', req)
-  console.log('user', user)
 
   if (!user) {
     // Log the auth failure with details

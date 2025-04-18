@@ -344,10 +344,10 @@ const DocumentTree = ({
     const textRect = textElement.getBoundingClientRect()
     const scrollTop = window.scrollY || document.documentElement.scrollTop
     const scrollLeft = window.scrollX || document.documentElement.scrollLeft
-
+    // -96 px in the editor, - scrolltop in the documents list view
     // Position the input exactly where the text element is
     editPositionRef.current = {
-      top: textRect.top + scrollTop,
+      top: textRect.top - scrollTop,
       left: textRect.left + scrollLeft,
       width: element.clientWidth - (textRect.left - element.getBoundingClientRect().left) - 8,
     }

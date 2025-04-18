@@ -16,9 +16,8 @@ if (!global.db && process.env.NEXT_PUBLIC_STORAGE_TYPE === 'mongo') {
   Mongoose.set('strictQuery', true)
   Mongoose.connect(MONGO_DB)
   global.db = Mongoose.connection
-}
 
-if (global.db) {
+  // Attach listeners only once when the connection is first established
   global.db.on('error', error => {
     console.error('\nMongoDB Connection Error:', error)
   })
