@@ -44,37 +44,18 @@ function NetworkStatus() {
   // Styles for the network indicator
   const containerStyle = {
     position: 'fixed',
-    bottom: '20px',
-    right: '20px',
-    padding: '8px 12px',
-    borderRadius: '4px',
-    backgroundColor: isOnline ? 'rgba(0, 128, 0, 0.1)' : 'rgba(255, 0, 0, 0.1)',
-    border: `1px solid ${isOnline ? 'green' : 'red'}`,
-    color: isOnline ? 'green' : 'red',
-    fontSize: '14px',
-    fontWeight: 'bold',
-    zIndex: 1000,
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-    transition: 'all 0.3s ease',
+    bottom: '12px',
+    left: '12px',
+    padding: '4px 8px',
+    fontSize: '12px',
+    color: isOnline ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 0, 0, 0.7)',
+    zIndex: 30,
+    fontFamily: 'monospace',
+    transition: 'opacity 0.3s ease',
+    opacity: 0.6,
   } as React.CSSProperties
 
-  const indicatorStyle = {
-    width: '8px',
-    height: '8px',
-    borderRadius: '50%',
-    backgroundColor: isOnline ? 'green' : 'red',
-    boxShadow: `0 0 4px ${isOnline ? 'green' : 'red'}`,
-  }
-
-  return (
-    <div style={containerStyle}>
-      <div style={indicatorStyle}></div>
-      {isOnline ? 'Online' : 'Offline'}
-    </div>
-  )
+  return <div style={containerStyle}>{isOnline ? 'online' : 'offline'}</div>
 }
 
 function ElectronApp() {

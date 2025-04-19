@@ -86,6 +86,7 @@
     "react": "^18.2.0",
     "react-complex-tree": "^2.4.6",
     "react-dom": "^18.2.0",
+    "react-resizable-panels": "^2.1.7",
     "react-syntax-highlighter": "^15.6.1",
     "slate": "^0.81.1",
     "slate-history": "^0.66.0",

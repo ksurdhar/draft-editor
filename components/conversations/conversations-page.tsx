@@ -418,7 +418,7 @@ const ConversationsPage = () => {
     <Layout>
       <div className="gradient-editor fixed left-0 top-0 z-[-1] h-screen w-screen" />
 
-      <div className="fixed flex h-[100vh] w-full flex-col overflow-hidden">
+      <div className="flex h-full w-full flex-col overflow-hidden">
         {showSpinner ? (
           <div className="flex h-full items-center justify-center pt-10">
             <Loader />
