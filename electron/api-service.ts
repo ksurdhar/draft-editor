@@ -257,11 +257,34 @@ const collections: Record<string, CollectionConfig> = {
         }
         console.log('Detecting dialogue in text:', data.text.substring(0, 100) + '...')
         try {
-          const dialogues = await detectDialogue(data.text)
-          console.log('Dialogue detection successful:', dialogues.length, 'dialogues found')
-          return { data: dialogues }
+          // Call the Next.js API endpoint instead of the local service
+          const cloudResponse = await performCloudOperation('post', '/dialogue/detect', { text: data.text })
+          console.log(
+            'Dialogue detection (via Next.js API) successful:',
+            cloudResponse.data?.dialogues?.length || 0,
+            'dialogues found',
+          )
+          return { data: cloudResponse.data?.dialogues || [] }
         } catch (error: any) {
-          console.error('Error in dialogue detection:', error)
+          console.error('Error in dialogue detection (via Next.js API):', error)
+
+          // If there's a network error, report it
+          if (error && isNetworkError(error) && networkDetector) {
+            console.log('Network error detected during dialogue detection')
+            networkDetector.reportNetworkFailure()
+
+            // Fallback to local detection as a backup in case of network issues
+            try {
+              console.log('Falling back to local dialogue detection service')
+              const dialogues = await detectDialogue(data.text)
+              console.log('Local dialogue detection successful:', dialogues.length, 'dialogues found')
+              return { data: dialogues }
+            } catch (localError: any) {
+              console.error('Error in local dialogue detection fallback:', localError)
+              throw localError
+            }
+          }
+
           throw error
         }
       },
@@ -652,13 +675,13 @@ const makeRequest = async (
     let localResult = await routeLocalOperation(method, cleanEndpoint, data)
     console.log('Local operation result:', localResult?.data ? 'success' : 'no data')
 
-    // If we're online and this isn't a dialogue detection request, perform cloud operation
-    if (isOnline() && !cleanEndpoint.startsWith('dialogue/detect')) {
+    // If we're online, perform cloud operation (including dialogue detection now)
+    if (isOnline()) {
       // Since we're now using the same IDs for both local and cloud,
       // we can simply pass the same endpoint to the cloud operation
       performCloudOperationAsync(method, endpoint, data, cleanEndpoint, localResult)
     } else {
-      console.log('Skipping cloud sync - offline or dialogue detection request')
+      console.log('Skipping cloud sync - offline')
     }
 
     // Always return the local result immediately

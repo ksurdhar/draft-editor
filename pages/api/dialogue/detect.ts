@@ -1,7 +1,8 @@
 import { generateObject } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { z } from 'zod'
-import type { NextApiRequest, NextApiResponse } from 'next'
+import withHybridAuth, { ExtendedApiRequest } from '@lib/with-hybrid-auth'
+import type { NextApiResponse } from 'next'
 
 // Create OpenAI client with API key from environment
 const openai = createOpenAI({
@@ -20,8 +21,22 @@ const DialogueResponseSchema = z.object({
   ),
 })
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
+async function dialogueDetectionHandler(req: ExtendedApiRequest, res: NextApiResponse) {
+  const { method, user } = req
+
+  if (!user) {
+    // Log the auth failure with details
+    console.error('Auth failed:', {
+      headers: req.headers,
+      method,
+      url: req.url,
+      timestamp: new Date().toISOString(),
+    })
+    res.status(401).end('Unauthorized')
+    return
+  }
+
+  if (method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
@@ -31,6 +46,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!text) {
       return res.status(400).json({ error: 'No text provided' })
     }
+
+    // Log the user making the request
+    console.log('\n=== Detecting Dialogue ===')
+    console.log('User ID:', user.sub)
+    console.log('Text length:', text.length, 'characters')
 
     // Use generateObject with the defined schema
     const { object } = await generateObject({
@@ -78,10 +98,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       temperature: 0.1,
     })
 
+    // Log success
+    console.log('Dialogue detection successful, found', object.dialogues.length, 'dialogues')
+
     // The 'object' is already validated against the schema
     return res.status(200).json(object)
   } catch (error: any) {
     console.error('Dialogue detection error:', error)
+
+    // Log the full error details
+    console.error('API Error:', {
+      error: error instanceof Error ? error.message : error,
+      method,
+      url: req.url,
+      user: user.sub,
+      timestamp: new Date().toISOString(),
+    })
 
     // Provide a more generic error message, but log details
     let errorMessage = 'Failed to detect dialogue'
@@ -96,3 +128,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     })
   }
 }
+
+export default withHybridAuth(dialogueDetectionHandler)
