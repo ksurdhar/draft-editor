@@ -21,11 +21,14 @@ const Layout = ({ children, documentId, onToggleGlobalSearch }: Props): ReactNod
   const { onMouseMove, mouseMoved } = useMouse()
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [isAnimating, setIsAnimating] = useState(false)
+  const [isPanelVisible, setIsPanelVisible] = useState(false)
 
   // References to panel objects for manual resize control
   const mainPanelRef = useRef<any>(null)
   const chatPanelRef = useRef<any>(null)
+  const isInitialRender = useRef(true)
 
+  // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Check for Shift+Command+F (Mac) or Shift+Ctrl+F (Windows) for global search
@@ -47,6 +50,17 @@ const Layout = ({ children, documentId, onToggleGlobalSearch }: Props): ReactNod
 
   // Handle chat panel open/close animation
   useEffect(() => {
+    // Skip animation on initial render when chat is closed
+    if (isInitialRender.current && !isChatOpen) {
+      isInitialRender.current = false
+      return
+    }
+
+    // Immediately update visibility when opening
+    if (isChatOpen) {
+      setIsPanelVisible(true)
+    }
+
     setIsAnimating(true)
 
     const startSize = isChatOpen ? 0 : 30
@@ -83,9 +97,21 @@ const Layout = ({ children, documentId, onToggleGlobalSearch }: Props): ReactNod
         currentStep++
         requestAnimationFrame(animatePanel)
       } else {
-        setIsAnimating(false)
+        // Animation complete
+        if (!isChatOpen) {
+          // When closing, delay hiding the panel until animation is fully complete
+          setTimeout(() => {
+            setIsPanelVisible(false)
+            setIsAnimating(false)
+          }, 50) // Small delay to ensure smooth transition
+        } else {
+          setIsAnimating(false)
+        }
       }
     }
+
+    // Mark as no longer the initial render for subsequent animations
+    isInitialRender.current = false
 
     requestAnimationFrame(animatePanel)
 
@@ -111,7 +137,7 @@ const Layout = ({ children, documentId, onToggleGlobalSearch }: Props): ReactNod
           <ResizableHandle
             withHandle
             className={`transition-opacity duration-300 ${
-              isChatOpen || isAnimating ? 'opacity-100' : 'opacity-0'
+              (isChatOpen || isAnimating) && !isInitialRender.current ? 'opacity-100' : 'opacity-0'
             }`}
           />
 
@@ -120,7 +146,7 @@ const Layout = ({ children, documentId, onToggleGlobalSearch }: Props): ReactNod
             defaultSize={isChatOpen ? 30 : 0}
             minSize={0}
             maxSize={50}
-            className={isChatOpen || isAnimating ? '' : 'hidden'}>
+            className={isPanelVisible || isAnimating ? '' : 'hidden'}>
             <ChatPanel isOpen={isChatOpen} onClose={toggleChat} />
           </ResizablePanel>
         </ResizablePanelGroup>
