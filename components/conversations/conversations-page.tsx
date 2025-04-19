@@ -187,20 +187,27 @@ const updateConversationNameInContent = (content: any, conversationId: string, n
   return modified ? updatedContent : parsedContent
 }
 
+// Check if we're in Electron environment
+const isElectron = typeof window !== 'undefined' && window.electronAPI
+
 const ConversationsPage = () => {
   const { get, patch } = useAPI()
+
+  // Use the appropriate fetch function based on environment
+  const fetcher = isElectron ? window.electronAPI.get : get
+
   const {
     data: characters,
     mutate: mutateCharacters,
     isLoading: charactersLoading,
-  } = useSWR<CharacterData[]>('/characters', window.electronAPI.get, {
+  } = useSWR<CharacterData[]>('/characters', fetcher, {
     revalidateOnFocus: false,
     focusThrottleInterval: 30000,
     dedupingInterval: 10000,
     revalidateIfStale: false,
   })
 
-  const { data: documents, isLoading: documentsLoading } = useSWR('/documents', window.electronAPI.get, {
+  const { data: documents, isLoading: documentsLoading } = useSWR('/documents', fetcher, {
     revalidateOnFocus: true,
     focusThrottleInterval: 30000,
     dedupingInterval: 10000,
@@ -263,8 +270,10 @@ const ConversationsPage = () => {
     })
   }, [documents])
 
-  // Listener for sync updates (similar to characters-page)
+  // Listener for sync updates (only for Electron)
   useEffect(() => {
+    if (!isElectron) return // Skip this effect in web version
+
     const removeListener = window.electronAPI.onSyncUpdate((updates: SyncUpdates) => {
       if (updates.characters && updates.characters.length > 0) {
         mutateCharacters(currentChars => {

@@ -514,7 +514,7 @@ async function syncCollectionToLocal(config: CollectionConfig, cloudData: Collec
           } catch (error) {
             console.error(
               `Error updating ${getSingular(config.name)} ${localItem._id} in cloud:`,
-              error?.data,
+              (error as any)?.data,
             )
           }
         }
