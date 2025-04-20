@@ -26,6 +26,22 @@ const electronAPI = {
       ipcRenderer.removeListener('sync:updates', listener)
     }
   },
+  onChatStream: (
+    callback: (data: {
+      messageId: string
+      chunk?: string
+      error?: string
+      done: boolean
+      fullText?: string
+    }) => void,
+  ) => {
+    const listener = (_: any, data: any) => callback(data)
+    ipcRenderer.on('chat:stream', listener)
+    return () => {
+      ipcRenderer.removeListener('chat:stream', listener)
+    }
+  },
+  streamChat: (payload: any) => ipcRenderer.invoke('api:stream-chat', payload),
 }
 
 // Register the API with the contextBridge

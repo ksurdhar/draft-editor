@@ -33,18 +33,18 @@ const challenge = base64URLEncode(sha256(verifier))
 
 let accessToken: string = mockAuth ? getMockToken() : ''
 let profile: any = mockAuth ? mockUser : null
-let refreshToken: string = ''
+let refreshToken = ''
 
 function getAccessToken() {
   if (mockAuth) return getMockToken()
-  console.log(
-    'Current access token:',
-    accessToken ? 'exists' : 'empty',
-    'Length:',
-    accessToken?.length || 0,
-    'First 20 chars:',
-    accessToken?.substring(0, 20),
-  )
+  // console.log(
+  //   'Current access token:',
+  //   accessToken ? 'exists' : 'empty',
+  //   'Length:',
+  //   accessToken?.length || 0,
+  //   'First 20 chars:',
+  //   accessToken?.substring(0, 20),
+  // )
   return accessToken
 }
 

@@ -1,8 +1,8 @@
 import { BrowserWindow, app, ipcMain, dialog } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
-import apiService, { setNetworkDetector } from './api-service'
-import { initNetworkDetection } from './network-detector'
+import apiService, { setNetworkDetector, BASE_URL, isNetworkError } from './api-service'
+import { initNetworkDetection, isOnline } from './network-detector'
 import { createAppWindow } from './app'
 import { createAuthWindow, createLogoutWindow } from './auth-process'
 import authService from './auth-service'
@@ -54,6 +54,199 @@ app.on('window-all-closed', () => {
   }
 })
 
+async function streamCloudChatResponse(endpoint: string, data: any, messageId: string) {
+  console.log('Setting up chat streaming from cloud API:', endpoint)
+
+  try {
+    // Get fresh access token
+    let token = authService.getAccessToken()
+
+    // If token is expired, refresh it
+    if (token && authService.isTokenExpired(token)) {
+      console.log('Token expired, refreshing before streaming...')
+      await authService.refreshTokens()
+      token = authService.getAccessToken()
+    }
+
+    if (!token) {
+      throw new Error('No authentication token available. Please log in.')
+    }
+
+    // Ensure endpoint is properly formatted
+    endpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
+    const url = `${BASE_URL}${endpoint}`
+
+    console.log('Using Node.js native http/https module for streaming request')
+
+    // Get reference to all browser windows
+    const windows = BrowserWindow.getAllWindows()
+
+    // Create and execute the request using node's http/https modules
+    return new Promise((resolve, reject) => {
+      try {
+        // Parse the URL to get hostname, path, etc.
+        const parsedUrl = new URL(url)
+
+        // Prepare the request data
+        const requestData = JSON.stringify(data)
+
+        // Configure the request options
+        const options = {
+          hostname: parsedUrl.hostname,
+          port: parsedUrl.port || (parsedUrl.protocol === 'https:' ? 443 : 80),
+          path: parsedUrl.pathname + parsedUrl.search,
+          method: 'POST',
+          headers: {
+            'x-whetstone-authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(requestData),
+          },
+        }
+
+        console.log('Request details:', {
+          url,
+          method: 'POST',
+          dataSize: requestData.length,
+        })
+
+        // Choose http or https module based on the URL
+        const httpModule = parsedUrl.protocol === 'https:' ? require('https') : require('http')
+
+        // Create the request
+        const req = httpModule.request(options, (res: any) => {
+          console.log('Response received. Status:', res.statusCode)
+          console.log('Response headers:', res.headers)
+
+          // Handle error status codes
+          if (res.statusCode < 200 || res.statusCode >= 300) {
+            const errorMsg = `Request failed with status code ${res.statusCode}`
+            console.error(errorMsg)
+
+            // Notify windows of the error
+            windows.forEach(window => {
+              if (!window.isDestroyed()) {
+                window.webContents.send('chat:stream', {
+                  messageId,
+                  error: errorMsg,
+                  done: true,
+                })
+              }
+            })
+
+            // Clean up and reject the promise
+            res.resume() // Consume the response data to free up memory
+            reject(new Error(errorMsg))
+            return
+          }
+
+          // Set up variables to collect the response
+          let fullText = ''
+          res.setEncoding('utf8')
+
+          // Handle data chunks
+          res.on('data', (chunk: string) => {
+            console.log(`Received chunk of length: ${chunk.length}`)
+            fullText += chunk
+
+            // Send the chunk to all renderer windows
+            windows.forEach(window => {
+              if (!window.isDestroyed()) {
+                window.webContents.send('chat:stream', {
+                  messageId,
+                  chunk,
+                  done: false,
+                })
+              }
+            })
+          })
+
+          // Handle end of response
+          res.on('end', () => {
+            console.log(`Response complete. Total length: ${fullText.length}`)
+
+            // Send completion to all renderer windows
+            windows.forEach(window => {
+              if (!window.isDestroyed()) {
+                window.webContents.send('chat:stream', {
+                  messageId,
+                  chunk: '',
+                  done: true,
+                  fullText,
+                })
+              }
+            })
+
+            // Report network success if needed
+            if (networkDetector && !isOnline()) {
+              networkDetector.reportNetworkSuccess()
+            }
+
+            resolve({ data: 'Streaming completed successfully' })
+          })
+        })
+
+        // Handle request errors
+        req.on('error', (err: Error) => {
+          console.error('Request error:', err.message)
+
+          // Notify windows of the error
+          windows.forEach(window => {
+            if (!window.isDestroyed()) {
+              window.webContents.send('chat:stream', {
+                messageId,
+                error: err.message,
+                done: true,
+              })
+            }
+          })
+
+          // Report network failure if appropriate
+          if (networkDetector) {
+            networkDetector.reportNetworkFailure()
+          }
+
+          reject(err)
+        })
+
+        // Send the request data
+        req.write(requestData)
+        req.end()
+
+        console.log('Request sent, awaiting response...')
+      } catch (err: any) {
+        console.error('Error creating request:', err.message)
+        reject(err)
+      }
+    })
+  } catch (error: any) {
+    console.error('Error setting up streaming:', error)
+    console.error('Error details:', {
+      message: error.message,
+      name: error.name,
+      code: error.code,
+      stack: error.stack,
+    })
+
+    // Report network failure if applicable
+    if (isNetworkError(error) && networkDetector) {
+      networkDetector.reportNetworkFailure()
+    }
+
+    // Notify all windows of the setup error
+    BrowserWindow.getAllWindows().forEach(window => {
+      if (!window.isDestroyed()) {
+        window.webContents.send('chat:stream', {
+          messageId,
+          error: error.message || 'Failed to set up streaming',
+          done: true,
+        })
+      }
+    })
+
+    throw error
+  }
+}
+
 app
   .whenReady()
   .then(() => {
@@ -99,6 +292,29 @@ app
     ipcMain.handle('api:patch', (_, url, body) => apiService.patch(url, body))
     ipcMain.handle('api:delete', (_, url) => apiService.destroy(url))
     ipcMain.handle('api:get', (_, url) => apiService.get(url))
+
+    // Add dedicated handler for chat streaming
+    ipcMain.handle('api:stream-chat', async (_, payload) => {
+      try {
+        console.log('Starting chat stream with payload:', {
+          messages: payload.messages?.length || 0,
+          entityContents: Object.keys(payload.entityContents || {}).length || 0,
+        })
+
+        // Make sure there's a message ID
+        const messageId = payload.messageId || `ai-${Date.now()}`
+
+        // Start the streaming process (this doesn't return the stream)
+        await streamCloudChatResponse('/dialogue/chat', payload, messageId)
+
+        // Return success (the actual content comes via IPC events)
+        return { success: true }
+      } catch (error: any) {
+        console.error('Error streaming chat:', error)
+        return { success: false, error: error.message }
+      }
+    })
+
     ipcMain.handle('dialog:open-folder', async () => {
       const result = await dialog.showOpenDialog({
         properties: ['openDirectory', 'multiSelections'],

@@ -50,6 +50,63 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
+  // Set up IPC listener for streaming in Electron
+  useEffect(() => {
+    if (!isElectron) return
+
+    // Function to handle stream chunks from the main process
+    const handleStreamChunk = (data: {
+      messageId: string
+      chunk?: string
+      error?: string
+      done: boolean
+      fullText?: string
+    }) => {
+      const { messageId, chunk, error: streamError, done, fullText } = data
+
+      if (streamError) {
+        setError(streamError)
+        toast.error(`Chat error: ${streamError}`)
+
+        // Remove the streaming message if there was an error
+        setMessages(prev => prev.filter(msg => msg.id !== messageId))
+        setIsResponding(false)
+        return
+      }
+
+      if (done) {
+        // Mark message as no longer streaming when we're done
+        setMessages(prev => prev.map(msg => (msg.id === messageId ? { ...msg, isStreaming: false } : msg)))
+        setIsResponding(false)
+
+        // If a fullText is provided and different from what we built up,
+        // use it as a fallback to ensure consistency
+        if (fullText) {
+          setMessages(prev =>
+            prev.map(msg =>
+              msg.id === messageId && msg.content !== fullText ? { ...msg, content: fullText } : msg,
+            ),
+          )
+        }
+      } else if (chunk) {
+        // Add the chunk to the message content
+        setMessages(prev =>
+          prev.map(msg => (msg.id === messageId ? { ...msg, content: msg.content + chunk } : msg)),
+        )
+      }
+    }
+
+    // Use the electronAPI.onChatStream method from preload
+    const unsubscribe = window.electronAPI.onChatStream(handleStreamChunk)
+
+    // Clean up the listener when component unmounts
+    return () => {
+      if (unsubscribe && typeof unsubscribe === 'function') {
+        unsubscribe()
+      }
+    }
+  }, [])
+
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -72,12 +129,12 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
 
     // Process references sequentially to allow for async operations
     for (const ref of entityRefs) {
-      console.log(`Processing entity reference: ${ref.type}:${ref.id} (${ref.displayName})`)
+      //   console.log(`Processing entity reference: ${ref.type}:${ref.id} (${ref.displayName})`)
 
       if (ref.type === 'document') {
         // Load document content using the EntityProvider
         const documentWithContent = await loadDocumentContent(ref.id)
-        console.log(`Document content loaded:`, documentWithContent?.content ? 'success' : 'failed')
+        // console.log(`Document content loaded:`, documentWithContent?.content ? 'success' : 'failed')
 
         if (documentWithContent && documentWithContent.content) {
           entityContents[`document:${ref.id}`] = {
@@ -86,31 +143,31 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
             name: ref.displayName,
             content: documentWithContent.content,
           }
-          console.log(
-            `Added document content to entity contents, type:`,
-            typeof documentWithContent.content,
-            `keys:`,
-            Object.keys(documentWithContent.content || {}).join(', '),
-          )
+          //   console.log(
+          //     `Added document content to entity contents, type:`,
+          //     typeof documentWithContent.content,
+          //     `keys:`,
+          //     Object.keys(documentWithContent.content || {}).join(', '),
+          //   )
         }
       } else if (ref.type === 'conversation' && ref.parentId) {
         // Load conversation content using the EntityProvider
         const conversationWithContent = await loadConversationContent(ref.id)
-        console.log(
-          `Conversation content loaded:`,
-          conversationWithContent?.entries?.length
-            ? `with ${conversationWithContent.entries.length} entries`
-            : 'failed',
-        )
+        // console.log(
+        //   `Conversation content loaded:`,
+        //   conversationWithContent?.entries?.length
+        //     ? `with ${conversationWithContent.entries.length} entries`
+        //     : 'failed',
+        // )
 
         if (conversationWithContent) {
           // Log detailed information about the conversation entity
-          console.log(`Adding conversation entity to contents:`, {
-            id: conversationWithContent.id,
-            name: conversationWithContent.name,
-            entriesCount: conversationWithContent.entries?.length || 0,
-            hasEntries: !!(conversationWithContent.entries && conversationWithContent.entries.length > 0),
-          })
+          //   console.log(`Adding conversation entity to contents:`, {
+          //     id: conversationWithContent.id,
+          //     name: conversationWithContent.name,
+          //     entriesCount: conversationWithContent.entries?.length || 0,
+          //     hasEntries: !!(conversationWithContent.entries && conversationWithContent.entries.length > 0),
+          //   })
 
           entityContents[`conversation:${ref.id}`] = {
             type: 'conversation',
@@ -137,7 +194,7 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
       } else if (ref.type === 'scene') {
         // Get scene entity
         const entity = getEntityById('scene', ref.id)
-        console.log(`Found scene entity:`, entity ? 'yes' : 'no')
+        // console.log(`Found scene entity:`, entity ? 'yes' : 'no')
         if (entity) {
           entityContents[`scene:${ref.id}`] = {
             type: 'scene',
@@ -151,7 +208,7 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
       }
     }
 
-    console.log(`Prepared entity contents for ${Object.keys(entityContents).length} entities`)
+    // console.log(`Prepared entity contents for ${Object.keys(entityContents).length} entities`)
     return entityContents
   }
 
@@ -192,7 +249,7 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
     try {
       // Prepare entity contents if there are entity references
       const entityContents = await prepareEntityContents(entityRefs)
-
+      console.log('****SENDING ENTITY CONTENTS:', entityContents)
       // Format messages for API
       const apiMessages = messages
         .filter(msg => msg.id !== 'welcome') // Remove welcome message
@@ -209,28 +266,25 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
         documentContext,
         entityContents, // Add entity contents to the payload
         model: 'gpt-4o', // Default model, could be made configurable
+        messageId: assistantMessageId, // Pass the message ID for streaming
       }
 
       // Use the appropriate method based on environment
       if (isElectron) {
-        // In Electron, use the electron API
-        const result = await window.electronAPI.post('/dialogue/chat', payload)
+        // In Electron, use the dedicated streamChat method for streaming
+        try {
+          await window.electronAPI.streamChat(payload)
+          // The streaming updates will be handled by the IPC listener in useEffect
+          // No need to update message state here
+        } catch (err: any) {
+          console.error('Failed to initiate chat streaming:', err)
+          setError(err.message || 'Failed to initiate chat streaming')
+          toast.error(`Chat error: ${err.message || 'Unknown error'}`)
 
-        // For now, as a temporary solution until we implement real streaming in Electron
-        // Just return the result as a complete message
-        setMessages(prev =>
-          prev.map(msg =>
-            msg.id === assistantMessageId
-              ? {
-                  ...msg,
-                  content: result || "I couldn't process your request at this time.",
-                  isStreaming: false,
-                }
-              : msg,
-          ),
-        )
-        setIsResponding(false)
-        return
+          // Remove the streaming message if we couldn't start streaming
+          setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
+          setIsResponding(false)
+        }
       } else {
         // In the browser, use fetch directly for streaming instead of the post method from useAPI
         const res = await fetch('/api/dialogue/chat', {
@@ -270,6 +324,7 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
         setMessages(prev =>
           prev.map(msg => (msg.id === assistantMessageId ? { ...msg, isStreaming: false } : msg)),
         )
+        setIsResponding(false)
       }
     } catch (err: any) {
       // Ignore aborted requests
@@ -281,9 +336,11 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
 
       // Remove the streaming message if it exists
       setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
-    } finally {
       setIsResponding(false)
+    } finally {
       abortControllerRef.current = null
+      // Don't set isResponding to false here for Electron, as the IPC listener handles it
+      // It's only set to false for web or on error
     }
   }
 

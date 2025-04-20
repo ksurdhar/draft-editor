@@ -13,7 +13,7 @@ import { isOnline } from './network-detector'
 import { BrowserWindow } from 'electron'
 
 // We'll always use local storage and sync with cloud when possible
-const BASE_URL = 'https://www.whetstone-writer.com/api'
+export const BASE_URL = 'https://www.whetstone-writer.com/api'
 const DOCUMENTS_COLLECTION = 'documents'
 const FOLDERS_COLLECTION = 'folders'
 const CHARACTERS_COLLECTION = 'characters'
@@ -35,7 +35,7 @@ export const setNetworkDetector = (detector: {
 }
 
 // Helper to determine if an error is a network connectivity error
-function isNetworkError(error: any): boolean {
+export function isNetworkError(error: any): boolean {
   return (
     !error.response && // No response from server
     (error.code === 'ECONNABORTED' || // Connection timeout
@@ -276,41 +276,6 @@ const collections: Record<string, CollectionConfig> = {
           throw error
         }
       },
-      // Handle AI chat
-      '^dialogue/chat$': async (method, match, data) => {
-        if (method !== 'post' || !data?.messages) {
-          console.log('Invalid request for chat:', { method, data })
-          return { data: null }
-        }
-
-        console.log('Processing chat request with', data.messages.length, 'messages')
-
-        try {
-          // Call the Next.js API endpoint
-          const cloudResponse = await performCloudOperation('post', '/dialogue/chat', {
-            messages: data.messages,
-            documentId: data.documentId,
-            documentContext: data.documentContext,
-            model: data.model || 'gpt-4o',
-          })
-
-          console.log('Chat completion (via Next.js API) successful')
-
-          // For now, just return the response as plain text
-          // In the future, we could implement proper streaming
-          return { data: cloudResponse.data || "I couldn't process your request." }
-        } catch (error: any) {
-          console.error('Error in chat completion (via Next.js API):', error)
-
-          // If there's a network error, report it
-          if (error && isNetworkError(error) && networkDetector) {
-            console.log('Network error detected during chat completion')
-            networkDetector.reportNetworkFailure()
-          }
-
-          throw error
-        }
-      },
     },
   },
   versions: {
@@ -501,9 +466,9 @@ async function syncCollectionToLocal(config: CollectionConfig, cloudData: Collec
           newItems.push(cloudItem)
           updatedCount++
         } else {
-          console.log(
-            `Skipping ${getSingular(config.name)} ${cloudItem._id}, local version is current or newer`,
-          )
+          // console.log(
+          //   `Skipping ${getSingular(config.name)} ${cloudItem._id}, local version is current or newer`,
+          // )
           skippedCount++
         }
       } else {
@@ -553,7 +518,7 @@ async function syncCollectionToLocal(config: CollectionConfig, cloudData: Collec
             new Date(cloudItem.updatedAt).getTime()
         ) {
           // Local item is newer, update cloud version
-          console.log(`Updating cloud ${getSingular(config.name)} ${localItem._id} with newer local version`)
+          // console.log(`Updating cloud ${getSingular(config.name)} ${localItem._id} with newer local version`)
           try {
             await performCloudOperation('patch', `/${config.name}/${localItem._id}`, localItem)
             cloudCreatedCount++ // Reuse this counter for updates too
@@ -721,7 +686,7 @@ async function performCloudOperation(
   endpoint: string,
   data?: any,
 ) {
-  console.log('Performing cloud operation:', { method, endpoint })
+  // console.log('Performing cloud operation:', { method, endpoint })
 
   // Ensure endpoint format is correct for cloud API
   endpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
