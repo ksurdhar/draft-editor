@@ -276,6 +276,41 @@ const collections: Record<string, CollectionConfig> = {
           throw error
         }
       },
+      // Handle AI chat
+      '^dialogue/chat$': async (method, match, data) => {
+        if (method !== 'post' || !data?.messages) {
+          console.log('Invalid request for chat:', { method, data })
+          return { data: null }
+        }
+
+        console.log('Processing chat request with', data.messages.length, 'messages')
+
+        try {
+          // Call the Next.js API endpoint
+          const cloudResponse = await performCloudOperation('post', '/dialogue/chat', {
+            messages: data.messages,
+            documentId: data.documentId,
+            documentContext: data.documentContext,
+            model: data.model || 'gpt-4o',
+          })
+
+          console.log('Chat completion (via Next.js API) successful')
+
+          // For now, just return the response as plain text
+          // In the future, we could implement proper streaming
+          return { data: cloudResponse.data || "I couldn't process your request." }
+        } catch (error: any) {
+          console.error('Error in chat completion (via Next.js API):', error)
+
+          // If there's a network error, report it
+          if (error && isNetworkError(error) && networkDetector) {
+            console.log('Network error detected during chat completion')
+            networkDetector.reportNetworkFailure()
+          }
+
+          throw error
+        }
+      },
     },
   },
   versions: {

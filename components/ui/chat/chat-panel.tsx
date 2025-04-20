@@ -96,10 +96,6 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
     setMessages(prev => [...prev, streamingMessage])
 
     try {
-      // Create AbortController for the fetch request
-      abortControllerRef.current = new AbortController()
-      // We'll keep the controller for potential cancellation but we don't need the signal for these API calls
-
       // Format messages for API
       const apiMessages = messages
         .filter(msg => msg.id !== 'welcome') // Remove welcome message
@@ -109,53 +105,72 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
           content: msg.content,
         }))
 
-      // Choose the right API implementation based on environment
-      const apiCall = isElectron
-        ? () =>
-            window.electronAPI.post('/dialogue/chat', {
-              messages: apiMessages,
-              documentId,
-              documentContext,
-              model: 'gpt-4o', // Default model, could be made configurable
-            })
-        : () =>
-            post('/api/dialogue/chat', {
-              messages: apiMessages,
-              documentId,
-              documentContext,
-              model: 'gpt-4o', // Default model, could be made configurable
-            })
-
-      // Call API with streaming support
-      const response = await apiCall()
-
-      if (!response.ok) {
-        throw new Error(`API call failed with status: ${response.status}`)
+      const payload = {
+        messages: apiMessages,
+        documentId,
+        documentContext,
+        model: 'gpt-4o', // Default model, could be made configurable
       }
 
-      const reader = response.body?.getReader()
-      if (!reader) throw new Error('No reader available on response')
+      // Use the appropriate method based on environment
+      if (isElectron) {
+        // In Electron, use the electron API
+        const result = await window.electronAPI.post('/dialogue/chat', payload)
 
-      const decoder = new TextDecoder()
-      let responseText = ''
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        const chunk = decoder.decode(value, { stream: true })
-        responseText += chunk
-
-        // Update the streaming message content
+        // For now, as a temporary solution until we implement real streaming in Electron
+        // Just return the result as a complete message
         setMessages(prev =>
-          prev.map(msg => (msg.id === assistantMessageId ? { ...msg, content: responseText } : msg)),
+          prev.map(msg =>
+            msg.id === assistantMessageId
+              ? {
+                  ...msg,
+                  content: result || "I couldn't process your request at this time.",
+                  isStreaming: false,
+                }
+              : msg,
+          ),
+        )
+        setIsResponding(false)
+        return
+      } else {
+        // In the browser, use the post method from useAPI
+        const res = await post('/dialogue/chat', {
+          messages: apiMessages,
+          documentId,
+          documentContext,
+          model: 'gpt-4o', // Default model, could be made configurable
+        })
+
+        if (!res.ok) {
+          throw new Error(`API call failed with status: ${res.status}`)
+        }
+
+        if (!res.body) {
+          throw new Error('No response body')
+        }
+
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let responseText = ''
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          const chunk = decoder.decode(value, { stream: true })
+          responseText += chunk
+
+          // Update the streaming message content
+          setMessages(prev =>
+            prev.map(msg => (msg.id === assistantMessageId ? { ...msg, content: responseText } : msg)),
+          )
+        }
+
+        // Finalize the message (remove streaming flag)
+        setMessages(prev =>
+          prev.map(msg => (msg.id === assistantMessageId ? { ...msg, isStreaming: false } : msg)),
         )
       }
-
-      // Finalize the message (remove streaming flag)
-      setMessages(prev =>
-        prev.map(msg => (msg.id === assistantMessageId ? { ...msg, isStreaming: false } : msg)),
-      )
     } catch (err: any) {
       // Ignore aborted requests
       if (err.name === 'AbortError') return
