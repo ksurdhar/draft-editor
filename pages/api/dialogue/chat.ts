@@ -13,6 +13,17 @@ const openai = createOpenAI({
 const MessageSchema = z.object({
   role: z.enum(['user', 'assistant', 'system']),
   content: z.string(),
+  entityReferences: z
+    .array(
+      z.object({
+        type: z.string(),
+        id: z.string(),
+        displayName: z.string(),
+        parentId: z.string().optional(),
+        parentType: z.string().optional(),
+      }),
+    )
+    .optional(),
 })
 
 // Define request schema
@@ -20,6 +31,7 @@ const ChatRequestSchema = z.object({
   messages: z.array(MessageSchema),
   documentContext: z.string().optional(),
   documentId: z.string().optional(),
+  entityContents: z.record(z.any()).optional(),
   model: z.string().default('gpt-4o'),
 })
 
@@ -54,7 +66,7 @@ async function chatHandler(req: ExtendedApiRequest, res: NextApiResponse): Promi
       return
     }
 
-    const { messages, documentContext, documentId, model } = parsedRequest.data
+    const { messages, documentContext, documentId, entityContents, model } = parsedRequest.data
 
     // Log the user making the request
     console.log('\n=== Chat Completion Request ===')
@@ -62,6 +74,61 @@ async function chatHandler(req: ExtendedApiRequest, res: NextApiResponse): Promi
     console.log('Model:', model)
     console.log('Document ID:', documentId || 'None')
     console.log('Messages count:', messages.length)
+    console.log('Entity contents:', entityContents ? Object.keys(entityContents).length : 0)
+
+    // Process entity references to create context
+    let entityContext = ''
+    if (entityContents && Object.keys(entityContents).length > 0) {
+      entityContext = 'Referenced entities:\n\n'
+
+      Object.entries(entityContents).forEach(([_key, entity]) => {
+        entityContext += `--- ${entity.type.toUpperCase()}: ${entity.name} ---\n`
+
+        if (entity.type === 'document' && entity.content) {
+          // For documents, include a text representation of the content
+          try {
+            const content = entity.content
+            if (typeof content === 'object') {
+              entityContext += `Document content: ${JSON.stringify(content).substring(0, 1000)}...\n`
+            } else if (typeof content === 'string') {
+              entityContext += `Document content: ${content.substring(0, 1000)}...\n`
+            }
+          } catch (e) {
+            entityContext += 'Error processing document content\n'
+          }
+        } else if (entity.type === 'conversation' && entity.content) {
+          // For conversations, include the entries
+          try {
+            const content = entity.content
+            if (content.entries && Array.isArray(content.entries)) {
+              entityContext += `Conversation ${content.conversationName || 'Unnamed'} (`
+
+              if (content.entries.length > 0) {
+                entityContext += 'Entries:\n'
+                content.entries.forEach((entry: any, i: number) => {
+                  if (i < 10) {
+                    // Limit to first 10 entries to avoid context bloat
+                    entityContext += `${entry.character}: ${entry.text}\n`
+                  }
+                })
+                if (content.entries.length > 10) {
+                  entityContext += `... and ${content.entries.length - 10} more entries\n`
+                }
+              } else {
+                entityContext += 'No entries yet\n'
+              }
+            }
+          } catch (e) {
+            entityContext += 'Error processing conversation content\n'
+          }
+        } else if (entity.type === 'scene') {
+          // Add scene handling when implemented
+          entityContext += 'Scene content (not yet implemented)\n'
+        }
+
+        entityContext += '\n'
+      })
+    }
 
     // Add system message if not already present
     const processedMessages = [...messages]
@@ -69,6 +136,7 @@ async function chatHandler(req: ExtendedApiRequest, res: NextApiResponse): Promi
       const systemPrompt = `You are a helpful assistant for writers working on their books and documents.
       ${documentContext ? 'Here is context about the current document: ' + documentContext : ''}
       ${documentId ? 'The user is currently working on document ID: ' + documentId : ''}
+      ${entityContext ? entityContext : ''}
       
       Provide thoughtful, creative, and helpful responses to assist the user with their writing.`
 
@@ -76,6 +144,13 @@ async function chatHandler(req: ExtendedApiRequest, res: NextApiResponse): Promi
         role: 'system',
         content: systemPrompt.trim(),
       })
+    } else if (entityContext) {
+      // If there's already a system message but we have entity references,
+      // update the system message to include the entity context
+      const systemMessage = processedMessages.find(m => m.role === 'system')
+      if (systemMessage) {
+        systemMessage.content = `${systemMessage.content}\n\n${entityContext}`
+      }
     }
 
     // Use streamText with the OpenAI model

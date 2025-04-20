@@ -8,7 +8,7 @@ import { ChatMessage } from './chat-message'
 import { ChatInput } from './chat-input'
 import { cn } from '@components/lib/utils'
 import { toast } from 'sonner'
-import { useEntities } from '@components/providers'
+import { useEntities, AnyEntity } from '@components/providers'
 import { EntityReference } from './chat-message'
 
 type MessageRole = 'user' | 'assistant' | 'system'
@@ -35,9 +35,7 @@ type ChatPanelProps = {
 }
 
 export function ChatPanel({ isOpen, onClose, className, documentId, documentContext }: ChatPanelProps) {
-  // We're importing the context but not using it yet - will be used in Phase 2
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { entities } = useEntities()
+  const { getEntityById } = useEntities()
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
@@ -65,6 +63,59 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
       }
     }
   }, [])
+
+  // Prepare entity contents for API
+  const prepareEntityContents = (entityRefs?: EntityReference[]) => {
+    if (!entityRefs || entityRefs.length === 0) return {}
+
+    const entityContents: Record<string, any> = {}
+
+    entityRefs.forEach(ref => {
+      let entity = null
+
+      if (ref.type === 'document') {
+        // Get document entity
+        entity = getEntityById('document', ref.id)
+        if (entity) {
+          const docEntity = entity as AnyEntity & { content?: any }
+          entityContents[`document:${ref.id}`] = {
+            type: 'document',
+            id: ref.id,
+            name: ref.displayName,
+            content: docEntity.content || {},
+          }
+        }
+      } else if (ref.type === 'conversation') {
+        // Get conversation entity
+        entity = getEntityById('conversation', ref.id)
+        if (entity) {
+          entityContents[`conversation:${ref.id}`] = {
+            type: 'conversation',
+            id: ref.id,
+            name: ref.displayName,
+            parentId: ref.parentId,
+            parentType: ref.parentType,
+            content: entity,
+          }
+        }
+      } else if (ref.type === 'scene') {
+        // Get scene entity
+        entity = getEntityById('scene', ref.id)
+        if (entity) {
+          entityContents[`scene:${ref.id}`] = {
+            type: 'scene',
+            id: ref.id,
+            name: ref.displayName,
+            parentId: ref.parentId,
+            parentType: ref.parentType,
+            content: entity,
+          }
+        }
+      }
+    })
+
+    return entityContents
+  }
 
   const handleSendMessage = async (content: string, entityRefs?: EntityReference[]) => {
     // Don't allow sending empty messages
@@ -101,6 +152,9 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
     setMessages(prev => [...prev, streamingMessage])
 
     try {
+      // Prepare entity contents if there are entity references
+      const entityContents = prepareEntityContents(entityRefs)
+
       // Format messages for API
       const apiMessages = messages
         .filter(msg => msg.id !== 'welcome') // Remove welcome message
@@ -115,6 +169,7 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
         messages: apiMessages,
         documentId,
         documentContext,
+        entityContents, // Add entity contents to the payload
         model: 'gpt-4o', // Default model, could be made configurable
       }
 
