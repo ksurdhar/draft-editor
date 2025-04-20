@@ -22,41 +22,41 @@
 
 ## Phase 2: Chat Input Enhancement
 
-- [ ] Modify `ChatInput` component to support mentions
+- [x] Modify `ChatInput` component to support mentions
   - [x] Add state variables for tracking mention status
-  - [ ] Implement event handlers for input changes
-  - [ ] Add logic to detect "@" character
-- [ ] Create UI indicator for mention mode
-  - [ ] Style the input differently when in mention mode
-  - [ ] Add visual cue for active mentions
-- [ ] Add positioning logic for entity selector
-  - [ ] Calculate position based on cursor/caret position
-  - [ ] Handle viewport constraints
-- [ ] Implement keyboard shortcuts
-  - [ ] Add support for Escape to cancel mention
-  - [ ] Add support for Tab/Enter to complete mention
-  - [ ] Add arrow key navigation
-- [ ] Test mention detection functionality
+  - [x] Implement event handlers for input changes
+  - [x] Add logic to detect "@" character
+- [x] Create UI indicator for mention mode
+  - [x] Style the input differently when in mention mode
+  - [x] Add visual cue for active mentions
+- [x] Add positioning logic for entity selector
+  - [x] Calculate position based on cursor/caret position
+  - [x] Handle viewport constraints
+- [x] Implement keyboard shortcuts
+  - [x] Add support for Escape to cancel mention
+  - [x] Add support for Tab/Enter to complete mention
+  - [x] Add arrow key navigation (placeholder)
+- [x] Test mention detection functionality
 
 ## Phase 3: Entity Selector Component
 
-- [ ] Create `EntitySelector` component
-  - [ ] Implement UI for entity type selection
-  - [ ] Create entity list with filtering
-  - [ ] Add keyboard navigation support
-- [ ] Style the component
-  - [ ] Match existing app design language
-  - [ ] Add hover and selection states
-  - [ ] Ensure accessibility
-- [ ] Implement entity selection logic
-  - [ ] Handle entity type selection
-  - [ ] Track and filter by search term
-  - [ ] Support keyboard and mouse selection
-- [ ] Add entity insertion functionality
-  - [ ] Insert selected entity reference into input
-  - [ ] Format the reference in the input
-  - [ ] Position cursor after insertion
-- [ ] Test selector with different entity types and counts
+- [x] Create `EntitySelector` component
+  - [x] Implement UI for entity type selection
+  - [x] Create entity list with filtering
+  - [x] Add keyboard navigation support
+- [x] Style the component
+  - [x] Match existing app design language
+  - [x] Add hover and selection states
+  - [x] Ensure accessibility
+- [x] Implement entity selection logic
+  - [x] Handle entity type selection
+  - [x] Track and filter by search term
+  - [x] Support keyboard and mouse selection
+- [x] Add entity insertion functionality
+  - [x] Insert selected entity reference into input
+  - [x] Format the reference in the input
+  - [x] Position cursor after insertion
+- [x] Test selector with different entity types and counts
 
 ## Phase 4: Entity References in Messages
 

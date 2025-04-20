@@ -1,0 +1,30 @@
+/* Chat input styles for entity mentions */
+
+.mention-active .textarea {
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 1px hsla(var(--primary), 0.2);
+}
+
+.mention-indicator {
+  color: hsl(var(--primary));
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  margin-left: 0.5rem;
+}
+
+/* Animation for mention mode */
+@keyframes mention-pulse {
+  0% {
+    box-shadow: 0 0 0 0 hsla(var(--primary), 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 3px hsla(var(--primary), 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 hsla(var(--primary), 0);
+  }
+}
+
+.mention-active textarea:focus {
+  animation: mention-pulse 1.5s infinite;
+}
