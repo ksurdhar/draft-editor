@@ -1,74 +1,96 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { Send } from 'lucide-react'
 import { Button } from '@components/ui/button'
 import { Textarea } from '@components/ui/textarea'
-import { SendIcon } from 'lucide-react'
+import { KeyboardEvent, useRef, useState } from 'react'
+import { EntityReference } from './chat-message'
 
-type ChatInputProps = {
-  onSendMessage: (message: string) => void
+interface ChatInputProps {
+  onSendMessage: (message: string, entityRefs?: EntityReference[]) => void
   disabled?: boolean
 }
 
-export function ChatInput({ onSendMessage, disabled = false }: ChatInputProps) {
+export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
   const [message, setMessage] = useState('')
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const textAreaRef = useRef<HTMLTextAreaElement>(null)
+  const [entityReferences, setEntityReferences] = useState<EntityReference[]>([])
 
-  const resizeTextarea = () => {
-    const textarea = textareaRef.current
-    if (!textarea) return
-
-    // Reset height to auto to properly calculate scrollHeight
-    textarea.style.height = 'auto'
-
-    // Set the height based on content, with a max height of 200px
-    const newHeight = Math.min(textarea.scrollHeight, 200)
-    textarea.style.height = `${newHeight}px`
-  }
-
-  // Resize on content change
-  useEffect(() => {
-    resizeTextarea()
-  }, [message])
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (message.trim()) {
-      onSendMessage(message)
+  // Function to handle sending the message
+  const handleSendMessage = () => {
+    if (message.trim() && !disabled) {
+      onSendMessage(message, entityReferences.length > 0 ? entityReferences : undefined)
       setMessage('')
+      setEntityReferences([])
     }
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Allow Shift+Enter for newline
+  // Handle key events (Enter to send, Shift+Enter for new line)
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      if (message.trim()) {
-        onSendMessage(message)
-        setMessage('')
-      }
+      handleSendMessage()
     }
+  }
+
+  // Auto-resize the textarea based on content
+  const handleAutoResize = () => {
+    const textarea = textAreaRef.current
+    if (textarea) {
+      textarea.style.height = 'auto'
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`
+    }
+  }
+
+  // Handle input change
+  const handleChange = (value: string) => {
+    setMessage(value)
+    handleAutoResize()
+
+    // In Phase 2, we'll add logic here to detect '@' mentions and trigger entity selection
   }
 
   return (
-    <form onSubmit={handleSubmit} className="border-t p-4">
-      <div className="flex items-end gap-2">
-        <div className="relative flex-1">
-          <Textarea
-            ref={textareaRef}
-            value={message}
-            onChange={e => setMessage(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type your message"
-            disabled={disabled}
-            className="max-h-[200px] min-h-9 w-full resize-none overflow-y-auto py-2"
-            rows={1}
-          />
-        </div>
-        <Button type="submit" size="icon" disabled={disabled || !message.trim()} className="flex-shrink-0">
-          <SendIcon className="h-4 w-4" />
+    <div className="border-t p-4">
+      <div className="relative flex items-center space-x-2">
+        <Textarea
+          ref={textAreaRef}
+          value={message}
+          onChange={e => handleChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Type a message..."
+          className="max-h-[200px] min-h-[40px] resize-none overflow-hidden border-muted bg-transparent p-3 py-2"
+          disabled={disabled}
+          rows={1}
+          onFocus={handleAutoResize}
+        />
+        <Button
+          type="submit"
+          size="icon"
+          disabled={!message.trim() || disabled}
+          onClick={handleSendMessage}
+          className="shrink-0">
+          <Send className="h-4 w-4" />
         </Button>
       </div>
-    </form>
+      {entityReferences.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {entityReferences.map((ref, i) => (
+            <span
+              key={i}
+              className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary-foreground">
+              @{ref.type}:{ref.displayName}
+              <button
+                onClick={() => {
+                  setEntityReferences(prev => prev.filter((_, index) => index !== i))
+                }}
+                className="ml-1 rounded-full hover:bg-primary/20">
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

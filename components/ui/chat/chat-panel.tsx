@@ -8,6 +8,8 @@ import { ChatMessage } from './chat-message'
 import { ChatInput } from './chat-input'
 import { cn } from '@components/lib/utils'
 import { toast } from 'sonner'
+import { useEntities } from '@components/providers'
+import { EntityReference } from './chat-message'
 
 type MessageRole = 'user' | 'assistant' | 'system'
 
@@ -18,6 +20,7 @@ type Message = {
   role: MessageRole
   timestamp: Date
   isStreaming?: boolean
+  entityReferences?: EntityReference[] // Added entity references
 }
 
 // Check if we're in Electron environment
@@ -32,6 +35,9 @@ type ChatPanelProps = {
 }
 
 export function ChatPanel({ isOpen, onClose, className, documentId, documentContext }: ChatPanelProps) {
+  // We're importing the context but not using it yet - will be used in Phase 2
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { entities } = useEntities()
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
@@ -60,7 +66,7 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
     }
   }, [])
 
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = async (content: string, entityRefs?: EntityReference[]) => {
     // Don't allow sending empty messages
     if (!content.trim()) return
 
@@ -71,6 +77,7 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
       isUser: true,
       role: 'user',
       timestamp: new Date(),
+      entityReferences: entityRefs,
     }
 
     setMessages(prev => [...prev, userMessage])
@@ -101,6 +108,7 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
         .map(msg => ({
           role: msg.role,
           content: msg.content,
+          entityReferences: msg.entityReferences, // Include entity references
         }))
 
       const payload = {
@@ -215,6 +223,7 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
             isUser={message.isUser}
             timestamp={message.timestamp}
             isStreaming={message.isStreaming}
+            entityReferences={message.entityReferences}
           />
         ))}
         {isResponding && !messages.some(m => m.isStreaming) && (

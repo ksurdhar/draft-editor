@@ -6,6 +6,72 @@ import { DocumentData } from '@typez/globals'
 
 import { UserProvider } from '@wrappers/auth-wrapper-client'
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react'
+import useSWR from 'swr'
+
+// Entity Context types
+export type EntityType = 'document' | 'conversation' | 'scene'
+
+export interface Entity {
+  id: string
+  type: EntityType
+  name: string
+  parentId?: string
+  parentType?: EntityType
+  lastUpdated?: number
+}
+
+interface DocumentEntity extends Entity {
+  type: 'document'
+  content?: any // Document content, only loaded when needed
+}
+
+interface ConversationEntity extends Entity {
+  type: 'conversation'
+  parentId: string
+  parentType: 'document'
+  conversationId: string // Original conversation ID in the document
+}
+
+interface SceneEntity extends Entity {
+  type: 'scene'
+  parentId: string
+  parentType: 'document'
+  sceneId: string // Original scene ID in the document
+}
+
+export type AnyEntity = DocumentEntity | ConversationEntity | SceneEntity
+
+interface EntityContextType {
+  entities: {
+    documents: DocumentEntity[]
+    conversations: ConversationEntity[]
+    scenes: SceneEntity[]
+  }
+  isLoading: boolean
+  refreshEntities: () => Promise<void>
+  filterEntities: (type: EntityType, searchTerm?: string) => AnyEntity[]
+  getEntityById: (type: EntityType, id: string) => AnyEntity | undefined
+}
+
+const entityContextDefaultValue: EntityContextType = {
+  entities: {
+    documents: [],
+    conversations: [],
+    scenes: [],
+  },
+  isLoading: false,
+  refreshEntities: async () => {},
+  filterEntities: () => [],
+  getEntityById: () => undefined,
+}
+
+const EntityContext = createContext<EntityContextType>(entityContextDefaultValue)
+
+export function useEntities() {
+  return useContext(EntityContext)
+}
+
+// ----------------- Existing Mouse Context -----------------
 
 type mouseContextType = {
   hoveringOverMenu: boolean
@@ -88,6 +154,233 @@ const useDebouncedEffect = (effect: () => void, deps: any[], delay: number) => {
     const handler = setTimeout(() => effect(), delay)
     return () => clearTimeout(handler)
   }, [deps, delay, effect])
+}
+
+// ----------------- Entity Provider -----------------
+
+export function EntityProvider({ children }: { children: ReactNode }) {
+  const { get } = useAPI()
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  // Check if we're in Electron environment
+  const isElectron = typeof window !== 'undefined' && window.electronAPI
+
+  // Use the appropriate fetch function based on environment
+  const fetcher = isElectron ? window.electronAPI.get : get
+
+  // Fetch documents using SWR
+  const {
+    data: documents,
+    mutate: mutateDocuments,
+    isLoading: documentsLoading,
+  } = useSWR('/documents', fetcher, {
+    revalidateOnFocus: false,
+    focusThrottleInterval: 30000,
+    dedupingInterval: 10000,
+    revalidateIfStale: false,
+  })
+
+  // State for processed entities
+  const [documentEntities, setDocumentEntities] = useState<DocumentEntity[]>([])
+  const [conversationEntities, setConversationEntities] = useState<ConversationEntity[]>([])
+  const [sceneEntities, setSceneEntities] = useState<SceneEntity[]>([])
+
+  // Extract conversations from documents (similar to extractAllConversations in conversations-page.tsx)
+  const extractConversationsFromDocuments = (docs: any[]) => {
+    if (!docs || docs.length === 0) return []
+
+    const extractedConversations: ConversationEntity[] = []
+
+    for (const document of docs) {
+      if (!document || !document._id) continue
+
+      try {
+        // Extract conversations from document content
+        const conversationsFromDoc = extractAllConversations(
+          document.content,
+          document.title || 'Untitled Document',
+          document._id,
+          document.lastUpdated,
+        )
+
+        // Convert to entity format
+        conversationsFromDoc.forEach(conv => {
+          extractedConversations.push({
+            id: `${document._id}-conversation-${conv.conversationId}`,
+            type: 'conversation',
+            name: conv.conversationName || `Unnamed Conversation (${conv.conversationId})`,
+            parentId: document._id,
+            parentType: 'document',
+            lastUpdated: conv.lastUpdated,
+            conversationId: conv.conversationId,
+          })
+        })
+      } catch (error) {
+        console.error(`Error processing document ${document._id} for conversations:`, error)
+      }
+    }
+
+    return extractedConversations
+  }
+
+  // Helper function to extract all conversations from a document
+  const extractAllConversations = (
+    documentContent: any,
+    documentTitle: string,
+    documentId: string,
+    lastUpdated?: number,
+  ): any[] => {
+    const conversationsMap: Record<string, any> = {}
+
+    let parsedContent = documentContent
+    if (typeof documentContent === 'string') {
+      try {
+        parsedContent = JSON.parse(documentContent)
+      } catch (e) {
+        console.error(`Failed to parse content for doc ${documentId} in extractAllConversations:`, e)
+        return []
+      }
+    }
+
+    if (!parsedContent || parsedContent.type !== 'doc') {
+      console.warn(`Invalid content structure for doc ${documentId} in extractAllConversations`)
+      return []
+    }
+
+    const processNode = (node: any) => {
+      if (node.type === 'text' && node.marks) {
+        node.marks.forEach((mark: any) => {
+          if (mark.type === 'dialogue' && mark.attrs?.conversationId && mark.attrs?.character && node.text) {
+            const { conversationId } = mark.attrs
+            const conversationName = mark.attrs?.conversationName || null
+
+            if (!conversationsMap[conversationId]) {
+              conversationsMap[conversationId] = {
+                conversationId,
+                conversationName,
+                documentId,
+                documentTitle,
+                entries: [],
+                lastUpdated: lastUpdated || Date.now(),
+              }
+            }
+            if (conversationName && conversationsMap[conversationId].conversationName !== conversationName) {
+              if (conversationsMap[conversationId].conversationName === null) {
+                conversationsMap[conversationId].conversationName = conversationName
+              }
+            }
+          }
+        })
+      }
+      if (node.content && Array.isArray(node.content)) {
+        node.content.forEach(processNode)
+      }
+    }
+
+    processNode(parsedContent)
+
+    return Object.values(conversationsMap)
+  }
+
+  // Process documents into entities whenever they change
+  useEffect(() => {
+    if (!documents) return
+
+    // Process document entities
+    const docEntities: DocumentEntity[] = documents.map((doc: any) => ({
+      id: doc._id,
+      type: 'document',
+      name: doc.title || 'Untitled Document',
+      lastUpdated: doc.lastUpdated,
+    }))
+    setDocumentEntities(docEntities)
+
+    // Process conversation entities
+    const convEntities = extractConversationsFromDocuments(documents)
+    setConversationEntities(convEntities)
+
+    // TODO: Process scene entities once scene detection is implemented
+    setSceneEntities([])
+  }, [documents])
+
+  // Listen for sync updates (for Electron)
+  useEffect(() => {
+    if (!isElectron) return // Skip this effect in web version
+
+    const removeListener = window.electronAPI.onSyncUpdate((updates: any) => {
+      if (updates.documents && updates.documents.length > 0) {
+        mutateDocuments()
+      }
+    })
+
+    return () => {
+      removeListener()
+    }
+  }, [isElectron, mutateDocuments])
+
+  // Function to manually refresh entities
+  const refreshEntities = async () => {
+    setIsRefreshing(true)
+    try {
+      await mutateDocuments()
+    } catch (error) {
+      console.error('Error refreshing entities:', error)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
+  // Function to filter entities by type and search term
+  const filterEntities = (type: EntityType, searchTerm?: string): AnyEntity[] => {
+    let entities: AnyEntity[] = []
+
+    switch (type) {
+      case 'document':
+        entities = [...documentEntities]
+        break
+      case 'conversation':
+        entities = [...conversationEntities]
+        break
+      case 'scene':
+        entities = [...sceneEntities]
+        break
+    }
+
+    if (!searchTerm) return entities
+
+    // Filter by name (case-insensitive)
+    const lowerSearchTerm = searchTerm.toLowerCase()
+    return entities.filter(entity => entity.name.toLowerCase().includes(lowerSearchTerm))
+  }
+
+  // Function to get entity by ID
+  const getEntityById = (type: EntityType, id: string): AnyEntity | undefined => {
+    switch (type) {
+      case 'document':
+        return documentEntities.find(entity => entity.id === id)
+      case 'conversation':
+        return conversationEntities.find(entity => entity.id === id)
+      case 'scene':
+        return sceneEntities.find(entity => entity.id === id)
+      default:
+        return undefined
+    }
+  }
+
+  // Context value
+  const value: EntityContextType = {
+    entities: {
+      documents: documentEntities,
+      conversations: conversationEntities,
+      scenes: sceneEntities,
+    },
+    isLoading: documentsLoading || isRefreshing,
+    refreshEntities,
+    filterEntities,
+    getEntityById,
+  }
+
+  return <EntityContext.Provider value={value}>{children}</EntityContext.Provider>
 }
 
 export function DocumentProvider({
@@ -188,7 +481,9 @@ export function MouseProvider({ children }: { children: ReactNode }) {
 function Providers({ children }: { children: ReactNode }) {
   return (
     <MouseProvider>
-      <UserProvider>{children}</UserProvider>
+      <EntityProvider>
+        <UserProvider>{children}</UserProvider>
+      </EntityProvider>
     </MouseProvider>
   )
 }
