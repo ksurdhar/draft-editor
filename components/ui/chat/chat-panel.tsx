@@ -10,6 +10,7 @@ import { cn } from '@components/lib/utils'
 import { toast } from 'sonner'
 import { useEntities } from '@components/providers'
 import { EntityReference } from './chat-message'
+import { flattenTiptapContent, conversationEntriesToText } from '@lib/tiptap-utils'
 
 type MessageRole = 'user' | 'assistant' | 'system'
 
@@ -129,45 +130,31 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
 
     // Process references sequentially to allow for async operations
     for (const ref of entityRefs) {
-      //   console.log(`Processing entity reference: ${ref.type}:${ref.id} (${ref.displayName})`)
-
       if (ref.type === 'document') {
-        // Load document content using the EntityProvider
         const documentWithContent = await loadDocumentContent(ref.id)
-        // console.log(`Document content loaded:`, documentWithContent?.content ? 'success' : 'failed')
 
         if (documentWithContent && documentWithContent.content) {
+          // Convert TipTap JSON to plain text
+          const plainTextContent = flattenTiptapContent(documentWithContent.content)
+          console.log(`Document text extracted: ${plainTextContent.length} characters`)
+
           entityContents[`document:${ref.id}`] = {
             type: 'document',
             id: ref.id,
             name: ref.displayName,
-            content: documentWithContent.content,
+            content: plainTextContent,
           }
-          //   console.log(
-          //     `Added document content to entity contents, type:`,
-          //     typeof documentWithContent.content,
-          //     `keys:`,
-          //     Object.keys(documentWithContent.content || {}).join(', '),
-          //   )
         }
       } else if (ref.type === 'conversation' && ref.parentId) {
         // Load conversation content using the EntityProvider
         const conversationWithContent = await loadConversationContent(ref.id)
-        // console.log(
-        //   `Conversation content loaded:`,
-        //   conversationWithContent?.entries?.length
-        //     ? `with ${conversationWithContent.entries.length} entries`
-        //     : 'failed',
-        // )
 
         if (conversationWithContent) {
-          // Log detailed information about the conversation entity
-          //   console.log(`Adding conversation entity to contents:`, {
-          //     id: conversationWithContent.id,
-          //     name: conversationWithContent.name,
-          //     entriesCount: conversationWithContent.entries?.length || 0,
-          //     hasEntries: !!(conversationWithContent.entries && conversationWithContent.entries.length > 0),
-          //   })
+          // Generate plain text representation of conversation
+          const plainTextConversation = conversationEntriesToText(conversationWithContent.entries || [])
+          console.log(
+            `Conversation text extracted: ${plainTextConversation.length} characters from ${conversationWithContent.entries?.length || 0} entries`,
+          )
 
           entityContents[`conversation:${ref.id}`] = {
             type: 'conversation',
@@ -179,6 +166,8 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
             entries: conversationWithContent.entries || [],
             conversationName: conversationWithContent.conversationName || ref.displayName,
             documentTitle: conversationWithContent.documentTitle,
+            // Add the plain text representation
+            textContent: plainTextConversation,
           }
 
           // Log the first few entries if available
@@ -250,6 +239,22 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
       // Prepare entity contents if there are entity references
       const entityContents = await prepareEntityContents(entityRefs)
       console.log('****SENDING ENTITY CONTENTS:', entityContents)
+
+      // Calculate and log total size of entity contents
+      let totalTextSize = 0
+      Object.values(entityContents).forEach((entity: any) => {
+        if (entity.type === 'document' && typeof entity.content === 'string') {
+          totalTextSize += entity.content.length
+        } else if (entity.type === 'conversation') {
+          if (entity.textContent) {
+            totalTextSize += entity.textContent.length
+          } else if (entity.entries && Array.isArray(entity.entries)) {
+            totalTextSize += JSON.stringify(entity.entries).length
+          }
+        }
+      })
+      console.log(`Total entity content text size: ${totalTextSize} characters`)
+
       // Format messages for API
       const apiMessages = messages
         .filter(msg => msg.id !== 'welcome') // Remove welcome message

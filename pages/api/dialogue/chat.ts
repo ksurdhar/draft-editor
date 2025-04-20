@@ -112,90 +112,53 @@ async function chatHandler(req: ExtendedApiRequest, res: NextApiResponse): Promi
         entityContext += `--- ${entity.type.toUpperCase()}: ${entity.name} ---\n`
 
         if (entity.type === 'document' && entity.content) {
-          // For documents, include a text representation of the content
+          // For documents, include the text representation of the content only
           try {
             const content = entity.content
             console.log(`Document content type: ${typeof content}`)
 
-            // Handle different content formats
-            if (typeof content === 'object') {
-              console.log(`Document content has these keys: ${Object.keys(content)}`)
-
-              // Try to extract meaningful content from document structure
-              if (content.type === 'doc' && content.content) {
-                console.log(`Document has ProseMirror structure with ${content.content.length} nodes`)
-                // Extract text content from ProseMirror structure
-                let docText = ''
-                const extractText = (nodes: any[]) => {
-                  nodes.forEach(node => {
-                    if (node.type === 'text') {
-                      docText += node.text + ' '
-                    } else if (node.content && Array.isArray(node.content)) {
-                      extractText(node.content)
-                    }
-                  })
-                }
-
-                try {
-                  if (Array.isArray(content.content)) {
-                    extractText(content.content)
-                    console.log(`Extracted ${docText.length} characters of text`)
-                    entityContext += `Document content:\n${docText.substring(0, 2000)}...\n`
-                  } else {
-                    entityContext += `Document content: ${JSON.stringify(content).substring(0, 1000)}...\n`
-                  }
-                } catch (err) {
-                  console.log(`Error extracting text: ${err}`)
-                  entityContext += `Document content: ${JSON.stringify(content).substring(0, 1000)}...\n`
-                }
-              } else {
-                entityContext += `Document content: ${JSON.stringify(content).substring(0, 1000)}...\n`
-              }
-            } else if (typeof content === 'string') {
-              console.log(`Document content is string, length: ${content.length}`)
-
-              // Try to parse JSON string
-              try {
-                const parsedContent = JSON.parse(content)
-                if (parsedContent.type === 'doc') {
-                  console.log(`String content contains ProseMirror document`)
-                }
-                entityContext += `Document content: ${content.substring(0, 1000)}...\n`
-              } catch (e) {
-                entityContext += `Document content: ${content.substring(0, 1000)}...\n`
-              }
+            // We expect content to be a string (plaintext)
+            if (typeof content === 'string') {
+              console.log(`Document content is text, length: ${content.length}`)
+              entityContext += `Document content:\n${content}\n`
+              console.log(`Added ${content.length} characters of text content for document`)
+            } else {
+              // Log error if not a string
+              console.log(`Error: Document content is not a string but ${typeof content}`)
+              entityContext += 'Error: Document content is not in expected text format\n'
             }
           } catch (e) {
             console.log(`Error processing document content: ${e}`)
             entityContext += 'Error processing document content\n'
           }
         } else if (entity.type === 'conversation') {
-          // For conversations, include the entries
-          try {
-            if (entity.entries && Array.isArray(entity.entries)) {
-              console.log(`Processing conversation with ${entity.entries.length} entries`)
-              const conversationName = entity.conversationName || entity.name || 'Unnamed'
+          // For conversations, use the precomputed text content
+          if (entity.textContent && typeof entity.textContent === 'string') {
+            console.log(`Using conversation text content: ${entity.textContent.length} characters`)
+            entityContext += `Conversation dialogue:\n${entity.textContent}\n`
+            console.log(`Added ${entity.textContent.length} characters of text for conversation`)
+          }
+          // Fall back to processing entries if needed
+          else if (entity.entries && Array.isArray(entity.entries)) {
+            console.log(`Processing conversation with ${entity.entries.length} entries`)
+            const conversationName = entity.conversationName || entity.name || 'Unnamed'
 
-              if (entity.entries.length > 0) {
-                entityContext += `Conversation "${conversationName}" dialogue:\n`
-                entity.entries.forEach((entry: any, i: number) => {
-                  if (i < 20) {
-                    // Limit to first 20 entries to avoid context bloat
-                    entityContext += `${entry.character}: ${entry.text}\n`
-                  }
-                })
-                if (entity.entries.length > 20) {
-                  entityContext += `... and ${entity.entries.length - 20} more entries\n`
-                }
-              } else {
-                entityContext += `Conversation "${conversationName}" has no dialogue entries yet\n`
-              }
+            if (entity.entries.length > 0) {
+              entityContext += `Conversation "${conversationName}" dialogue:\n`
+              let totalConversationChars = 0
+              entity.entries.forEach((entry: any, _i: number) => {
+                const entryText = `${entry.character}: ${entry.text}\n`
+                entityContext += entryText
+                totalConversationChars += entryText.length
+              })
+              console.log(
+                `Added ${entity.entries.length} conversation entries (${totalConversationChars} characters) to entityContext`,
+              )
             } else {
-              entityContext += 'Conversation has no entries\n'
+              entityContext += `Conversation "${conversationName}" has no dialogue entries yet\n`
             }
-          } catch (e) {
-            console.log(`Error processing conversation: ${e}`)
-            entityContext += 'Error processing conversation content\n'
+          } else {
+            entityContext += 'Conversation has no content\n'
           }
         } else if (entity.type === 'scene') {
           // Add scene handling when implemented
@@ -205,6 +168,9 @@ async function chatHandler(req: ExtendedApiRequest, res: NextApiResponse): Promi
         entityContext += '\n'
       })
     }
+
+    console.log('Entity context:', entityContext)
+    console.log(`Total entity context length: ${entityContext.length} characters`)
 
     // Add system message if not already present
     const processedMessages = [...messages]

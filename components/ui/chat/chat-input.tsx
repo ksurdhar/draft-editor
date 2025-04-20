@@ -145,7 +145,7 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
     const textarea = textAreaRef.current
     if (textarea) {
       textarea.style.height = 'auto'
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 300)}px`
     }
   }
 
@@ -326,12 +326,12 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
                 : 'Type a message...'
             }
             className={`
-              max-h-[200px] min-h-[40px] w-full resize-none overflow-hidden 
+              max-h-[300px] min-h-[80px] w-full resize-none overflow-hidden 
               border-muted bg-transparent p-3 py-2
               ${isMentionActive ? 'border-primary ring-1 ring-primary/20' : ''}
             `}
             disabled={disabled}
-            rows={1}
+            rows={3}
             onFocus={handleAutoResize}
           />
         </div>

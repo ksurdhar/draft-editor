@@ -238,7 +238,7 @@ const Layout = ({ children, documentId, onToggleGlobalSearch }: Props): ReactNod
     <div className="absolute h-screen w-screen font-geist" onMouseMove={e => onMouseMove(e.clientY)}>
       <HeaderComponent id={documentId || ''} />
 
-      <div className="h-[calc(100vh-60px)] overflow-hidden">
+      <div className="h-[calc(100vh)] overflow-hidden">
         <ResizablePanelGroup direction="horizontal" className="h-full" onLayout={handlePanelResize}>
           {/* Main content */}
           <ResizablePanel
