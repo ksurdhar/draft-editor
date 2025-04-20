@@ -104,7 +104,9 @@ const extractBearerToken = async (req: ExtendedApiRequest): Promise<Claims | nul
   }
 }
 
-const withHybridAuth = (handler: (req: ExtendedApiRequest, res: NextApiResponse) => Promise<void>) => {
+const withHybridAuth = (
+  handler: (req: ExtendedApiRequest, res: NextApiResponse) => Promise<void | Response>,
+) => {
   return async (req: ExtendedApiRequest, res: NextApiResponse) => {
     try {
       const userFromToken = await extractBearerToken(req)
@@ -112,7 +114,7 @@ const withHybridAuth = (handler: (req: ExtendedApiRequest, res: NextApiResponse)
         // token-based authentication
         console.log('found user from token, using token-based authentication')
         req.user = userFromToken
-        await handler(req, res)
+        return await handler(req, res)
       } else {
         // console.log('no user from token, using session-based authentication')
         const session = await getSession(req, res)
@@ -123,7 +125,13 @@ const withHybridAuth = (handler: (req: ExtendedApiRequest, res: NextApiResponse)
         }
 
         // session-based authentication
-        await withApiAuthRequired(handler)(req, res)
+        // Wrap the handler to handle both void and Response returns
+        const wrappedHandler = async (req: ExtendedApiRequest, res: NextApiResponse) => {
+          const result = await handler(req, res)
+          return result
+        }
+
+        return await withApiAuthRequired(wrappedHandler)(req, res)
       }
     } catch (error) {
       console.error('Authentication error:', (error as Error).message)

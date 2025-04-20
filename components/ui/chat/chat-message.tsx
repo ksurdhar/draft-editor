@@ -6,9 +6,10 @@ type ChatMessageProps = {
   message: string
   isUser: boolean
   timestamp?: Date
+  isStreaming?: boolean
 }
 
-export function ChatMessage({ message, isUser, timestamp }: ChatMessageProps) {
+export function ChatMessage({ message, isUser, timestamp, isStreaming }: ChatMessageProps) {
   // Trim leading and trailing whitespace while preserving internal formatting
   const trimmedMessage = message.trim()
 
@@ -25,11 +26,14 @@ export function ChatMessage({ message, isUser, timestamp }: ChatMessageProps) {
       className={cn(
         'mb-4 flex w-max max-w-[80%] flex-col rounded-lg px-4 py-2',
         isUser ? 'ml-auto bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+        isStreaming && 'animate-pulse',
       )}>
       <div className="whitespace-pre-line text-sm">{formattedMessage}</div>
       {timestamp && (
         <div className="mt-1 text-right text-xs opacity-70">
-          {timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          {isStreaming
+            ? 'Typing...'
+            : timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </div>
       )}
     </div>

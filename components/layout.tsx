@@ -262,7 +262,7 @@ const Layout = ({ children, documentId, onToggleGlobalSearch }: Props): ReactNod
             minSize={0}
             maxSize={50}
             className={isPanelVisible || isAnimating ? '' : 'hidden'}>
-            <ChatPanel isOpen={isChatOpen} onClose={toggleChat} />
+            <ChatPanel isOpen={isChatOpen} onClose={toggleChat} documentId={documentId} />
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>

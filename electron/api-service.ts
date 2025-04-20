@@ -11,7 +11,6 @@ import {
 import { DEFAULT_DOCUMENT_CONTENT } from '../lib/constants'
 import { isOnline } from './network-detector'
 import { BrowserWindow } from 'electron'
-import { detectDialogue } from './services/dialogue-detection'
 
 // We'll always use local storage and sync with cloud when possible
 const BASE_URL = 'https://www.whetstone-writer.com/api'
@@ -272,17 +271,6 @@ const collections: Record<string, CollectionConfig> = {
           if (error && isNetworkError(error) && networkDetector) {
             console.log('Network error detected during dialogue detection')
             networkDetector.reportNetworkFailure()
-
-            // Fallback to local detection as a backup in case of network issues
-            try {
-              console.log('Falling back to local dialogue detection service')
-              const dialogues = await detectDialogue(data.text)
-              console.log('Local dialogue detection successful:', dialogues.length, 'dialogues found')
-              return { data: dialogues }
-            } catch (localError: any) {
-              console.error('Error in local dialogue detection fallback:', localError)
-              throw localError
-            }
           }
 
           throw error
