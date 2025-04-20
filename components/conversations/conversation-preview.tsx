@@ -2,7 +2,6 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react'
 import { Card, CardContent, CardHeader } from '@components/ui/card'
-import { Button } from '@components/ui/button' // Add Button for toggle
 import { Typography } from '@mui/material'
 import TiptapJsonRenderer from '@components/tiptap-json-renderer'
 import EditorComponent from '@components/editor' // Import Editor
@@ -11,6 +10,7 @@ import { Loader } from '@components/loader' // Import Loader
 import { debounce } from '@lib/utils' // Import debounce
 import { DocumentData } from '@typez/globals' // Import DocumentData type
 import { Input } from '@components/ui/input' // Add Input for editing name
+import { Switch } from '@components/ui/switch' // Import Switch component
 
 // --- Type Definitions (Should match or be imported from a shared location) ---
 interface TiptapMark {
@@ -207,7 +207,7 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({
   conversation,
   isEditing,
   setIsEditing,
-  onUpdateConversationName, // Destructure new prop
+  onUpdateConversationName,
 }) => {
   const { get, patch } = useAPI()
   const { navigateTo } = useNavigation() // Add navigation hook
@@ -218,6 +218,11 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({
   )
   const [isLoadingPreview, setIsLoadingPreview] = useState(false)
   const [nameInputValue, setNameInputValue] = useState('') // State for name input value
+
+  // New state variables for screenplay mode
+  const [isScreenplayMode, setIsScreenplayMode] = useState(true) // Default to screenplay mode (current view mode)
+  const [editingEntryIndex, setEditingEntryIndex] = useState<number | null>(null)
+  const [editingContent, setEditingContent] = useState<string>('')
 
   // Update local state if the conversation prop changes from parent
   useEffect(() => {
@@ -260,14 +265,17 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({
     if (!currentConversationData) return
 
     if (isEditing) {
-      // Switching from Edit to View
+      // Switching from Edit to Screenplay Mode
       setIsEditing(false)
+      setIsScreenplayMode(true)
       setEditorContent(null)
       refreshConversationView()
     } else {
-      // Switching from View to Edit
+      // Switching from Screenplay Mode to Edit
       setIsLoadingEditor(true)
       setIsEditing(true)
+      setIsScreenplayMode(false)
+      setEditingEntryIndex(null) // Clear any in-progress edits
       try {
         const fullDocument = await get(`/documents/${currentConversationData.documentId}`)
         if (fullDocument && fullDocument.content) {
@@ -357,6 +365,131 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({
 
   const debouncedNameSave = useMemo(() => debounce(handleNameSave, 750), [handleNameSave])
 
+  // New functions for screenplay mode dialogue editing
+  const handleStartEditing = (entryIndex: number, content: TiptapNode) => {
+    setEditingEntryIndex(entryIndex)
+    // Extract text content from the TiptapNode
+    setEditingContent(content.text || '')
+  }
+
+  const handleSaveEdit = async (entryIndex: number) => {
+    if (editingEntryIndex === null || !currentConversationData) return
+
+    // Create updated entry with edited content
+    const entry = currentConversationData.entries[entryIndex]
+    const updatedEntry = {
+      ...entry,
+      contentNode: {
+        ...entry.contentNode,
+        text: editingContent,
+      },
+    }
+
+    // Update document with the modified entry
+    try {
+      // Similar logic to existing save function but for a single entry
+      const fullDocument = await get(`/documents/${currentConversationData.documentId}`)
+      if (!fullDocument) {
+        console.error('Failed to fetch full document for editing dialogue.')
+        return
+      }
+
+      // Update a single dialogue entry in the document
+      const updatedContent = updateDialogueEntry(
+        fullDocument.content,
+        currentConversationData.conversationId,
+        entryIndex,
+        editingContent,
+      )
+
+      await patch(`/documents/${currentConversationData.documentId}`, {
+        content: JSON.stringify(updatedContent),
+        lastUpdated: Date.now(),
+      })
+
+      // Update local state to reflect the change
+      setCurrentConversationData(prevData => {
+        if (!prevData) return null
+        const newEntries = [...prevData.entries]
+        newEntries[entryIndex] = updatedEntry
+        return { ...prevData, entries: newEntries }
+      })
+
+      // Exit edit mode for this entry
+      setEditingEntryIndex(null)
+      setEditingContent('')
+    } catch (error) {
+      console.error('Error saving dialogue edit:', error)
+    }
+  }
+
+  // New helper function to update a single dialogue entry
+  const updateDialogueEntry = (
+    fullContent: any,
+    conversationId: string,
+    entryIndex: number,
+    newText: string,
+  ): any => {
+    let parsedContent = fullContent
+    if (typeof fullContent === 'string') {
+      try {
+        parsedContent = JSON.parse(fullContent)
+      } catch (e) {
+        console.error('Failed to parse content in updateDialogueEntry:', e)
+        return fullContent
+      }
+    }
+
+    // Find all nodes with the target conversation ID
+    const dialogueNodes: { node: TiptapNode; path: number[] }[] = []
+
+    const findDialogueNodes = (node: TiptapNode, path: number[] = []) => {
+      if (node.type === 'text' && node.marks) {
+        const hasMark = node.marks.some(
+          (mark: TiptapMark) => mark.type === 'dialogue' && mark.attrs?.conversationId === conversationId,
+        )
+
+        if (hasMark) {
+          dialogueNodes.push({ node, path: [...path] })
+        }
+      }
+
+      if (node.content && Array.isArray(node.content)) {
+        node.content.forEach((child, index) => {
+          findDialogueNodes(child, [...path, index])
+        })
+      }
+    }
+
+    findDialogueNodes(parsedContent)
+
+    // If we found the right number of nodes, update the entryIndex one
+    if (dialogueNodes.length > entryIndex) {
+      const targetNodeInfo = dialogueNodes[entryIndex]
+
+      // Create a deep copy to avoid mutation issues
+      const updatedContent = JSON.parse(JSON.stringify(parsedContent))
+
+      // Navigate to the target node using the path
+      let current = updatedContent
+      for (let i = 0; i < targetNodeInfo.path.length - 1; i++) {
+        current = current.content[targetNodeInfo.path[i]]
+      }
+
+      // Update the text of the target node
+      if (current.content && targetNodeInfo.path.length > 0) {
+        const lastIndex = targetNodeInfo.path[targetNodeInfo.path.length - 1]
+        if (current.content[lastIndex]) {
+          current.content[lastIndex].text = newText
+        }
+      }
+
+      return updatedContent
+    }
+
+    return parsedContent // Return unchanged if node not found
+  }
+
   if (!currentConversationData) {
     return (
       <Card className="flex h-full items-center justify-center bg-transparent backdrop-blur-none">
@@ -392,12 +525,34 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({
             From: {currentConversationData?.documentTitle}
           </Typography>
         </div>
-        <Button variant="outline" size="sm" onClick={handleToggleEdit} disabled={isLoadingEditor}>
-          {isLoadingEditor ? <Loader /> : isEditing ? 'View' : 'Edit'}
-        </Button>
+
+        {/* Replace Button with Switch */}
+        <div className="flex items-center gap-2">
+          <label htmlFor="screenplay-toggle" className="text-sm font-medium">
+            Screenplay Mode
+          </label>
+          <Switch
+            id="screenplay-toggle"
+            checked={isScreenplayMode}
+            onCheckedChange={checked => {
+              setIsScreenplayMode(checked)
+              if (!checked && !isEditing) {
+                // If turning off screenplay mode, go to full edit mode
+                handleToggleEdit()
+              } else if (checked && isEditing) {
+                // If turning on screenplay mode from edit mode, go back to view
+                handleToggleEdit()
+              }
+              // Reset any in-progress dialogue edits
+              setEditingEntryIndex(null)
+              setEditingContent('')
+            }}
+            disabled={isLoadingEditor}
+          />
+        </div>
       </CardHeader>
       <CardContent className="flex-1 overflow-y-auto">
-        {isLoadingPreview ? ( // Show loader while refreshing view
+        {isLoadingPreview ? (
           <div className="flex h-full items-center justify-center">
             <Loader />
           </div>
@@ -435,9 +590,55 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({
           <div className="read-only-conversation mx-auto w-full max-w-2xl space-y-4 p-6 font-editor2 text-[18px]">
             {currentConversationData.entries.length > 0 ? (
               currentConversationData.entries.map((entry, entryIndex) => (
-                <div key={entryIndex} className="dialogue-line">
-                  <span className="character-name mr-1 font-bold text-black">{entry.characterName}:</span>
-                  <TiptapJsonRenderer node={entry.contentNode} className="inline" />
+                <div key={entryIndex} className="dialogue-line flex">
+                  <span className="character-name mr-1 whitespace-nowrap font-bold text-black">
+                    {entry.characterName}:
+                  </span>
+
+                  {isScreenplayMode && editingEntryIndex === entryIndex ? (
+                    // Replace input with textarea for multi-line support
+                    <textarea
+                      value={editingContent}
+                      onChange={e => setEditingContent(e.target.value)}
+                      onBlur={() => handleSaveEdit(entryIndex)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && e.shiftKey) {
+                          // Allow shift+enter for new lines
+                          return
+                        } else if (e.key === 'Enter') {
+                          e.preventDefault()
+                          handleSaveEdit(entryIndex)
+                        } else if (e.key === 'Escape') {
+                          setEditingEntryIndex(null)
+                          setEditingContent('')
+                        }
+                      }}
+                      className="m-0 w-full flex-1 resize-none overflow-hidden border-none bg-transparent p-0 font-editor2 text-[18px] leading-normal focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+                      autoFocus
+                      rows={1}
+                      ref={el => {
+                        if (el) {
+                          // Auto-resize textarea to fit content
+                          el.style.height = 'auto'
+                          el.style.height = el.scrollHeight + 'px'
+                          // Focus at end of text
+                          el.selectionStart = el.selectionEnd = el.value.length
+                        }
+                      }}
+                    />
+                  ) : isScreenplayMode ? (
+                    // Clickable dialogue line in screenplay mode
+                    <span
+                      className="flex-1 cursor-pointer rounded hover:bg-gray-100/50"
+                      onClick={() => handleStartEditing(entryIndex, entry.contentNode)}>
+                      <TiptapJsonRenderer node={entry.contentNode} className="inline" />
+                    </span>
+                  ) : (
+                    // Regular read-only view
+                    <span className="flex-1">
+                      <TiptapJsonRenderer node={entry.contentNode} className="inline" />
+                    </span>
+                  )}
                 </div>
               ))
             ) : (
