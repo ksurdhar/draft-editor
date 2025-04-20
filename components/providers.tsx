@@ -30,6 +30,9 @@ interface ConversationEntity extends Entity {
   parentId: string
   parentType: 'document'
   conversationId: string // Original conversation ID in the document
+  entries?: any[] // Dialogue entries
+  conversationName?: string
+  documentTitle?: string
 }
 
 interface SceneEntity extends Entity {
@@ -51,6 +54,8 @@ interface EntityContextType {
   refreshEntities: () => Promise<void>
   filterEntities: (type: EntityType, searchTerm?: string) => AnyEntity[]
   getEntityById: (type: EntityType, id: string) => AnyEntity | undefined
+  loadDocumentContent: (documentId: string) => Promise<DocumentEntity | undefined>
+  loadConversationContent: (conversationId: string) => Promise<ConversationEntity | undefined>
 }
 
 const entityContextDefaultValue: EntityContextType = {
@@ -63,6 +68,8 @@ const entityContextDefaultValue: EntityContextType = {
   refreshEntities: async () => {},
   filterEntities: () => [],
   getEntityById: () => undefined,
+  loadDocumentContent: async () => undefined,
+  loadConversationContent: async () => undefined,
 }
 
 const EntityContext = createContext<EntityContextType>(entityContextDefaultValue)
@@ -213,6 +220,9 @@ export function EntityProvider({ children }: { children: ReactNode }) {
             parentType: 'document',
             lastUpdated: conv.lastUpdated,
             conversationId: conv.conversationId,
+            entries: conv.entries,
+            conversationName: conv.conversationName,
+            documentTitle: conv.documentTitle,
           })
         })
       } catch (error) {
@@ -230,12 +240,14 @@ export function EntityProvider({ children }: { children: ReactNode }) {
     documentId: string,
     lastUpdated?: number,
   ): any[] => {
+    console.log(`Extracting conversations from document: ${documentId} (${documentTitle})`)
     const conversationsMap: Record<string, any> = {}
 
     let parsedContent = documentContent
     if (typeof documentContent === 'string') {
       try {
         parsedContent = JSON.parse(documentContent)
+        console.log(`Successfully parsed document content from string`)
       } catch (e) {
         console.error(`Failed to parse content for doc ${documentId} in extractAllConversations:`, e)
         return []
@@ -244,15 +256,26 @@ export function EntityProvider({ children }: { children: ReactNode }) {
 
     if (!parsedContent || parsedContent.type !== 'doc') {
       console.warn(`Invalid content structure for doc ${documentId} in extractAllConversations`)
+      console.log(`Document content type:`, parsedContent ? parsedContent.type : 'undefined')
       return []
     }
+
+    console.log(`Processing document content to extract conversations`)
+
+    // Count of dialogue marks found
+    let dialogueMarkCount = 0
 
     const processNode = (node: any) => {
       if (node.type === 'text' && node.marks) {
         node.marks.forEach((mark: any) => {
           if (mark.type === 'dialogue' && mark.attrs?.conversationId && mark.attrs?.character && node.text) {
+            dialogueMarkCount++
             const { conversationId } = mark.attrs
             const conversationName = mark.attrs?.conversationName || null
+
+            console.log(
+              `Found dialogue mark with conversation ID: ${conversationId}, character: ${mark.attrs.character}`,
+            )
 
             if (!conversationsMap[conversationId]) {
               conversationsMap[conversationId] = {
@@ -264,6 +287,13 @@ export function EntityProvider({ children }: { children: ReactNode }) {
                 lastUpdated: lastUpdated || Date.now(),
               }
             }
+
+            // Add dialogue entry
+            conversationsMap[conversationId].entries.push({
+              character: mark.attrs.character,
+              text: node.text,
+            })
+
             if (conversationName && conversationsMap[conversationId].conversationName !== conversationName) {
               if (conversationsMap[conversationId].conversationName === null) {
                 conversationsMap[conversationId].conversationName = conversationName
@@ -279,7 +309,17 @@ export function EntityProvider({ children }: { children: ReactNode }) {
 
     processNode(parsedContent)
 
-    return Object.values(conversationsMap)
+    const conversations = Object.values(conversationsMap)
+    console.log(`Extracted ${conversations.length} conversations, found ${dialogueMarkCount} dialogue marks`)
+
+    // Log the conversations found
+    conversations.forEach(conv => {
+      console.log(
+        `Conversation: ${conv.conversationId}, Name: ${conv.conversationName || 'Unnamed'}, Entries: ${conv.entries.length}`,
+      )
+    })
+
+    return conversations
   }
 
   // Process documents into entities whenever they change
@@ -367,6 +407,125 @@ export function EntityProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // Function to load document content for a specific document
+  const loadDocumentContent = async (documentId: string): Promise<DocumentEntity | undefined> => {
+    try {
+      console.log(`Loading document content for ID: ${documentId}`)
+      // Find the document entity
+      const docEntity = documentEntities.find(doc => doc.id === documentId)
+      if (!docEntity) {
+        console.log(`Document entity not found for ID: ${documentId}`)
+        return undefined
+      }
+
+      // If the document already has content, return it
+      if (docEntity.content && Object.keys(docEntity.content).length > 0) {
+        console.log(`Document content already loaded for ID: ${documentId}`)
+        return docEntity
+      }
+
+      // Fetch the document with content
+      const documentWithContent = await fetcher(`/documents/${documentId}`)
+      console.log(
+        `Fetched document content for ID: ${documentId}:`,
+        documentWithContent?.content ? 'success' : 'failed',
+      )
+
+      if (documentWithContent && documentWithContent.content) {
+        // Update the document entity with content
+        const updatedEntity = {
+          ...docEntity,
+          content: documentWithContent.content,
+        }
+
+        // Update the document entities state
+        setDocumentEntities(prev => prev.map(doc => (doc.id === documentId ? updatedEntity : doc)))
+
+        return updatedEntity
+      }
+
+      return docEntity
+    } catch (error) {
+      console.error(`Error loading document content for ID: ${documentId}:`, error)
+      return undefined
+    }
+  }
+
+  // Function to load conversation content including dialogue entries
+  const loadConversationContent = async (conversationId: string): Promise<ConversationEntity | undefined> => {
+    try {
+      console.log(`Loading conversation content for ID: ${conversationId}`)
+      // Find the conversation entity
+      const convEntity = conversationEntities.find(conv => conv.id === conversationId)
+      if (!convEntity) {
+        console.log(`Conversation entity not found for ID: ${conversationId}`)
+        return undefined
+      }
+
+      // If the conversation already has fully populated entries, return it
+      if (convEntity.entries && convEntity.entries.length > 0) {
+        console.log(`Conversation content already loaded for ID: ${conversationId}`)
+        return convEntity
+      }
+
+      // For conversations, we need to get the parent document first
+      if (!convEntity.parentId) {
+        console.log(`No parentId found for conversation: ${conversationId}`)
+        return convEntity
+      }
+
+      // Get the parent document with content
+      const documentEntity = await loadDocumentContent(convEntity.parentId)
+      if (!documentEntity || !documentEntity.content) {
+        console.log(`Failed to load parent document content for conversation: ${conversationId}`)
+        return convEntity
+      }
+
+      // Use the conversation's actual ID field rather than trying to parse it from the entity ID
+      const actualConversationId = convEntity.conversationId
+      console.log(`Extracting conversation ${actualConversationId} from document`)
+
+      // Extract conversations from document
+      const conversations = extractAllConversations(
+        documentEntity.content,
+        documentEntity.name,
+        documentEntity.id,
+      )
+
+      // Find the specific conversation
+      const conversationData = conversations.find(c => c.conversationId === actualConversationId)
+      if (!conversationData) {
+        console.log(`Conversation ${actualConversationId} not found in document content`)
+
+        // Debug: Log all conversation IDs found in the document
+        console.log(
+          `Found conversation IDs in document:`,
+          conversations.map(c => c.conversationId).join(', '),
+        )
+
+        return convEntity
+      }
+
+      console.log(`Found conversation with ${conversationData.entries?.length || 0} entries`)
+
+      // Update the conversation entity with entries and other data
+      const updatedEntity: ConversationEntity = {
+        ...convEntity,
+        entries: conversationData.entries || [],
+        conversationName: conversationData.conversationName || convEntity.name,
+        documentTitle: documentEntity.name,
+      }
+
+      // Update the conversation entities state
+      setConversationEntities(prev => prev.map(conv => (conv.id === conversationId ? updatedEntity : conv)))
+
+      return updatedEntity
+    } catch (error) {
+      console.error(`Error loading conversation content for ID: ${conversationId}:`, error)
+      return undefined
+    }
+  }
+
   // Context value
   const value: EntityContextType = {
     entities: {
@@ -378,6 +537,8 @@ export function EntityProvider({ children }: { children: ReactNode }) {
     refreshEntities,
     filterEntities,
     getEntityById,
+    loadDocumentContent,
+    loadConversationContent,
   }
 
   return <EntityContext.Provider value={value}>{children}</EntityContext.Provider>

@@ -8,7 +8,7 @@ import { ChatMessage } from './chat-message'
 import { ChatInput } from './chat-input'
 import { cn } from '@components/lib/utils'
 import { toast } from 'sonner'
-import { useEntities, AnyEntity } from '@components/providers'
+import { useEntities } from '@components/providers'
 import { EntityReference } from './chat-message'
 
 type MessageRole = 'user' | 'assistant' | 'system'
@@ -35,7 +35,7 @@ type ChatPanelProps = {
 }
 
 export function ChatPanel({ isOpen, onClose, className, documentId, documentContext }: ChatPanelProps) {
-  const { getEntityById } = useEntities()
+  const { getEntityById, loadDocumentContent, loadConversationContent } = useEntities()
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
@@ -65,42 +65,79 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
   }, [])
 
   // Prepare entity contents for API
-  const prepareEntityContents = (entityRefs?: EntityReference[]) => {
+  const prepareEntityContents = async (entityRefs?: EntityReference[]) => {
     if (!entityRefs || entityRefs.length === 0) return {}
 
     const entityContents: Record<string, any> = {}
 
-    entityRefs.forEach(ref => {
-      let entity = null
+    // Process references sequentially to allow for async operations
+    for (const ref of entityRefs) {
+      console.log(`Processing entity reference: ${ref.type}:${ref.id} (${ref.displayName})`)
 
       if (ref.type === 'document') {
-        // Get document entity
-        entity = getEntityById('document', ref.id)
-        if (entity) {
-          const docEntity = entity as AnyEntity & { content?: any }
+        // Load document content using the EntityProvider
+        const documentWithContent = await loadDocumentContent(ref.id)
+        console.log(`Document content loaded:`, documentWithContent?.content ? 'success' : 'failed')
+
+        if (documentWithContent && documentWithContent.content) {
           entityContents[`document:${ref.id}`] = {
             type: 'document',
             id: ref.id,
             name: ref.displayName,
-            content: docEntity.content || {},
+            content: documentWithContent.content,
           }
+          console.log(
+            `Added document content to entity contents, type:`,
+            typeof documentWithContent.content,
+            `keys:`,
+            Object.keys(documentWithContent.content || {}).join(', '),
+          )
         }
-      } else if (ref.type === 'conversation') {
-        // Get conversation entity
-        entity = getEntityById('conversation', ref.id)
-        if (entity) {
+      } else if (ref.type === 'conversation' && ref.parentId) {
+        // Load conversation content using the EntityProvider
+        const conversationWithContent = await loadConversationContent(ref.id)
+        console.log(
+          `Conversation content loaded:`,
+          conversationWithContent?.entries?.length
+            ? `with ${conversationWithContent.entries.length} entries`
+            : 'failed',
+        )
+
+        if (conversationWithContent) {
+          // Log detailed information about the conversation entity
+          console.log(`Adding conversation entity to contents:`, {
+            id: conversationWithContent.id,
+            name: conversationWithContent.name,
+            entriesCount: conversationWithContent.entries?.length || 0,
+            hasEntries: !!(conversationWithContent.entries && conversationWithContent.entries.length > 0),
+          })
+
           entityContents[`conversation:${ref.id}`] = {
             type: 'conversation',
             id: ref.id,
             name: ref.displayName,
             parentId: ref.parentId,
             parentType: ref.parentType,
-            content: entity,
+            conversationId: conversationWithContent.conversationId,
+            entries: conversationWithContent.entries || [],
+            conversationName: conversationWithContent.conversationName || ref.displayName,
+            documentTitle: conversationWithContent.documentTitle,
+          }
+
+          // Log the first few entries if available
+          if (conversationWithContent.entries && conversationWithContent.entries.length > 0) {
+            console.log(
+              `First few entries:`,
+              conversationWithContent.entries
+                .slice(0, 2)
+                .map(entry => `${entry.character}: ${entry.text.substring(0, 20)}...`),
+            )
           }
         }
       } else if (ref.type === 'scene') {
         // Get scene entity
-        entity = getEntityById('scene', ref.id)
+        const entity = getEntityById('scene', ref.id)
+        console.log(`Found scene entity:`, entity ? 'yes' : 'no')
         if (entity) {
           entityContents[`scene:${ref.id}`] = {
             type: 'scene',
@@ -112,8 +149,9 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
           }
         }
       }
-    })
+    }
 
+    console.log(`Prepared entity contents for ${Object.keys(entityContents).length} entities`)
     return entityContents
   }
 
@@ -153,7 +191,7 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
 
     try {
       // Prepare entity contents if there are entity references
-      const entityContents = prepareEntityContents(entityRefs)
+      const entityContents = await prepareEntityContents(entityRefs)
 
       // Format messages for API
       const apiMessages = messages
