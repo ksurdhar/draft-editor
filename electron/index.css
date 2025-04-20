@@ -36,7 +36,7 @@ body {
 
 /* Add padding to account for the transparent title bar on macOS */
 #root {
-  padding-top: 28px; /* Adjust this value as needed for your title bar height */
+  /* padding-top: 28px; Adjust this value as needed for your title bar height */
 }
 
 /* Add draggable region for window dragging */
