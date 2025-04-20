@@ -186,17 +186,13 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
         return
       }
 
-      // If a type is selected, update the search term
-      if (entitySelector.selectedType) {
-        const searchTerm = value.substring(entitySelector.startPosition + 1, curPos)
-        setEntitySelector(prev => ({
-          ...prev,
-          searchTerm,
-          endPosition: curPos,
-        }))
-        return
-      }
-
+      // Update the search term regardless of whether a type is selected
+      const searchTerm = value.substring(entitySelector.startPosition + 1, curPos)
+      setEntitySelector(prev => ({
+        ...prev,
+        searchTerm,
+        endPosition: curPos,
+      }))
       return
     }
 

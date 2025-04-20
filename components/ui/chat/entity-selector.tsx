@@ -2,14 +2,7 @@
 
 import React, { useEffect, useState, useRef } from 'react'
 import { useEntities, EntityType, AnyEntity } from '@components/providers'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@components/ui/command'
+import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@components/ui/command'
 import { ChevronRight, FileText, MessageSquare, Camera, Loader2 } from 'lucide-react'
 import { cn } from '@components/lib/utils'
 
@@ -43,11 +36,28 @@ export function EntitySelector({
   const commandRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
-  // Filter entities based on selected type and search term
-  const filteredEntities = selectedType ? filterEntities(selectedType, searchTerm) : []
-
   // Entity types for selection
   const entityTypes: EntityType[] = ['document', 'conversation', 'scene']
+
+  // Filter entities based on conditions:
+  // 1. If type is already selected, filter by that type and search term
+  // 2. If no type is selected but search term exists, search across all entity types
+  // 3. If no type and no search term, show type selection options
+  const filteredEntities = (() => {
+    if (selectedType) {
+      // If type is selected, filter by that type and search term
+      return filterEntities(selectedType, searchTerm)
+    } else if (searchTerm) {
+      // If no type but search term exists, combine filtered entities from all types
+      const allFilteredEntities: AnyEntity[] = []
+      entityTypes.forEach(type => {
+        allFilteredEntities.push(...filterEntities(type, searchTerm))
+      })
+      return allFilteredEntities
+    }
+    // If no type and no search, return empty array (will show type selection)
+    return []
+  })()
 
   // When active state changes, reset the highlighted index
   useEffect(() => {
@@ -67,10 +77,10 @@ export function EntitySelector({
       if (e.key === 'ArrowUp') {
         setHighlightedIndex(prev => Math.max(0, prev - 1))
       } else if (e.key === 'ArrowDown') {
-        const maxIndex = selectedType ? filteredEntities.length - 1 : entityTypes.length - 1
+        const maxIndex = searchTerm || selectedType ? filteredEntities.length - 1 : entityTypes.length - 1
         setHighlightedIndex(prev => Math.min(maxIndex, prev + 1))
       } else if (e.key === 'Enter' || e.key === 'Tab') {
-        if (selectedType) {
+        if (selectedType || searchTerm) {
           if (filteredEntities.length > 0 && highlightedIndex < filteredEntities.length) {
             onSelect(filteredEntities[highlightedIndex])
           }
@@ -92,6 +102,7 @@ export function EntitySelector({
     isActive,
     highlightedIndex,
     selectedType,
+    searchTerm,
     filteredEntities,
     entityTypes,
     onSelect,
@@ -125,13 +136,6 @@ export function EntitySelector({
       className="entity-selector rounded-md border bg-popover shadow-md"
       style={selectorStyle}>
       <Command className="max-h-[300px]">
-        <CommandInput
-          placeholder={selectedType ? `Search ${selectedType}s...` : 'Select entity type...'}
-          value={searchTerm}
-          readOnly={true}
-          className="h-9"
-        />
-
         <CommandList ref={listRef} className="max-h-[240px] overflow-auto">
           {isLoading && (
             <div className="flex items-center justify-center p-4">
@@ -140,8 +144,8 @@ export function EntitySelector({
             </div>
           )}
 
-          {!selectedType ? (
-            // Show entity types for selection
+          {!searchTerm && !selectedType ? (
+            // Show entity types for selection when no search
             <CommandGroup heading="Select entity type">
               {entityTypes.map((type, index) => (
                 <CommandItem
@@ -163,14 +167,14 @@ export function EntitySelector({
               ))}
             </CommandGroup>
           ) : (
-            // Show entities based on selected type
-            <CommandGroup heading={`${selectedType}s`}>
+            // Show filtered entities across all types or by selected type
+            <CommandGroup heading={selectedType ? `${selectedType}s` : 'Results'}>
               {filteredEntities.length === 0 ? (
-                <CommandEmpty>No {selectedType}s found.</CommandEmpty>
+                <CommandEmpty>No results found.</CommandEmpty>
               ) : (
                 filteredEntities.map((entity, index) => (
                   <CommandItem
-                    key={entity.id}
+                    key={`${entity.type}-${entity.id}`}
                     data-highlighted={highlightedIndex === index}
                     className={cn(
                       highlightedIndex === index && 'bg-accent',
@@ -183,9 +187,12 @@ export function EntitySelector({
                     }}>
                     {ENTITY_ICONS[entity.type]}
                     <span className="truncate">{entity.name}</span>
+                    {!selectedType && (
+                      <span className="ml-2 text-xs text-muted-foreground opacity-70">({entity.type})</span>
+                    )}
                     {entity.parentId && (
                       <span className="ml-2 text-xs text-muted-foreground opacity-70">
-                        ({entity.parentType === 'document' ? 'in document' : 'in'})
+                        (in {entity.parentType === 'document' ? 'document' : entity.parentType})
                       </span>
                     )}
                   </CommandItem>
