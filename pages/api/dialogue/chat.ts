@@ -92,8 +92,9 @@ async function chatHandler(req: ExtendedApiRequest, res: NextApiResponse): Promi
     // Log success
     console.log('Chat completion streaming started')
 
-    // Return text stream response
-    return result.toTextStreamResponse()
+    // Pipe the text stream to the response instead of returning it
+    result.pipeTextStreamToResponse(res)
+    return
   } catch (error: any) {
     console.error('Chat completion error:', error)
 

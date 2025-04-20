@@ -7,7 +7,6 @@ import { Button } from '@components/ui/button'
 import { ChatMessage } from './chat-message'
 import { ChatInput } from './chat-input'
 import { cn } from '@components/lib/utils'
-import { useAPI } from '@components/providers'
 import { toast } from 'sonner'
 
 type MessageRole = 'user' | 'assistant' | 'system'
@@ -33,7 +32,6 @@ type ChatPanelProps = {
 }
 
 export function ChatPanel({ isOpen, onClose, className, documentId, documentContext }: ChatPanelProps) {
-  const { post } = useAPI()
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
@@ -133,12 +131,13 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
         setIsResponding(false)
         return
       } else {
-        // In the browser, use the post method from useAPI
-        const res = await post('/dialogue/chat', {
-          messages: apiMessages,
-          documentId,
-          documentContext,
-          model: 'gpt-4o', // Default model, could be made configurable
+        // In the browser, use fetch directly for streaming instead of the post method from useAPI
+        const res = await fetch('/api/dialogue/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
         })
 
         if (!res.ok) {
