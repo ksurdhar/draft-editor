@@ -16,10 +16,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { EyeIcon, EyeOffIcon, ClockIcon, SearchIcon, ChatIcon, CodeIcon } from '@heroicons/react/outline'
 import VersionList from '@components/version-list'
 import GlobalFind from '@components/global-find'
-import DialogueList from '@components/dialogue-list'
+import { DialogueList, useDialogue } from '@components/dialogue'
 import { renameItem, DocumentOperations } from '@lib/document-operations'
-import { findAllMatches } from '../lib/search'
-import { Node as ProseMirrorNode } from 'prosemirror-model'
 import DebugPanel from './debug-panel'
 
 const backdropStyles = `
@@ -96,7 +94,6 @@ export default function SharedDocumentPage() {
   const [initAnimate, setInitAnimate] = useState(false)
   const [isDialogueMode, setIsDialogueMode] = useState(false)
   const [showDebugPanel, setShowDebugPanel] = useState(false)
-  const [focusedConversationId, setFocusedConversationId] = useState<string | null>(null)
 
   useEffect(() => {
     if (databaseDoc) {
@@ -206,7 +203,6 @@ export default function SharedDocumentPage() {
   const [showGlobalFind, setShowGlobalFind] = useState(false)
   const [diffContent, setDiffContent] = useState<any>(null)
   const [showInitialLoader, setShowInitialLoader] = useState(false)
-  const [isSyncingDialogue, setIsSyncingDialogue] = useState(false)
   const [dialogueDoc, setDialogueDoc] = useState<any>(null)
 
   const debouncedSave = useDebouncedCallback((data: Partial<DocumentData>) => {
@@ -352,219 +348,18 @@ export default function SharedDocumentPage() {
     setEditor(editorInstance)
   }
 
-  const toggleConversationFocus = useCallback(
-    (conversationId: string) => {
-      if (!editor) return
-
-      const newFocusedId = focusedConversationId === conversationId ? null : conversationId
-      setFocusedConversationId(newFocusedId)
-      editor.commands.setDialogueFocus(newFocusedId)
-    },
-    [editor, focusedConversationId],
-  )
-
-  const handleConfirmDialogue = useCallback(
-    (markId: string, character: string, conversationId: string, confirmed: boolean) => {
-      if (!editor) return
-
-      // The markId is expected to be "start-end"
-      const [startStr, endStr] = markId.split('-')
-      const start = parseInt(startStr, 10)
-      const end = parseInt(endStr, 10)
-
-      if (isNaN(start) || isNaN(end)) {
-        console.error('Invalid markId format:', markId)
-        return
-      }
-
-      const { state } = editor
-      const { schema } = state
-      let tr = state.tr
-
-      // 1. Remove any existing dialogue mark in the range
-      tr = tr.removeMark(start, end, schema.marks.dialogue)
-      // 2. Add the new mark with updated attributes
-      tr = tr.addMark(
-        start,
-        end,
-        schema.marks.dialogue.create({
-          character: character,
-          conversationId: conversationId === 'unknown' ? undefined : conversationId,
-          userConfirmed: confirmed,
-        }),
-      )
-
-      editor.view.dispatch(tr)
-
-      const updatedContent = editor.getJSON()
-      debouncedSave({ content: updatedContent })
-    },
-    [editor, debouncedSave],
-  )
-
-  const syncDialogue = async () => {
-    if (!documentContent || isSyncingDialogue || !editor) return
-
-    setIsSyncingDialogue(true)
-    try {
-      const text = editor.state.doc.textContent
-      const response = await post('/dialogue/detect', { text })
-      // Ensure response structure matches expected DialogueDetectionResult[]
-      const detectedDialogues: { character: string; snippet: string; conversationId: string }[] =
-        Array.isArray(response) ? response : response?.dialogues || []
-
-      if (!detectedDialogues) {
-        throw new Error('Invalid response from dialogue detection')
-      }
-
-      // Store confirmed marks before making changes
-      const confirmedRanges = new Map<string, { character: string; conversationId: string }>()
-      editor.state.doc.descendants((node: ProseMirrorNode, pos: number) => {
-        if (node.isText) {
-          const dialogueMark = node.marks.find(mark => mark.type.name === 'dialogue')
-          if (dialogueMark?.attrs.userConfirmed) {
-            const rangeKey = `${pos}-${pos + node.nodeSize}`
-            confirmedRanges.set(rangeKey, {
-              character: dialogueMark.attrs.character,
-              conversationId: dialogueMark.attrs.conversationId,
-            })
-          }
-        }
-      })
-
-      // Start a Tiptap transaction to batch changes
-      let tr = editor.state.tr
-
-      // 1. Remove all *existing* non-confirmed dialogue marks first
-      editor.state.doc.descendants((node: ProseMirrorNode, pos: number) => {
-        if (node.isText) {
-          const dialogueMark = node.marks.find(mark => mark.type.name === 'dialogue')
-          if (dialogueMark && !dialogueMark.attrs.userConfirmed) {
-            tr = tr.removeMark(pos, pos + node.nodeSize, editor.schema.marks.dialogue)
-          }
-        }
-      })
-
-      // Apply the transaction to remove marks before adding new ones
-      editor.view.dispatch(tr)
-      tr = editor.state.tr // Get a new transaction based on the updated state
-
-      // 2. Apply *new* marks from AI, skipping confirmed ranges
-      for (const dialogue of detectedDialogues) {
-        const matches = findAllMatches(editor.state.doc, dialogue.snippet)
-        for (const match of matches) {
-          const rangeKey = `${match.from}-${match.to}`
-          // Construct the unique conversation ID
-          const uniqueConversationId = dialogue.conversationId
-            ? `${documentId}-${dialogue.conversationId}`
-            : `${documentId}-unknown`
-          if (confirmedRanges.has(rangeKey)) {
-            // If confirmed, ensure its ID matches what we expect, otherwise log potential issue
-            const confirmedAttrs = confirmedRanges.get(rangeKey)
-            if (confirmedAttrs?.conversationId !== uniqueConversationId) {
-              console.warn(
-                `Confirmed range ${rangeKey} has ID ${confirmedAttrs?.conversationId}, but new detection suggests ${uniqueConversationId} for snippet "${dialogue.snippet}". Keeping confirmed ID.`,
-              )
-            }
-            // console.log('Skipping confirmed dialogue:', dialogue.snippet)
-            continue
-          }
-          tr = tr.addMark(
-            match.from,
-            match.to,
-            editor.schema.marks.dialogue.create({
-              character: dialogue.character,
-              conversationId: uniqueConversationId, // Use unique ID
-              userConfirmed: false,
-            }),
-          )
-        }
-      }
-
-      // 3. Re-apply confirmed marks
-      confirmedRanges.forEach((attrs, rangeKey) => {
-        const [from, to] = rangeKey.split('-').map(Number)
-        // Construct the unique conversation ID expected for the confirmed mark
-        const uniqueConversationId = attrs.conversationId
-          ? `${documentId}-${attrs.conversationId}`
-          : `${documentId}-unknown`
-        let needsReapply = true
-        editor.state.doc.nodesBetween(from, to, (node: ProseMirrorNode, pos: number) => {
-          // Check if a confirmed mark with the *correct unique ID* already exists
-          if (pos === from && node.isText) {
-            const existingMark = node.marks.find(m => m.type.name === 'dialogue')
-            if (
-              existingMark &&
-              existingMark.attrs.userConfirmed &&
-              existingMark.attrs.character === attrs.character &&
-              existingMark.attrs.conversationId === uniqueConversationId // Check unique ID
-            ) {
-              needsReapply = false
-            }
-          }
-        })
-
-        if (needsReapply && !isNaN(from) && !isNaN(to)) {
-          // Apply the mark with the unique ID
-          tr = tr.addMark(
-            from,
-            to,
-            editor.schema.marks.dialogue.create({
-              ...attrs,
-              conversationId: uniqueConversationId,
-              userConfirmed: true,
-            }),
-          )
-        }
-      })
-
-      // Dispatch the final transaction
-      editor.view.dispatch(tr)
-
-      // Get the final updated content
-      const updatedContent = editor.getJSON()
-      setCurrentContent(updatedContent)
-      setDialogueDoc(updatedContent) // Ensure dialogue list also updates
-
-      // Save the updated content
-      await debouncedSave({ content: updatedContent })
-
-      if (isDialogueMode) {
-        setTimeout(() => {
-          editor.commands.setDialogueHighlight(true)
-        }, 50)
-      }
-    } catch (e) {
-      console.error('Failed to sync dialogue:', e)
-    } finally {
-      setIsSyncingDialogue(false)
-    }
-  }
-
-  useEffect(() => {
-    if (editor) {
-      if (isDialogueMode) {
-        console.log('setting dialogue highlight')
-        editor.commands.setDialogueHighlight(true)
-      } else {
-        console.log('unsetting dialogue highlight')
-        editor.commands.clearDialogueHighlight()
-      }
-    }
-  }, [editor, isDialogueMode])
-
-  // Function to update the conversation name using the editor command
-  const handleUpdateConversationName = useCallback(
-    (conversationId: string, newName: string) => {
-      if (!editor) return
-      editor.chain().focus().updateConversationName(conversationId, newName).run()
-
-      // Trigger save after update
-      const currentEditorContent = editor.getJSON()
-      debouncedSave({ content: JSON.stringify(currentEditorContent) })
-    },
-    [editor, debouncedSave],
-  )
+  const {
+    handleConfirmDialogue,
+    syncDialogue,
+    isSyncingDialogue,
+    handleUpdateConversationName,
+    focusedConversationId,
+    toggleConversationFocus,
+  } = useDialogue(editor, documentId, documentContent, post, debouncedSave, {
+    setCurrentContent,
+    setDialogueDoc,
+    isDialogueMode,
+  })
 
   return (
     <Layout documentId={id} onToggleGlobalSearch={handleToggleGlobalSearch}>

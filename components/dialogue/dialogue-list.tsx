@@ -2,7 +2,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { RefreshIcon, CheckCircleIcon, EyeIcon, EyeOffIcon } from '@heroicons/react/outline'
 import { CheckCircleIcon as CheckCircleIconSolid } from '@heroicons/react/solid'
-import { ListItem } from './list-item'
+import { ListItem } from '../list-item'
 import { Editor } from '@tiptap/react'
 
 interface DialogueListProps {
