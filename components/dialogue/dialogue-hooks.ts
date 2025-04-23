@@ -65,8 +65,24 @@ export const useDialogueSync = (
 
     setIsSyncingDialogue(true)
     try {
+      // 1. Collect known characters from confirmed dialogue marks
+      const knownCharacters: Set<string> = new Set()
+
+      editor.state.doc.descendants((node: ProseMirrorNode, _pos: number) => {
+        if (node.isText) {
+          const dialogueMark = node.marks.find(mark => mark.type.name === 'dialogue')
+          if (dialogueMark?.attrs.userConfirmed && dialogueMark.attrs.character) {
+            knownCharacters.add(dialogueMark.attrs.character)
+          }
+        }
+      })
+
       const text = editor.state.doc.textContent
-      const response = await post('/dialogue/detect', { text })
+      const response = await post('/dialogue/detect', {
+        text,
+        knownCharacters: Array.from(knownCharacters),
+      })
+
       // Ensure response structure matches expected DialogueDetectionResult[]
       const detectedDialogues: { character: string; snippet: string; conversationId: string }[] =
         Array.isArray(response) ? response : response?.dialogues || []
@@ -76,7 +92,15 @@ export const useDialogueSync = (
       }
 
       // Store confirmed marks before making changes
-      const confirmedRanges = new Map<string, { character: string; conversationId: string }>()
+      const confirmedRanges = new Map<
+        string,
+        {
+          character: string
+          conversationId: string
+          conversationName?: string | null
+        }
+      >()
+
       editor.state.doc.descendants((node: ProseMirrorNode, pos: number) => {
         if (node.isText) {
           const dialogueMark = node.marks.find(mark => mark.type.name === 'dialogue')
@@ -85,10 +109,44 @@ export const useDialogueSync = (
             confirmedRanges.set(rangeKey, {
               character: dialogueMark.attrs.character,
               conversationId: dialogueMark.attrs.conversationId,
+              conversationName: dialogueMark.attrs.conversationName,
             })
           }
         }
       })
+
+      // Group detected dialogues by conversationId for naming
+      const conversationSnippets: Record<string, string[]> = {}
+      detectedDialogues.forEach(dialogue => {
+        const convId = dialogue.conversationId
+        if (!conversationSnippets[convId]) {
+          conversationSnippets[convId] = []
+        }
+        conversationSnippets[convId].push(dialogue.snippet)
+      })
+
+      // Call the conversation naming API
+      let nameMap = new Map<string, string>()
+      if (Object.keys(conversationSnippets).length > 0) {
+        try {
+          const nameResponse = await post('/dialogue/name-conversations', {
+            conversations: Object.entries(conversationSnippets).map(([id, snippets]) => ({
+              id,
+              snippets,
+            })),
+          })
+
+          // Build the name map with document-specific conversation IDs
+          if (nameResponse?.names) {
+            nameMap = new Map(
+              nameResponse.names.map((n: { id: string; name: string }) => [`${documentId}-${n.id}`, n.name]),
+            )
+          }
+        } catch (error) {
+          console.error('Failed to name conversations:', error)
+          // Continue with dialogue sync even if naming fails
+        }
+      }
 
       // Start a Tiptap transaction to batch changes
       let tr = editor.state.tr
@@ -116,6 +174,7 @@ export const useDialogueSync = (
           const uniqueConversationId = dialogue.conversationId
             ? `${documentId}-${dialogue.conversationId}`
             : `${documentId}-unknown`
+
           if (confirmedRanges.has(rangeKey)) {
             // If confirmed, ensure its ID matches what we expect, otherwise log potential issue
             const confirmedAttrs = confirmedRanges.get(rangeKey)
@@ -126,12 +185,17 @@ export const useDialogueSync = (
             }
             continue
           }
+
+          // Get conversation name from the map or keep the existing one
+          const conversationName = nameMap.get(uniqueConversationId) || null
+
           tr = tr.addMark(
             match.from,
             match.to,
             editor.schema.marks.dialogue.create({
               character: dialogue.character,
               conversationId: uniqueConversationId, // Use unique ID
+              conversationName: conversationName,
               userConfirmed: false,
             }),
           )
@@ -162,13 +226,15 @@ export const useDialogueSync = (
         })
 
         if (needsReapply && !isNaN(from) && !isNaN(to)) {
-          // Apply the mark with the unique ID
+          // Apply the mark with the unique ID, preserving existing conversationName
           tr = tr.addMark(
             from,
             to,
             editor.schema.marks.dialogue.create({
               ...attrs,
               conversationId: uniqueConversationId,
+              // Keep existing conversationName if it exists
+              conversationName: attrs.conversationName || nameMap.get(uniqueConversationId) || null,
               userConfirmed: true,
             }),
           )

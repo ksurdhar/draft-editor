@@ -21,6 +21,18 @@ const DialogueResponseSchema = z.object({
   ),
 })
 
+// Helper function to generate better dialogue detection prompt
+const getBetterDialoguePrompt = (knownCharacters: string[]) => `
+KNOWN CHARACTERS: ${knownCharacters.length ? knownCharacters.join(', ') : 'None'}
+
+If a line lacks lexical hints:
+• assume the previous explicit speaker (turn-taking)  
+• else 'Unknown'  
+• set confidence ≤ 0.60
+
+All other rules (interrupted-speech, JSON schema) remain.
+`
+
 async function dialogueDetectionHandler(req: ExtendedApiRequest, res: NextApiResponse) {
   const { method, user } = req
 
@@ -41,7 +53,7 @@ async function dialogueDetectionHandler(req: ExtendedApiRequest, res: NextApiRes
   }
 
   try {
-    const { text } = req.body
+    const { text, knownCharacters = [] } = req.body
 
     if (!text) {
       return res.status(400).json({ error: 'No text provided' })
@@ -51,6 +63,7 @@ async function dialogueDetectionHandler(req: ExtendedApiRequest, res: NextApiRes
     console.log('\n=== Detecting Dialogue ===')
     console.log('User ID:', user.sub)
     console.log('Text length:', text.length, 'characters')
+    console.log('Known characters:', knownCharacters.length ? knownCharacters.join(', ') : 'None')
 
     // Use generateObject with the defined schema
     const { object } = await generateObject({
@@ -88,7 +101,9 @@ async function dialogueDetectionHandler(req: ExtendedApiRequest, res: NextApiRes
           - The first object's snippet would be "Go away,"
           - The second object's snippet would be "now."
           - Both objects should have the same character and conversationId.
-          DO NOT combine interrupted dialogue into a single snippet. Always split it based on the interruption.`,
+          DO NOT combine interrupted dialogue into a single snippet. Always split it based on the interruption.
+
+          ${getBetterDialoguePrompt(knownCharacters)}`,
         },
         {
           role: 'user',
