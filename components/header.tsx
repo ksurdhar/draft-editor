@@ -1,16 +1,14 @@
 'use client'
 
-import { DocumentData } from '@typez/globals'
 import { useUser } from '@wrappers/auth-wrapper-client'
-import { Fragment, useCallback, useEffect, useState, useRef } from 'react'
-import useSWR, { mutate } from 'swr'
+import { Fragment, useEffect, useState, useRef } from 'react'
+import { mutate } from 'swr'
 import { useAPI, useMouse, useNavigation } from './providers'
 import { useFolderSync } from '@lib/hooks'
 import { importFiles } from '@lib/import-utils'
 import { Divider, List, ListItem, ListItemButton, ListItemText } from '@mui/material'
 import Box from '@mui/material/Box'
 import Drawer from '@mui/material/Drawer'
-import ShareModal from './share-modal'
 
 // Direct detection method for Electron environment
 const isBrowser = typeof window !== 'undefined'
@@ -62,22 +60,18 @@ export const useEditorFades = (isMouseStill: boolean) => {
   return [initFadeIn, fadeOut]
 }
 
-type HeaderProps = {
-  id: string
-}
-
-const HeaderComponent = ({ id }: HeaderProps) => {
+const HeaderComponent = () => {
   const { user } = useUser()
   const { navigateTo, signOut } = useNavigation()
-  const { post, get } = useAPI()
+  const { post } = useAPI()
   const { mutate: mutateFolders } = useFolderSync()
 
-  const fetcher = useCallback(
-    async (path: string) => {
-      return await get(path)
-    },
-    [get],
-  )
+  // const fetcher = useCallback(
+  //   async (path: string) => {
+  //     return await get(path)
+  //   },
+  //   [get],
+  // )
 
   const [menuOpen, setMenuOpen] = useState(false)
   const toggleDrawer = (open: boolean) => (event: React.KeyboardEvent | React.MouseEvent) => {
@@ -90,26 +84,26 @@ const HeaderComponent = ({ id }: HeaderProps) => {
     setMenuOpen(open)
   }
 
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false)
-  const openShareModal = () => setIsShareModalOpen(true)
-  const closeShareModal = () => setIsShareModalOpen(false)
+  // const [isShareModalOpen, setIsShareModalOpen] = useState(false)
+  // const openShareModal = () => setIsShareModalOpen(true)
+  // const closeShareModal = () => setIsShareModalOpen(false)
 
   const { mouseMoved, hoveringOverMenu } = useMouse()
   const [initFadeIn, fadeOut] = useEditorFades(!mouseMoved)
 
-  const documentPath = `/documents/${id}`
+  // const documentPath = `/documents/${id}`
 
-  const { data: databaseDoc } = useSWR<DocumentData, Error>(documentPath, fetcher)
-  const [hybridDoc, setHybridDoc] = useState<DocumentData | null>()
+  // const { data: databaseDoc } = useSWR<DocumentData, Error>(documentPath, fetcher)
+  // const [hybridDoc, setHybridDoc] = useState<DocumentData | null>()
 
   // useSyncHybridDoc(id, databaseDoc, setHybridDoc)
-  useEffect(() => {
-    if (databaseDoc) {
-      setHybridDoc(databaseDoc)
-    }
-  }, [databaseDoc])
+  // useEffect(() => {
+  //   if (databaseDoc) {
+  //     setHybridDoc(databaseDoc)
+  //   }
+  // }, [databaseDoc])
 
-  const isOwner = user && hybridDoc && hybridDoc.userId === user.sub
+  // const isOwner = user && hybridDoc && hybridDoc.userId === user.sub
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -125,7 +119,7 @@ const HeaderComponent = ({ id }: HeaderProps) => {
 
     try {
       await importFiles(files, user.sub, { post }, () => {
-        Promise.all([mutate('/documents'), mutateFolders()])
+        Promise.all([mutate('/documents?metadataOnly=true'), mutateFolders()])
       })
     } catch (error: any) {
       console.error('Error importing files:', error)
@@ -238,7 +232,7 @@ const HeaderComponent = ({ id }: HeaderProps) => {
                 </ListItem>
               </List>
               <Divider />
-              {isOwner && (
+              {/* {isOwner && (
                 <List>
                   <ListItem disablePadding>
                     <ListItemButton onClick={openShareModal}>
@@ -246,10 +240,10 @@ const HeaderComponent = ({ id }: HeaderProps) => {
                     </ListItemButton>
                   </ListItem>
                 </List>
-              )}
+              )} */}
             </Box>
           </Drawer>
-          {isOwner && <ShareModal open={isShareModalOpen} onClose={closeShareModal} document={hybridDoc} />}
+          {/* {isOwner && <ShareModal open={isShareModalOpen} onClose={closeShareModal} document={hybridDoc} />} */}
         </Fragment>
       </div>
     </>

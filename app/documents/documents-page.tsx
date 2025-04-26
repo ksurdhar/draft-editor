@@ -11,7 +11,7 @@ export const NextDocumentsPage = () => {
     data: documents,
     mutate: mutateDocuments,
     isLoading: docsLoading,
-  } = useSWR<DocumentData[]>('/documents', get)
+  } = useSWR<DocumentData[]>('/documents?metadataOnly=true', get)
   const {
     data: folders,
     mutate: mutateFolders,

@@ -1,6 +1,6 @@
 'use client'
 import { useMemo, useState, useEffect } from 'react'
-import { RefreshIcon, CheckCircleIcon, EyeIcon, EyeOffIcon } from '@heroicons/react/outline'
+import { RefreshIcon, CheckCircleIcon, EyeIcon, EyeOffIcon, TrashIcon } from '@heroicons/react/outline'
 import { CheckCircleIcon as CheckCircleIconSolid } from '@heroicons/react/solid'
 import { ListItem } from '../list-item'
 import { Editor } from '@tiptap/react'
@@ -15,6 +15,7 @@ interface DialogueListProps {
   focusedConversationId: string | null
   onToggleFocus: (conversationId: string) => void
   onUpdateConversationName: (conversationId: string, newName: string) => void
+  onRemoveAllDialogueMarks?: () => void
 }
 
 interface DialogueMark {
@@ -50,6 +51,7 @@ const DialogueList = ({
   focusedConversationId,
   onToggleFocus,
   onUpdateConversationName,
+  onRemoveAllDialogueMarks,
 }: DialogueListProps) => {
   const [processedMarks, setProcessedMarks] = useState<ProcessedDialogueMark[]>([])
   const [editingConversationId, setEditingConversationId] = useState<string | null>(null)
@@ -218,13 +220,24 @@ const DialogueList = ({
     <div className="flex flex-col gap-2">
       <div className="mb-2 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-gray-400">Dialogue</h2>
-        <button
-          onClick={onSyncDialogue}
-          disabled={isSyncing}
-          className="flex items-center gap-1.5 rounded px-2 py-1.5 text-gray-400 transition-colors hover:bg-white/[.05] hover:text-gray-600 disabled:opacity-50">
-          <RefreshIcon className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-          <span className="text-xs">{isSyncing ? 'Syncing...' : 'Sync'}</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          {onRemoveAllDialogueMarks && (
+            <button
+              onClick={onRemoveAllDialogueMarks}
+              className="flex items-center gap-1.5 rounded px-2 py-1.5 text-gray-400 transition-colors hover:bg-white/[.05] hover:text-red-400 disabled:opacity-50"
+              title="Remove all dialogue marks (dev only)">
+              <TrashIcon className="h-4 w-4" />
+              <span className="text-xs">Clear All</span>
+            </button>
+          )}
+          <button
+            onClick={onSyncDialogue}
+            disabled={isSyncing}
+            className="flex items-center gap-1.5 rounded px-2 py-1.5 text-gray-400 transition-colors hover:bg-white/[.05] hover:text-gray-600 disabled:opacity-50">
+            <RefreshIcon className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span className="text-xs">{isSyncing ? 'Syncing...' : 'Sync'}</span>
+          </button>
+        </div>
       </div>
 
       {processedMarks.length === 0 ? (

@@ -180,7 +180,8 @@ export function EntityProvider({ children }: { children: ReactNode }) {
     data: documents,
     mutate: mutateDocuments,
     isLoading: documentsLoading,
-  } = useSWR('/documents', fetcher, {
+  } = useSWR('/documents?metadataOnly=true', fetcher, {
+    // we probably do want all the documents here, but they shouldn't slow things down
     revalidateOnFocus: false,
     focusThrottleInterval: 30000,
     dedupingInterval: 10000,

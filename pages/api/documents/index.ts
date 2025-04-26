@@ -77,8 +77,12 @@ const handlers = {
   },
 
   async GET(req: ExtendedApiRequest, res: NextApiResponse) {
+    console.log('documents GET start')
+
     const { metadataOnly } = req.query
+    console.log('metadataOnly', metadataOnly === 'true')
     const documents = await storage.find('documents', { userId: req.user!.sub })
+    console.log('documents retrieved from storage', documents.length)
 
     // Process documents and parse stringified JSON
     const docsWithPermissions = await Promise.all(

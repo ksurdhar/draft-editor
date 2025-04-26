@@ -355,6 +355,7 @@ export default function SharedDocumentPage() {
     handleUpdateConversationName,
     focusedConversationId,
     toggleConversationFocus,
+    removeAllDialogueMarks,
   } = useDialogue(editor, documentId, documentContent, post, debouncedSave, {
     setCurrentContent,
     setDialogueDoc,
@@ -532,6 +533,7 @@ export default function SharedDocumentPage() {
                   focusedConversationId={focusedConversationId}
                   onToggleFocus={toggleConversationFocus}
                   onUpdateConversationName={handleUpdateConversationName}
+                  onRemoveAllDialogueMarks={removeAllDialogueMarks}
                 />
               </div>
             </motion.div>

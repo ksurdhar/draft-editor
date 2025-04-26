@@ -30,6 +30,7 @@ export class MongoStorageAdapter implements StorageAdapter {
   }
 
   private async getCollection(collection: string) {
+    console.log('MongoStorageAdapter getting collection', collection)
     await this.connect()
     return this.client.db(this.dbName).collection<MongoDocument>(collection)
   }

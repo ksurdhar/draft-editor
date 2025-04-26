@@ -294,6 +294,37 @@ export const useDialogueHighlight = (editor: Editor | null, isDialogueMode: bool
   }, [editor, isDialogueMode])
 }
 
+// Hook for removing all dialogue marks
+export const useRemoveAllDialogueMarks = (editor: Editor | null, debouncedSave: (data: any) => void) => {
+  const removeAllDialogueMarks = useCallback(() => {
+    if (!editor) return
+
+    const { state } = editor
+    const { schema } = state
+    let tr = state.tr
+
+    // Find all dialogue marks and remove them
+    editor.state.doc.descendants((node, pos) => {
+      if (node.isText) {
+        const dialogueMark = node.marks.find(mark => mark.type.name === 'dialogue')
+        if (dialogueMark) {
+          tr = tr.removeMark(pos, pos + node.nodeSize, schema.marks.dialogue)
+        }
+      }
+      return true
+    })
+
+    // Apply the transaction
+    editor.view.dispatch(tr)
+
+    // Save the updated content
+    const updatedContent = editor.getJSON()
+    debouncedSave({ content: updatedContent })
+  }, [editor, debouncedSave])
+
+  return { removeAllDialogueMarks }
+}
+
 // Hook for handling conversation rename
 export const useConversationRename = (editor: Editor | null, debouncedSave: (data: any) => void) => {
   const handleUpdateConversationName = useCallback(
@@ -341,6 +372,8 @@ export const useDialogue = (
 
   const { handleUpdateConversationName } = useConversationRename(editor, debouncedSave)
 
+  const { removeAllDialogueMarks } = useRemoveAllDialogueMarks(editor, debouncedSave)
+
   const [focusedConversationId, setFocusedConversationId] = useState<string | null>(null)
 
   const toggleConversationFocus = useCallback(
@@ -361,5 +394,6 @@ export const useDialogue = (
     handleUpdateConversationName,
     focusedConversationId,
     toggleConversationFocus,
+    removeAllDialogueMarks,
   }
 }

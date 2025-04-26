@@ -8,6 +8,7 @@ const API = axios.create({
 })
 
 export async function get(url: string): ApiResponse {
+  console.trace('http-utils get', url)
   const result = await API.get(url)
   return result.data
 }
