@@ -84,7 +84,7 @@ export default function SharedDocumentPage() {
   }, [documentId, id])
 
   const { data: databaseDoc } = useSWR<DocumentData, Error>(documentPath, fetcher)
-  const { data: allDocs } = useSWR<DocumentData[], Error>('/documents', fetcher)
+  const { data: allDocs } = useSWR<DocumentData[], Error>('/documents?metadataOnly=true', fetcher)
   const { data: allFolders } = useSWR<DocumentData[], Error>('/folders', fetcher)
 
   const [hybridDoc, setHybridDoc] = useState<DocumentData | null>()

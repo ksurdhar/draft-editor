@@ -97,10 +97,15 @@ export class MongoStorageAdapter implements StorageAdapter {
     }
   }
 
-  async find(collection: string, query: Record<string, any> = {}): Promise<Document[]> {
+  async find(
+    collection: string,
+    query: Record<string, any> = {},
+    options: { projection?: Record<string, number> } = {},
+  ): Promise<Document[]> {
     // console.log('\n=== MongoStorageAdapter.find ===')
     // console.log('Collection:', collection)
     // console.log('Query:', query)
+    // console.log('Options:', options)
 
     try {
       const col = await this.getCollection(collection)
@@ -117,7 +122,14 @@ export class MongoStorageAdapter implements StorageAdapter {
         }
       }
 
-      const results = await col.find(processedQuery).toArray()
+      const cursor = col.find(processedQuery)
+
+      // Apply projection if provided
+      if (options.projection) {
+        cursor.project(options.projection)
+      }
+
+      const results = await cursor.toArray()
       return results.map(doc => this.toDocument(doc))
     } catch (error) {
       console.error('Error finding documents:', error)

@@ -81,7 +81,12 @@ const handlers = {
 
     const { metadataOnly } = req.query
     console.log('metadataOnly', metadataOnly === 'true')
-    const documents = await storage.find('documents', { userId: req.user!.sub })
+
+    // Use projection to exclude content field when metadataOnly is true
+    const findOptions = metadataOnly === 'true' ? { projection: { content: 0 } } : {}
+
+    const documents = await storage.find('documents', { userId: req.user!.sub }, findOptions)
+
     console.log('documents retrieved from storage', documents.length)
 
     // Process documents and parse stringified JSON
@@ -89,10 +94,8 @@ const handlers = {
       documents.map(async doc => {
         let content = doc.content
 
-        // Only include content if metadataOnly is not set to true
-        if (metadataOnly === 'true') {
-          content = undefined
-        } else if (typeof content === 'string') {
+        // Only parse content if it exists (it won't if metadataOnly=true)
+        if (content && typeof content === 'string') {
           // Try to parse stringified JSON
           try {
             content = JSON.parse(content)

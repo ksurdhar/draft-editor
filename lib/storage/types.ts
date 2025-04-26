@@ -31,7 +31,7 @@ export interface Document extends BaseDocument {
 // Generic storage adapter interface
 export interface StorageAdapter {
   create(collection: string, data: any): Promise<any>
-  find(collection: string, query: any): Promise<any[]>
+  find(collection: string, query: any, options?: { projection?: Record<string, number> }): Promise<any[]>
   findById(collection: string, id: string): Promise<any>
   update(collection: string, id: string, data: any): Promise<any>
   delete(collection: string, query: Record<string, any>): Promise<boolean>
