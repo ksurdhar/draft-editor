@@ -36,7 +36,7 @@ type ChatPanelProps = {
 }
 
 export function ChatPanel({ isOpen, onClose, className, documentId, documentContext }: ChatPanelProps) {
-  const { getEntityById, loadDocumentContent, loadConversationContent } = useEntities()
+  const { getEntityById, loadDocumentContent, loadConversationContent, loadFolderContent } = useEntities()
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
@@ -143,6 +143,33 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
             id: ref.id,
             name: ref.displayName,
             content: plainTextContent,
+          }
+        }
+      } else if (ref.type === 'folder') {
+        // Load all documents in this folder
+        const documentsInFolder = await loadFolderContent(ref.id)
+        console.log(`Found ${documentsInFolder.length} documents in folder ${ref.displayName}`)
+
+        // Process each document in the folder
+        for (const doc of documentsInFolder) {
+          if (doc.content) {
+            // Convert TipTap JSON to plain text
+            const plainTextContent = flattenTiptapContent(doc.content)
+            console.log(`Folder document text extracted: ${doc.name} - ${plainTextContent.length} characters`)
+
+            // Store the document with a special key indicating it came from a folder
+            entityContents[`document:${doc.id}:folder:${ref.id}`] = {
+              type: 'document',
+              id: doc.id,
+              name: doc.name,
+              folderRef: {
+                id: ref.id,
+                name: ref.displayName,
+              },
+              content: plainTextContent,
+            }
+          } else {
+            console.log(`No content found for document ${doc.id} in folder ${ref.id}`)
           }
         }
       } else if (ref.type === 'conversation' && ref.parentId) {

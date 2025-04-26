@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useEntities, EntityType, AnyEntity } from '@components/providers'
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@components/ui/command'
-import { ChevronRight, FileText, MessageSquare, Camera, Loader2 } from 'lucide-react'
+import { ChevronRight, FileText, MessageSquare, Camera, Folder, Loader2 } from 'lucide-react'
 import { cn } from '@components/lib/utils'
 
 // Styling constants
@@ -11,6 +11,7 @@ const ENTITY_ICONS = {
   document: <FileText className="mr-2 h-4 w-4" />,
   conversation: <MessageSquare className="mr-2 h-4 w-4" />,
   scene: <Camera className="mr-2 h-4 w-4" />,
+  folder: <Folder className="mr-2 h-4 w-4" />,
 }
 
 // Props for the entity selector
@@ -37,7 +38,7 @@ export function EntitySelector({
   const listRef = useRef<HTMLDivElement>(null)
 
   // Entity types for selection
-  const entityTypes: EntityType[] = ['document', 'conversation', 'scene']
+  const entityTypes: EntityType[] = ['document', 'conversation', 'scene', 'folder']
 
   // Filter entities based on conditions:
   // 1. If type is already selected, filter by that type and search term

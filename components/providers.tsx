@@ -9,7 +9,7 @@ import { createContext, ReactNode, useContext, useEffect, useState } from 'react
 import useSWR from 'swr'
 
 // Entity Context types
-export type EntityType = 'document' | 'conversation' | 'scene'
+export type EntityType = 'document' | 'conversation' | 'scene' | 'folder'
 
 export interface Entity {
   id: string
@@ -42,13 +42,20 @@ interface SceneEntity extends Entity {
   sceneId: string // Original scene ID in the document
 }
 
-export type AnyEntity = DocumentEntity | ConversationEntity | SceneEntity
+interface FolderEntity extends Entity {
+  type: 'folder'
+  parentId?: string | 'root'
+  folderIndex?: number
+}
+
+export type AnyEntity = DocumentEntity | ConversationEntity | SceneEntity | FolderEntity
 
 interface EntityContextType {
   entities: {
     documents: DocumentEntity[]
     conversations: ConversationEntity[]
     scenes: SceneEntity[]
+    folders: FolderEntity[]
   }
   isLoading: boolean
   refreshEntities: () => Promise<void>
@@ -56,6 +63,7 @@ interface EntityContextType {
   getEntityById: (type: EntityType, id: string) => AnyEntity | undefined
   loadDocumentContent: (documentId: string) => Promise<DocumentEntity | undefined>
   loadConversationContent: (conversationId: string) => Promise<ConversationEntity | undefined>
+  loadFolderContent: (folderId: string) => Promise<DocumentEntity[]>
 }
 
 const entityContextDefaultValue: EntityContextType = {
@@ -63,6 +71,7 @@ const entityContextDefaultValue: EntityContextType = {
     documents: [],
     conversations: [],
     scenes: [],
+    folders: [],
   },
   isLoading: false,
   refreshEntities: async () => {},
@@ -70,6 +79,7 @@ const entityContextDefaultValue: EntityContextType = {
   getEntityById: () => undefined,
   loadDocumentContent: async () => undefined,
   loadConversationContent: async () => undefined,
+  loadFolderContent: async () => [],
 }
 
 const EntityContext = createContext<EntityContextType>(entityContextDefaultValue)
@@ -188,10 +198,23 @@ export function EntityProvider({ children }: { children: ReactNode }) {
     revalidateIfStale: false,
   })
 
+  // Fetch folders using SWR
+  const {
+    data: folders,
+    mutate: mutateFolders,
+    isLoading: foldersLoading,
+  } = useSWR('/folders', fetcher, {
+    revalidateOnFocus: false,
+    focusThrottleInterval: 30000,
+    dedupingInterval: 10000,
+    revalidateIfStale: false,
+  })
+
   // State for processed entities
   const [documentEntities, setDocumentEntities] = useState<DocumentEntity[]>([])
   const [conversationEntities, setConversationEntities] = useState<ConversationEntity[]>([])
   const [sceneEntities, setSceneEntities] = useState<SceneEntity[]>([])
+  const [folderEntities, setFolderEntities] = useState<FolderEntity[]>([])
 
   // Extract conversations from documents (similar to extractAllConversations in conversations-page.tsx)
   const extractConversationsFromDocuments = (docs: any[]) => {
@@ -310,6 +333,8 @@ export function EntityProvider({ children }: { children: ReactNode }) {
       type: 'document',
       name: doc.title || 'Untitled Document',
       lastUpdated: doc.lastUpdated,
+      parentId: doc.parentId,
+      parentType: doc.parentId && doc.parentId !== 'root' ? 'folder' : undefined,
     }))
     setDocumentEntities(docEntities)
 
@@ -321,6 +346,23 @@ export function EntityProvider({ children }: { children: ReactNode }) {
     setSceneEntities([])
   }, [documents])
 
+  // Process folders into entities whenever they change
+  useEffect(() => {
+    if (!folders) return
+
+    // Process folder entities
+    const folderEnts: FolderEntity[] = folders.map((folder: any) => ({
+      id: folder._id,
+      type: 'folder',
+      name: folder.title || 'Untitled Folder',
+      lastUpdated: folder.lastUpdated,
+      parentId: folder.parentId,
+      parentType: folder.parentId && folder.parentId !== 'root' ? 'folder' : undefined,
+      folderIndex: folder.folderIndex,
+    }))
+    setFolderEntities(folderEnts)
+  }, [folders])
+
   // Listen for sync updates (for Electron)
   useEffect(() => {
     if (!isElectron) return // Skip this effect in web version
@@ -329,18 +371,21 @@ export function EntityProvider({ children }: { children: ReactNode }) {
       if (updates.documents && updates.documents.length > 0) {
         mutateDocuments()
       }
+      if (updates.folders && updates.folders.length > 0) {
+        mutateFolders()
+      }
     })
 
     return () => {
       removeListener()
     }
-  }, [isElectron, mutateDocuments])
+  }, [isElectron, mutateDocuments, mutateFolders])
 
   // Function to manually refresh entities
   const refreshEntities = async () => {
     setIsRefreshing(true)
     try {
-      await mutateDocuments()
+      await Promise.all([mutateDocuments(), mutateFolders()])
     } catch (error) {
       // Error handling without console.error
     } finally {
@@ -362,6 +407,9 @@ export function EntityProvider({ children }: { children: ReactNode }) {
       case 'scene':
         entities = [...sceneEntities]
         break
+      case 'folder':
+        entities = [...folderEntities]
+        break
     }
 
     if (!searchTerm) return entities
@@ -380,6 +428,8 @@ export function EntityProvider({ children }: { children: ReactNode }) {
         return conversationEntities.find(entity => entity.id === id)
       case 'scene':
         return sceneEntities.find(entity => entity.id === id)
+      case 'folder':
+        return folderEntities.find(entity => entity.id === id)
       default:
         return undefined
     }
@@ -479,19 +529,48 @@ export function EntityProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // Function to load all documents that are immediate children of a folder
+  const loadFolderContent = async (folderId: string): Promise<DocumentEntity[]> => {
+    try {
+      // Find the folder entity
+      const folderEntity = folderEntities.find(folder => folder.id === folderId)
+      if (!folderEntity) {
+        return []
+      }
+
+      // Filter documents that have this folder as their parentId
+      const docsInFolder = documentEntities.filter(doc => doc.parentId === folderId)
+
+      // If we need the content of these documents, we can load them
+      const documentsWithContent: DocumentEntity[] = []
+      for (const doc of docsInFolder) {
+        const docWithContent = await loadDocumentContent(doc.id)
+        if (docWithContent) {
+          documentsWithContent.push(docWithContent)
+        }
+      }
+
+      return documentsWithContent
+    } catch (error) {
+      return []
+    }
+  }
+
   // Context value
   const value: EntityContextType = {
     entities: {
       documents: documentEntities,
       conversations: conversationEntities,
       scenes: sceneEntities,
+      folders: folderEntities,
     },
-    isLoading: documentsLoading || isRefreshing,
+    isLoading: documentsLoading || foldersLoading || isRefreshing,
     refreshEntities,
     filterEntities,
     getEntityById,
     loadDocumentContent,
     loadConversationContent,
+    loadFolderContent,
   }
 
   return <EntityContext.Provider value={value}>{children}</EntityContext.Provider>
