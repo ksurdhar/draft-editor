@@ -236,7 +236,7 @@ const Layout = ({ children, documentId, onToggleGlobalSearch }: Props): ReactNod
 
   return (
     <div className="absolute h-screen w-screen font-geist" onMouseMove={e => onMouseMove(e.clientY)}>
-      <HeaderComponent />
+      <HeaderComponent isChatOpen={isChatOpen} chatPanelSize={effectiveSize} />
 
       <div className="h-[calc(100vh)] overflow-hidden">
         <ResizablePanelGroup direction="horizontal" className="h-full" onLayout={handlePanelResize}>

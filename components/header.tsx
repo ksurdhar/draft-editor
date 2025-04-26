@@ -60,7 +60,12 @@ export const useEditorFades = (isMouseStill: boolean) => {
   return [initFadeIn, fadeOut]
 }
 
-const HeaderComponent = () => {
+interface HeaderComponentProps {
+  isChatOpen?: boolean
+  chatPanelSize?: number
+}
+
+const HeaderComponent = ({ isChatOpen = false, chatPanelSize = 0 }: HeaderComponentProps) => {
   const { user } = useUser()
   const { navigateTo, signOut } = useNavigation()
   const { post } = useAPI()
@@ -132,6 +137,9 @@ const HeaderComponent = () => {
   // Adjust the hamburger menu position for Electron
   const hamburgerTopPosition = isElectron ? 'top-[28px]' : 'top-[20px]'
 
+  // Calculate the right position for the hamburger menu based on chat panel status
+  const hamburgerRightPosition = isChatOpen ? `calc(${chatPanelSize}% + 20px)` : '20px'
+
   return (
     <>
       <input
@@ -167,7 +175,8 @@ const HeaderComponent = () => {
       <div
         className={`${
           fadeOut && !hoveringOverMenu && !menuOpen ? 'opacity-0' : 'opacity-100'
-        } fixed right-[20px] ${hamburgerTopPosition} z-50 flex flex-row-reverse transition-opacity duration-700`}>
+        } fixed ${hamburgerTopPosition} z-50 flex flex-row-reverse transition-opacity duration-700`}
+        style={{ right: hamburgerRightPosition }}>
         <Fragment>
           <div
             onClick={toggleDrawer(true)}
