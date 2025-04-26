@@ -4,20 +4,35 @@ import { ObjectId } from 'mongodb'
 import { StorageAdapter, Document } from './types'
 import os from 'os'
 
+export interface FileStorageOptions {
+  storagePath?: string // Path where files should be stored
+  allowCustomIds?: boolean // Allow client-supplied IDs during creation
+  parseContentOnUpdate?: boolean // Attempt to parse content as JSON in update
+  handleNestedContent?: boolean // Handle nested content for folders on delete
+}
+
 export class FileStorageAdapter implements StorageAdapter {
   private storagePath: string
+  private options: Required<FileStorageOptions>
 
-  constructor() {
-    // In production, use the system's temp directory
-    // In development, use the configured path or ./data
-    this.storagePath =
-      process.env.NODE_ENV === 'production'
-        ? path.join(os.tmpdir(), 'draft-editor-data')
-        : process.env.JSON_STORAGE_PATH || './data'
+  constructor(options: FileStorageOptions = {}) {
+    // Set default options
+    this.options = {
+      storagePath:
+        process.env.JSON_STORAGE_PATH ||
+        (process.env.NODE_ENV === 'production' ? path.join(os.tmpdir(), 'draft-editor-data') : './data'),
+      allowCustomIds: false,
+      parseContentOnUpdate: false,
+      handleNestedContent: false,
+      ...options,
+    }
+
+    this.storagePath = this.options.storagePath
 
     console.log('\n=== FileStorageAdapter Initialization ===')
     console.log('Environment:', process.env.NODE_ENV)
     console.log('Storage path:', this.storagePath)
+    console.log('Options:', JSON.stringify(this.options, null, 2))
 
     this.initialize()
   }
@@ -47,6 +62,11 @@ export class FileStorageAdapter implements StorageAdapter {
     return path.join(this.getDocumentsPath(collection), `${id}.json`)
   }
 
+  // Generate a MongoDB-compatible ID
+  private generateUUID() {
+    return new ObjectId().toString()
+  }
+
   async create(collection: string, data: Omit<Document, '_id'>): Promise<Document> {
     console.log('\n=== FileStorageAdapter.create ===')
     console.log('Collection:', collection)
@@ -60,9 +80,12 @@ export class FileStorageAdapter implements StorageAdapter {
     fs.ensureDirSync(documentsPath)
     console.log('Documents path:', documentsPath)
 
+    // Use client-supplied ID if allowed and available, otherwise generate a new ID
+    const docId = this.options.allowCustomIds && (data as any)._id ? (data as any)._id : this.generateUUID()
+
     const newDoc: Document = {
       ...data,
-      _id: new ObjectId().toString(),
+      _id: docId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
@@ -137,7 +160,26 @@ export class FileStorageAdapter implements StorageAdapter {
         throw new Error(`Document not found: ${id}`)
       }
 
-      const updatedDoc = { ...doc, ...data }
+      // Parse content if needed and it's provided as a string
+      let parsedData = { ...data }
+      if (this.options.parseContentOnUpdate && data.content) {
+        if (typeof data.content === 'string') {
+          try {
+            parsedData.content = JSON.parse(data.content)
+          } catch (e) {
+            console.error('Error parsing content:', e)
+            // Keep content as string if parsing fails
+          }
+        }
+      }
+
+      const updatedDoc = {
+        ...doc,
+        ...parsedData,
+        updatedAt: new Date().toISOString(),
+        lastUpdated: Date.now(),
+      }
+
       if (!updatedDoc._id) {
         throw new Error('Document ID is undefined')
       }
@@ -163,19 +205,51 @@ export class FileStorageAdapter implements StorageAdapter {
         return false
       }
 
-      await Promise.all(
-        documents.map(doc => {
-          if (!doc._id) {
-            throw new Error('Document ID is undefined')
-          }
-          return fs.unlink(this.getDocumentPath(collection, doc._id))
-        }),
-      )
+      // If we're deleting folders and handleNestedContent is enabled, we need to handle nested content
+      if (collection === 'folders' && this.options.handleNestedContent) {
+        for (const folder of documents) {
+          await this.handleFolderDeletion(folder)
+        }
+      } else {
+        // For non-folder collections or when handleNestedContent is disabled, just delete the files
+        await Promise.all(
+          documents.map(doc => {
+            if (!doc._id) {
+              throw new Error('Document ID is undefined')
+            }
+            return fs.unlink(this.getDocumentPath(collection, doc._id))
+          }),
+        )
+      }
 
       return true
     } catch (error) {
       console.error('Error deleting documents:', error)
       return false
     }
+  }
+
+  // Helper method to handle folder deletion with nested content
+  private async handleFolderDeletion(folder: Document): Promise<void> {
+    if (!folder._id) {
+      throw new Error('Folder ID is undefined')
+    }
+
+    // Delete all documents in this folder
+    const docs = await this.find('documents', { parentId: folder._id })
+    for (const doc of docs) {
+      if (doc._id) {
+        await fs.remove(this.getDocumentPath('documents', doc._id))
+      }
+    }
+
+    // Delete all nested folders recursively
+    const subfolders = await this.find('folders', { parentId: folder._id })
+    for (const subfolder of subfolders) {
+      await this.handleFolderDeletion(subfolder)
+    }
+
+    // Delete the folder file itself
+    await fs.remove(this.getDocumentPath('folders', folder._id))
   }
 }

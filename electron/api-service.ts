@@ -290,8 +290,23 @@ const collections: Record<string, CollectionConfig> = {
 }
 
 // Generic function to handle collection-level GET
-async function handleCollectionGet(config: CollectionConfig) {
-  return { data: await config.storage.find(config.collectionName, {}) }
+async function handleCollectionGet(config: CollectionConfig, queryParams: Record<string, string> = {}) {
+  const items = await config.storage.find(config.collectionName, {})
+
+  // Handle metadataOnly parameter for documents collection
+  if (config.name === 'documents' && queryParams.metadataOnly === 'true') {
+    console.log('Applying metadataOnly filter to documents')
+    return {
+      data: items.map((item: any) => {
+        // Create a shallow copy of the item without the content field
+        const metadata = { ...item }
+        delete metadata.content
+        return metadata
+      }),
+    }
+  }
+
+  return { data: items }
 }
 
 // Generic function to handle collection-level POST (create)
@@ -306,10 +321,23 @@ async function handleCollectionCreate(config: CollectionConfig, data: any) {
 }
 
 // Generic function to handle entity-level GET
-async function handleEntityGet(config: CollectionConfig, id: string) {
+async function handleEntityGet(
+  config: CollectionConfig,
+  id: string,
+  queryParams: Record<string, string> = {},
+) {
   console.log(`Finding ${getSingular(config.name)} by ID: ${id} in collection: ${config.collectionName}`)
   const item = await config.storage.findById(config.collectionName, id)
   console.log(`${capitalize(getSingular(config.name))} found:`, item ? 'yes' : 'no')
+
+  // Handle metadataOnly parameter for documents collection
+  if (config.name === 'documents' && queryParams.metadataOnly === 'true' && item) {
+    console.log('Applying metadataOnly filter to document')
+    const metadata = { ...item }
+    delete metadata.content
+    return { data: metadata }
+  }
+
   return { data: item }
 }
 
@@ -338,6 +366,25 @@ async function routeLocalOperation(
 ) {
   console.log('Routing local operation:', { method, endpoint })
 
+  // Parse query parameters
+  let baseEndpoint = endpoint
+  const queryParams: Record<string, string> = {}
+
+  if (endpoint.includes('?')) {
+    const [path, queryString] = endpoint.split('?')
+    baseEndpoint = path
+
+    // Parse each query parameter
+    queryString.split('&').forEach(pair => {
+      const [key, value] = pair.split('=')
+      if (key && value) {
+        queryParams[key] = decodeURIComponent(value)
+      }
+    })
+
+    console.log('Parsed query parameters:', queryParams)
+  }
+
   // Handle collection-level operations
   for (const config of Object.values(collections)) {
     // Check for special endpoints first
@@ -351,10 +398,10 @@ async function routeLocalOperation(
     }
 
     // Handle collection-level operations
-    if (endpoint === config.name) {
+    if (baseEndpoint === config.name) {
       // Collection-level operations
       if (method === 'get') {
-        return handleCollectionGet(config)
+        return handleCollectionGet(config, queryParams)
       }
       if (method === 'post') {
         return handleCollectionCreate(config, data)
@@ -363,7 +410,7 @@ async function routeLocalOperation(
     }
 
     // Handle entity-level operations
-    const entityMatch = endpoint.match(new RegExp(`^${config.name}/([^/]+)$`))
+    const entityMatch = baseEndpoint.match(new RegExp(`^${config.name}/([^/]+)$`))
     if (entityMatch) {
       const [, id] = entityMatch
       if (!id) {
@@ -373,7 +420,7 @@ async function routeLocalOperation(
 
       switch (method) {
         case 'get':
-          return handleEntityGet(config, id)
+          return handleEntityGet(config, id, queryParams)
         case 'patch':
           return handleEntityUpdate(config, id, data)
         case 'delete':
@@ -386,9 +433,9 @@ async function routeLocalOperation(
   }
 
   // Handle version operations
-  if (endpoint.startsWith('versions/')) {
+  if (baseEndpoint.startsWith('versions/')) {
     const config = collections.versions
-    const parts = endpoint.split('versions/')[1].split('/')
+    const parts = baseEndpoint.split('versions/')[1].split('/')
     console.log('Version parts:', parts)
     if (parts.length === 2) {
       const [, versionId] = parts

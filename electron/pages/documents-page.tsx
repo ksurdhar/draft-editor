@@ -13,7 +13,7 @@ const ElectronDocumentsPage = () => {
     data: documents,
     mutate: mutateDocuments,
     isLoading: docsLoading,
-  } = useSWR<DocumentData[]>('/documents', window.electronAPI.get, {
+  } = useSWR<DocumentData[]>('/documents?metadataOnly=true', window.electronAPI.get, {
     revalidateOnFocus: false,
     focusThrottleInterval: 30000,
     dedupingInterval: 10000,
@@ -56,6 +56,7 @@ const ElectronDocumentsPage = () => {
       removeListener()
     }
   }, [mutateDocuments, mutateFolders])
+  console.log('documents', documents)
 
   return (
     <SharedDocumentsPage
