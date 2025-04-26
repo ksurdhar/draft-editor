@@ -326,7 +326,7 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
                 : 'Type a message...'
             }
             className={`
-              max-h-[300px] min-h-[80px] w-full resize-none overflow-hidden 
+              max-h-[300px] min-h-[120px] w-full resize-none overflow-hidden 
               border-muted bg-transparent p-3 py-2
               ${isMentionActive ? 'border-primary ring-1 ring-primary/20' : ''}
             `}

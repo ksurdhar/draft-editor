@@ -376,9 +376,9 @@ export default function SharedDocumentPage() {
           <CloudIcon className="h-[20px] w-[20px] animate-bounce self-center fill-black/[.10] md:h-[24px] md:w-[24px] md:fill-black/[.15]" />
         </div>
       )}
-      <div className="flex h-[calc(100vh_-_40px)]">
+      <div className="flex h-[calc(100vh)]">
         {/* Left Sidebar Container */}
-        <div className="h-screen w-[320px] shrink-0 pt-[60px] lg:fixed lg:left-0 lg:top-0">
+        <div className="h-screen w-[320px] shrink-0 pt-[60px]">
           {/* Control Buttons */}
           <div className="relative z-50 px-4 pb-2">
             <div className="pointer-events-auto flex gap-2">
@@ -482,73 +482,8 @@ export default function SharedDocumentPage() {
           </div>
         </div>
 
-        {/* Versions Sidebar */}
-        <AnimatePresence initial={false}>
-          {showVersions && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.98, filter: 'blur(8px)' }}
-              animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, scale: 0.98, filter: 'blur(8px)' }}
-              transition={{
-                opacity: { duration: 0.5, ease: [0.23, 1, 0.32, 1] },
-                scale: { duration: 0.25, ease: [0.23, 1, 0.32, 1] },
-                filter: { duration: 0.4, ease: [0.23, 1, 0.32, 1] },
-              }}
-              style={{ willChange: 'filter' }}
-              className="fixed right-0 top-0 h-screen w-[320px] shrink-0 bg-white/[.02] pt-[60px] backdrop-blur-xl">
-              <div className="h-[calc(100vh_-_60px)] overflow-y-auto p-4">
-                <VersionList
-                  documentId={documentId}
-                  onRestore={handleRestoreVersion}
-                  onCompare={setDiffContent}
-                  currentContent={documentContent}
-                />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Dialogue Sidebar */}
-        <AnimatePresence initial={false}>
-          {showDialogue && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.98, filter: 'blur(8px)' }}
-              animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, scale: 0.98, filter: 'blur(8px)' }}
-              transition={{
-                opacity: { duration: 0.5, ease: [0.23, 1, 0.32, 1] },
-                scale: { duration: 0.25, ease: [0.23, 1, 0.32, 1] },
-                filter: { duration: 0.4, ease: [0.23, 1, 0.32, 1] },
-              }}
-              style={{ willChange: 'filter' }}
-              className="fixed right-0 top-0 h-screen w-[320px] shrink-0 bg-white/[.02] pt-[60px] backdrop-blur-xl">
-              <div className="h-[calc(100vh_-_60px)] overflow-y-auto p-4">
-                <DialogueList
-                  editor={editor}
-                  documentId={documentId}
-                  currentContent={dialogueDoc}
-                  onSyncDialogue={syncDialogue}
-                  isSyncing={isSyncingDialogue}
-                  onConfirmDialogue={handleConfirmDialogue}
-                  focusedConversationId={focusedConversationId}
-                  onToggleFocus={toggleConversationFocus}
-                  onUpdateConversationName={handleUpdateConversationName}
-                  onRemoveAllDialogueMarks={removeAllDialogueMarks}
-                />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* ---- Debug Panel ---- */}
-        <AnimatePresence>
-          {showDebugPanel && (
-            <DebugPanel content={documentContent} onClose={() => setShowDebugPanel(false)} />
-          )}
-        </AnimatePresence>
-
         {/* Editor Container */}
-        <div className="flex flex-1 justify-center lg:justify-center">
+        <div className="flex flex-1 justify-center">
           {!hybridDoc ? (
             <div className="flex h-[calc(100vh_-_44px)] items-center justify-center">
               {showInitialLoader && <Loader />}
@@ -556,7 +491,7 @@ export default function SharedDocumentPage() {
           ) : (
             <div
               id="editor-container"
-              className={`w-full overflow-y-scroll p-[20px] pb-10 font-editor2 text-black/[.79] lg:w-[740px]`}>
+              className={`w-full overflow-y-scroll pb-10 font-editor2 text-black/[.79] lg:w-[740px]`}>
               <div
                 className={`flex transition-flex duration-500 ease-in ${showSpinner ? 'mt-[-36px] flex-col justify-center' : ''} relative pb-10`}>
                 {showSpinner && <Loader />}
@@ -587,6 +522,74 @@ export default function SharedDocumentPage() {
             </div>
           )}
         </div>
+
+        {/* Right Sidebar Container - Always present */}
+        <div className="w-[320px] shrink-0 pt-[60px]">
+          {/* Versions Sidebar */}
+          <AnimatePresence initial={false}>
+            {showVersions && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.98, filter: 'blur(8px)' }}
+                animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+                exit={{ opacity: 0, scale: 0.98, filter: 'blur(8px)' }}
+                transition={{
+                  opacity: { duration: 0.5, ease: [0.23, 1, 0.32, 1] },
+                  scale: { duration: 0.25, ease: [0.23, 1, 0.32, 1] },
+                  filter: { duration: 0.4, ease: [0.23, 1, 0.32, 1] },
+                }}
+                style={{ willChange: 'filter' }}
+                className="h-screen w-full bg-white/[.02] backdrop-blur-xl">
+                <div className="h-[calc(100vh_-_60px)] overflow-y-auto p-4">
+                  <VersionList
+                    documentId={documentId}
+                    onRestore={handleRestoreVersion}
+                    onCompare={setDiffContent}
+                    currentContent={documentContent}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Dialogue Sidebar */}
+          <AnimatePresence initial={false}>
+            {showDialogue && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.98, filter: 'blur(8px)' }}
+                animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+                exit={{ opacity: 0, scale: 0.98, filter: 'blur(8px)' }}
+                transition={{
+                  opacity: { duration: 0.5, ease: [0.23, 1, 0.32, 1] },
+                  scale: { duration: 0.25, ease: [0.23, 1, 0.32, 1] },
+                  filter: { duration: 0.4, ease: [0.23, 1, 0.32, 1] },
+                }}
+                style={{ willChange: 'filter' }}
+                className="h-screen w-full bg-white/[.02] backdrop-blur-xl">
+                <div className="h-[calc(100vh_-_60px)] overflow-y-auto p-4">
+                  <DialogueList
+                    editor={editor}
+                    documentId={documentId}
+                    currentContent={dialogueDoc}
+                    onSyncDialogue={syncDialogue}
+                    isSyncing={isSyncingDialogue}
+                    onConfirmDialogue={handleConfirmDialogue}
+                    focusedConversationId={focusedConversationId}
+                    onToggleFocus={toggleConversationFocus}
+                    onUpdateConversationName={handleUpdateConversationName}
+                    onRemoveAllDialogueMarks={removeAllDialogueMarks}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* ---- Debug Panel ---- */}
+        <AnimatePresence>
+          {showDebugPanel && (
+            <DebugPanel content={documentContent} onClose={() => setShowDebugPanel(false)} />
+          )}
+        </AnimatePresence>
       </div>
     </Layout>
   )

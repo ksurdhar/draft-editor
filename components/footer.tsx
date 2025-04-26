@@ -112,9 +112,11 @@ const Footer = ({ editor, initFadeIn, fadeOut }: FooterProps) => {
 
   return (
     <div
-      className={`fixed ${initFadeIn ? 'footer-gradient' : 'bg-transparent'} ${fadeOut ? 'opacity-0' : 'opacity-100'}  bottom-0 left-0 z-10 h-[50px] w-[100vw] transition-opacity duration-700 hover:opacity-100`}>
+      className={`${initFadeIn ? 'footer-gradient' : 'bg-transparent'} ${
+        fadeOut ? 'opacity-0' : 'opacity-100'
+      } fixed bottom-0 left-0 right-0 z-10 mx-auto h-[50px] max-w-[740px] transition-opacity duration-700 hover:opacity-100`}>
       <div
-        className="fixed bottom-0 right-0 cursor-pointer pr-[20px] font-index text-sm md:text-base"
+        className="absolute bottom-0 right-0 cursor-pointer pr-[20px] font-index text-sm md:text-base"
         onClick={() => {
           if (activeFormat < 2) {
             setActiveFormat(activeFormat + 1)

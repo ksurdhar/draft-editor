@@ -6,6 +6,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@component
 import { ChatPanel } from '@components/ui/chat/chat-panel'
 import { MessageSquare } from 'lucide-react'
 import { Button } from '@components/ui/button'
+import React from 'react'
 
 // Direct detection method for Electron environment
 // const isBrowser = typeof window !== 'undefined'
@@ -273,8 +274,8 @@ const Layout = ({ children, documentId, onToggleGlobalSearch }: Props): ReactNod
         variant={isChatOpen ? 'secondary' : 'outline'}
         size="icon"
         className={`fixed bottom-4 right-4 z-50 rounded-full shadow-md transition-all duration-500 ${
-          mouseMoved || isChatOpen ? 'opacity-100' : 'opacity-0'
-        }`}>
+          mouseMoved ? 'opacity-100' : 'opacity-0'
+        } ${isChatOpen ? 'hidden' : ''}`}>
         <MessageSquare className={`h-5 w-5 ${isChatOpen ? 'text-primary' : ''}`} />
       </Button>
     </div>
