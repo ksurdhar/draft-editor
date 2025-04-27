@@ -1,4 +1,4 @@
-import { streamText } from 'ai'
+import { streamText, smoothStream } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createAnthropic } from '@ai-sdk/anthropic'
@@ -226,6 +226,10 @@ async function chatHandler(req: ExtendedApiRequest, res: NextApiResponse): Promi
       messages: processedMessages as any, // Type assertion to avoid complex typings
       temperature: 0.7,
       maxTokens: 1000,
+      experimental_transform: smoothStream({
+        delayInMs: 20,
+        chunking: 'word',
+      }),
       onError: ({ error }) => {
         console.error('Streaming error:', error)
       },
