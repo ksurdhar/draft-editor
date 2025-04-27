@@ -11,6 +11,11 @@ import { toast } from 'sonner'
 import { useEntities } from '@components/providers'
 import { EntityReference } from './chat-message'
 import { flattenTiptapContent, conversationEntriesToText } from '@lib/tiptap-utils'
+import { AI_MODELS } from '@lib/constants'
+
+// Session storage key for the selected model
+const SELECTED_MODEL_KEY = 'selected-chat-model'
+const DEFAULT_MODEL_ID = 'gpt-4o' // Default model if none saved
 
 type MessageRole = 'user' | 'assistant' | 'system'
 
@@ -50,7 +55,40 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
   const [error, setError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
-  const [selectedModel, setSelectedModel] = useState<string>('gpt-4o')
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL_ID)
+  const [hasModelInitialized, setHasModelInitialized] = useState(false)
+
+  // Load selected model from session storage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedModel = sessionStorage.getItem(SELECTED_MODEL_KEY)
+      if (savedModel) {
+        // Validate if the saved model ID is valid
+        const isValidModel = Object.values(AI_MODELS).some(providerModels =>
+          providerModels.some(model => model.id === savedModel),
+        )
+        if (isValidModel) {
+          setSelectedModel(savedModel)
+        } else {
+          // If saved model is invalid, use default and clear storage
+          console.warn(`Invalid saved model ID "${savedModel}". Using default.`)
+          setSelectedModel(DEFAULT_MODEL_ID)
+          sessionStorage.removeItem(SELECTED_MODEL_KEY)
+        }
+      } else {
+        // If no model saved, set the default (already done in useState initial)
+      }
+      setHasModelInitialized(true) // Mark as initialized
+    }
+  }, [])
+
+  // Save selected model to session storage when it changes
+  useEffect(() => {
+    // Only save after initial loading is complete
+    if (typeof window !== 'undefined' && hasModelInitialized) {
+      sessionStorage.setItem(SELECTED_MODEL_KEY, selectedModel)
+    }
+  }, [selectedModel, hasModelInitialized])
 
   // Set up IPC listener for streaming in Electron
   useEffect(() => {
@@ -298,7 +336,7 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
         documentId,
         documentContext,
         entityContents, // Add entity contents to the payload
-        model: selectedModel, // Use the selected model
+        model: selectedModel, // Use the state variable
         messageId: assistantMessageId, // Pass the message ID for streaming
       }
 
