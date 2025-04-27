@@ -63,7 +63,11 @@ function ElectronApp() {
   // Profile state is maintained for future use but not displayed in the current UI
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [profile, setProfile] = useState({} as Profile)
-  const [isDebugPanelOpen, setIsDebugPanelOpen] = useState(false)
+  const [isDebugPanelOpen, setIsDebugPanelOpen] = useState(() => {
+    // Initialize from localStorage if available
+    const savedState = localStorage.getItem('debug-panel-open')
+    return savedState === 'true'
+  })
 
   useEffect(() => {
     const getProfile = async () => {
@@ -79,7 +83,12 @@ function ElectronApp() {
       // Check for Cmd+Shift+D or Ctrl+Shift+D
       if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key === 'd') {
         event.preventDefault() // Prevent default browser behavior (like bookmarking)
-        setIsDebugPanelOpen(prev => !prev)
+        setIsDebugPanelOpen(prev => {
+          const newState = !prev
+          // Save state to localStorage
+          localStorage.setItem('debug-panel-open', String(newState))
+          return newState
+        })
       }
     }
 
@@ -89,6 +98,11 @@ function ElectronApp() {
       window.removeEventListener('keydown', handleKeyDown)
     }
   }, [])
+
+  // Handle panel open state change
+  const handleDebugPanelOpenChange = (isOpen: boolean) => {
+    setIsDebugPanelOpen(isOpen)
+  }
 
   const getLocation = useCallback(() => {
     return location
@@ -119,7 +133,13 @@ function ElectronApp() {
             {/* Network status indicator */}
             <NetworkStatus />
             {/* Conditionally render DebugPanel */}
-            {isDebugPanelOpen && <DebugPanel onClose={() => setIsDebugPanelOpen(false)} />}
+            {isDebugPanelOpen && (
+              <DebugPanel
+                onClose={() => setIsDebugPanelOpen(false)}
+                isOpen={isDebugPanelOpen}
+                onOpenChange={handleDebugPanelOpenChange}
+              />
+            )}
           </Providers>
         </APIProvider>
       </NavigationProvider>
