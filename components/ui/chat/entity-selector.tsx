@@ -123,8 +123,6 @@ export function EntitySelector({
 
   // Position the selector
   const selectorStyle = {
-    minWidth: '250px',
-    maxWidth: '400px',
     maxHeight: '300px',
     zIndex: 50,
   }

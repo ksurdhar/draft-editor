@@ -1,6 +1,6 @@
 'use client'
 
-import { Send } from 'lucide-react'
+import { Send, ChevronDown } from 'lucide-react'
 import { Button } from '@components/ui/button'
 import { Textarea } from '@components/ui/textarea'
 import { KeyboardEvent, useEffect, useRef, useState } from 'react'
@@ -9,6 +9,9 @@ import { useEntities, EntityType, AnyEntity } from '@components/providers'
 import './chat-input.css'
 import { EntitySelector } from './entity-selector'
 import { FileText, MessageSquare, Camera, Folder } from 'lucide-react'
+import { Popover, PopoverContent, PopoverTrigger } from '@components/ui/popover'
+import { AI_MODELS } from '@lib/constants'
+import { cn } from '@components/lib/utils'
 
 // Entity icons
 const ENTITY_ICONS = {
@@ -30,15 +33,18 @@ type EntitySelectorState = {
 interface ChatInputProps {
   onSendMessage: (message: string, entityRefs?: EntityReference[]) => void
   disabled?: boolean
+  selectedModel: string
+  onModelChange: (model: string) => void
 }
 
-export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
+export function ChatInput({ onSendMessage, disabled, selectedModel, onModelChange }: ChatInputProps) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { entities, filterEntities } = useEntities()
   const [message, setMessage] = useState('')
   const textAreaRef = useRef<HTMLTextAreaElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [entityReferences, setEntityReferences] = useState<EntityReference[]>([])
+  const [modelPopoverOpen, setModelPopoverOpen] = useState(false)
 
   // Entity selector state
   const [entitySelector, setEntitySelector] = useState<EntitySelectorState>({
@@ -153,8 +159,10 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
   const handleAutoResize = () => {
     const textarea = textAreaRef.current
     if (textarea) {
+      // Reset height to auto so it can shrink if needed
       textarea.style.height = 'auto'
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 300)}px`
+      // Set height based on scrollHeight without a fixed limit
+      textarea.style.height = `${textarea.scrollHeight}px`
     }
   }
 
@@ -162,6 +170,8 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
   const handleChange = (value: string) => {
     const prevMessage = message
     setMessage(value)
+
+    // Auto-resize on each input change
     handleAutoResize()
 
     const textarea = textAreaRef.current
@@ -286,6 +296,24 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
   // Get the type of mention being entered
   const mentionType = entitySelector.selectedType
 
+  // Set up event listeners for textarea
+  useEffect(() => {
+    const textarea = textAreaRef.current
+    if (textarea) {
+      textarea.addEventListener('select', handleSelectionChange)
+      textarea.addEventListener('click', handleSelectionChange)
+      textarea.addEventListener('keyup', handleSelectionChange)
+      textarea.addEventListener('input', handleAutoResize)
+
+      return () => {
+        textarea.removeEventListener('select', handleSelectionChange)
+        textarea.removeEventListener('click', handleSelectionChange)
+        textarea.removeEventListener('keyup', handleSelectionChange)
+        textarea.removeEventListener('input', handleAutoResize)
+      }
+    }
+  }, [])
+
   return (
     <div className="border-t p-4" ref={containerRef}>
       {/* Entity references displayed above the input */}
@@ -310,22 +338,26 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
         </div>
       )}
 
-      <div className={`relative flex items-center space-x-2 ${isMentionActive ? 'mention-active' : ''}`}>
-        <div className="relative flex-1">
-          {/* Entity selector positioned just above the input area, within the input container */}
-          {entitySelector.isActive && (
-            <div className="absolute bottom-full left-0 mb-1 w-full">
-              <EntitySelector
-                isActive={entitySelector.isActive}
-                selectedType={entitySelector.selectedType}
-                searchTerm={entitySelector.searchTerm}
-                onSelect={handleSelectEntity}
-                onSelectType={handleSelectType}
-                onClose={handleCloseSelector}
-              />
-            </div>
-          )}
+      <div
+        className={`relative overflow-visible rounded-xl border border-gray-200 dark:border-gray-700
+          ${isMentionActive ? 'shadow-[0_0_0_1px] shadow-primary/20' : ''}
+          group focus-within:ring-2 focus-within:ring-black focus-within:ring-offset-0 dark:focus-within:ring-white
+        `}>
+        {/* Entity selector positioned just above the input area */}
+        {entitySelector.isActive && (
+          <div className="absolute bottom-full left-0 z-50 mb-1 w-full">
+            <EntitySelector
+              isActive={entitySelector.isActive}
+              selectedType={entitySelector.selectedType}
+              searchTerm={entitySelector.searchTerm}
+              onSelect={handleSelectEntity}
+              onSelectType={handleSelectType}
+              onClose={handleCloseSelector}
+            />
+          </div>
+        )}
 
+        <div className="flex flex-col">
           <Textarea
             ref={textAreaRef}
             value={message}
@@ -336,24 +368,63 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
                 ? `Mention a ${mentionType || 'document/conversation/scene'}...`
                 : 'Type a message...'
             }
-            className={`
-              max-h-[300px] min-h-[120px] w-full resize-none overflow-hidden 
-              border-muted bg-transparent p-3 py-2
-              ${isMentionActive ? 'border-primary ring-1 ring-primary/20' : ''}
-            `}
+            className="max-h-[500px] min-h-[100px] flex-1 resize-none overflow-y-auto border-0 !border-b-0 border-none bg-transparent p-3 py-2 !shadow-none shadow-none outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+            style={{ boxShadow: 'none' }}
             disabled={disabled}
             rows={3}
             onFocus={handleAutoResize}
           />
+
+          <div className="flex items-center justify-between px-3 py-2">
+            <Popover open={modelPopoverOpen} onOpenChange={setModelPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="flex h-6 items-center gap-1 p-0 text-sm text-muted-foreground hover:bg-transparent">
+                  <span className="text-muted-foreground/70">
+                    {selectedModel.includes('gpt-4') ? '4o' : selectedModel.replace('gpt-', '')}
+                  </span>
+                  <ChevronDown className="h-3 w-3 text-muted-foreground/70" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[240px] p-1" align="start" side="top" sideOffset={5}>
+                <div className="grid gap-1">
+                  {Object.entries(AI_MODELS).map(([provider, models]) => (
+                    <div key={provider} className="p-1">
+                      <div className="mb-1 text-xs font-medium text-muted-foreground">
+                        {provider.charAt(0).toUpperCase() + provider.slice(1)}
+                      </div>
+                      {models.map(model => (
+                        <Button
+                          key={model.id}
+                          variant="ghost"
+                          className={cn(
+                            'w-full justify-start text-left font-normal',
+                            selectedModel === model.id && 'bg-accent text-accent-foreground',
+                          )}
+                          onClick={() => {
+                            onModelChange(model.id)
+                            setModelPopoverOpen(false)
+                          }}>
+                          {model.name}
+                        </Button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <Button
+              type="submit"
+              size="sm"
+              disabled={!message.trim() || disabled}
+              onClick={handleSendMessage}
+              className="h-8 w-8 rounded-lg bg-primary p-0 text-primary-foreground hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/90">
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-        <Button
-          type="submit"
-          size="icon"
-          disabled={!message.trim() || disabled}
-          onClick={handleSendMessage}
-          className="shrink-0">
-          <Send className="h-4 w-4" />
-        </Button>
       </div>
     </div>
   )
