@@ -1,12 +1,23 @@
 import { streamText } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
+import { createGoogleGenerativeAI } from '@ai-sdk/google'
+import { createAnthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 import withHybridAuth, { ExtendedApiRequest } from '../../../lib/with-hybrid-auth'
 import type { NextApiResponse } from 'next'
+import { getProviderFromModel } from '@lib/constants'
 
-// Create OpenAI client with API key from environment
+// Create AI clients with API keys from environment
 const openai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+})
+
+const googleAI = createGoogleGenerativeAI({
+  apiKey: process.env.GOOGLE_API_KEY,
+})
+
+const anthropicAI = createAnthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
 // Define message schema for validation
@@ -26,7 +37,7 @@ const MessageSchema = z.object({
     .optional(),
 })
 
-// Define request schema
+// Define request schema with all supported models
 const ChatRequestSchema = z.object({
   messages: z.array(MessageSchema),
   documentContext: z.string().optional(),
@@ -67,11 +78,13 @@ async function chatHandler(req: ExtendedApiRequest, res: NextApiResponse): Promi
     }
 
     const { messages, documentContext, documentId, entityContents, model } = parsedRequest.data
+    const provider = getProviderFromModel(model)
 
     // Log the user making the request
     console.log('\n=== Chat Completion Request ===')
     console.log('User ID:', user.sub)
     console.log('Model:', model)
+    console.log('Provider:', provider)
     console.log('Document ID:', documentId || 'None')
     console.log('Messages count:', messages.length)
     console.log('Entity contents:', entityContents ? Object.keys(entityContents).length : 0)
@@ -95,9 +108,6 @@ async function chatHandler(req: ExtendedApiRequest, res: NextApiResponse): Promi
           console.log(`  Has content: ${!!entity.content}`)
           if (entity.content) {
             console.log(`  Content type: ${typeof entity.content}`)
-            if (entity.type === 'document') {
-              console.log(`  Document content keys: ${Object.keys(entity.content || {}).join(', ')}`)
-            }
           }
         }
       })
@@ -195,9 +205,24 @@ async function chatHandler(req: ExtendedApiRequest, res: NextApiResponse): Promi
       }
     }
 
-    // Use streamText with the OpenAI model
+    // Select the appropriate AI provider based on the model
+    let aiModel
+    switch (provider) {
+      case 'google':
+        aiModel = googleAI(model)
+        break
+      case 'anthropic':
+        aiModel = anthropicAI(model)
+        break
+      case 'openai':
+      default:
+        aiModel = openai(model)
+        break
+    }
+
+    // Use streamText with the selected AI model
     const result = await streamText({
-      model: openai(model),
+      model: aiModel,
       messages: processedMessages as any, // Type assertion to avoid complex typings
       temperature: 0.7,
       maxTokens: 1000,

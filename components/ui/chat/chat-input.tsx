@@ -8,6 +8,15 @@ import { EntityReference } from './chat-message'
 import { useEntities, EntityType, AnyEntity } from '@components/providers'
 import './chat-input.css'
 import { EntitySelector } from './entity-selector'
+import { FileText, MessageSquare, Camera, Folder } from 'lucide-react'
+
+// Entity icons
+const ENTITY_ICONS = {
+  document: <FileText className="h-3 w-3" />,
+  conversation: <MessageSquare className="h-3 w-3" />,
+  scene: <Camera className="h-3 w-3" />,
+  folder: <Folder className="h-3 w-3" />,
+}
 
 // Entity selector type to track the current selection state
 type EntitySelectorState = {
@@ -285,13 +294,15 @@ export function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
           {entityReferences.map((ref, i) => (
             <span
               key={i}
-              className="inline-flex items-center rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary">
-              @{ref.type}:{ref.displayName}
+              className="inline-flex items-center rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary"
+              title={`${ref.type}: ${ref.displayName}`}>
+              {ENTITY_ICONS[ref.type as keyof typeof ENTITY_ICONS]}
+              <span className="ml-1 mr-1">{ref.displayName}</span>
               <button
                 onClick={() => {
                   setEntityReferences(prev => prev.filter((_, index) => index !== i))
                 }}
-                className="ml-1 rounded-full hover:bg-primary/30">
+                className="rounded-full hover:bg-primary/30">
                 ×
               </button>
             </span>

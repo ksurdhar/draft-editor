@@ -11,6 +11,8 @@ import { toast } from 'sonner'
 import { useEntities } from '@components/providers'
 import { EntityReference } from './chat-message'
 import { flattenTiptapContent, conversationEntriesToText } from '@lib/tiptap-utils'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@components/ui/select'
+import { AI_MODELS } from '@lib/constants'
 
 type MessageRole = 'user' | 'assistant' | 'system'
 
@@ -50,6 +52,7 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
   const [error, setError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const [selectedModel, setSelectedModel] = useState<string>('gpt-4o')
 
   // Set up IPC listener for streaming in Electron
   useEffect(() => {
@@ -297,7 +300,7 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
         documentId,
         documentContext,
         entityContents, // Add entity contents to the payload
-        model: 'gpt-4o', // Default model, could be made configurable
+        model: selectedModel, // Use the selected model
         messageId: assistantMessageId, // Pass the message ID for streaming
       }
 
@@ -422,6 +425,23 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
       </div>
 
       <ChatInput onSendMessage={handleSendMessage} disabled={isResponding} />
+
+      <div className="flex justify-center border-t p-2">
+        <Select value={selectedModel} onValueChange={setSelectedModel}>
+          <SelectTrigger className="h-auto border-none bg-transparent px-3 py-1 text-sm shadow-none transition-colors hover:bg-muted/50 focus:ring-0">
+            <SelectValue placeholder="Select a model" />
+          </SelectTrigger>
+          <SelectContent position="popper" className="mb-1" sideOffset={-5}>
+            {Object.entries(AI_MODELS).map(([provider, models]) =>
+              models.map(model => (
+                <SelectItem key={model.id} value={model.id}>
+                  {model.name} ({provider.charAt(0).toUpperCase() + provider.slice(1)})
+                </SelectItem>
+              )),
+            )}
+          </SelectContent>
+        </Select>
+      </div>
     </motion.div>
   )
 }
