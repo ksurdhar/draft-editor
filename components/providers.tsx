@@ -369,9 +369,11 @@ export function EntityProvider({ children }: { children: ReactNode }) {
 
     const removeListener = window.electronAPI.onSyncUpdate((updates: any) => {
       if (updates.documents && updates.documents.length > 0) {
+        // console.log('sync:updates documents', updates.documents)
         mutateDocuments()
       }
       if (updates.folders && updates.folders.length > 0) {
+        // console.log('sync:updates folders', updates.folders)
         mutateFolders()
       }
     })

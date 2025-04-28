@@ -74,6 +74,14 @@ let syncInProgress: Record<string, boolean> = {
   dialogue: false,
 }
 
+// Track results of sync operations
+let syncResults: Record<string, { timestamp: number; updatedCount: number }> = {
+  last_sync_documents: { timestamp: 0, updatedCount: 0 },
+  last_sync_folders: { timestamp: 0, updatedCount: 0 },
+  last_sync_characters: { timestamp: 0, updatedCount: 0 },
+  last_sync_dialogue: { timestamp: 0, updatedCount: 0 },
+}
+
 // Define collection configuration interface
 interface CollectionConfig {
   name: string // API endpoint name (e.g., 'documents')
@@ -460,143 +468,6 @@ async function routeLocalOperation(
   return { data: null }
 }
 
-// Generic function to sync cloud data to local for any collection
-async function syncCollectionToLocal(config: CollectionConfig, cloudData: CollectionItem[]) {
-  // Skip if a sync is already in progress for this collection
-  if (syncInProgress[config.name]) {
-    console.log(`Skipping ${config.name} sync - another sync already in progress`)
-    return
-  }
-
-  try {
-    // Set sync flag
-    syncInProgress[config.name] = true
-
-    console.log(`Syncing cloud ${config.name} to local storage`)
-    console.log(`Cloud ${config.name} count: ${cloudData.length}`)
-
-    // Get local items
-    const localItems = await config.storage.find(config.collectionName, {})
-    console.log(`Local ${config.name} count before sync: ${localItems.length}`)
-
-    // Create maps for efficient lookups
-    const localItemsById = new Map(localItems.map((item: CollectionItem) => [normalizeId(item._id), item]))
-    const cloudItemsById = new Map(cloudData.map((item: CollectionItem) => [normalizeId(item._id), item]))
-
-    // Keep track of items we process
-    let updatedCount = 0
-    let createdCount = 0
-    let skippedCount = 0
-    let cloudCreatedCount = 0
-    const newItems: any[] = []
-
-    // First sync cloud items to local
-    for (const cloudItem of cloudData) {
-      if (!cloudItem._id) {
-        console.warn(`Skipping cloud ${getSingular(config.name)} without ID:`, cloudItem)
-        continue
-      }
-
-      const normalizedId = normalizeId(cloudItem._id)
-      const localItem = localItemsById.get(normalizedId)
-
-      if (localItem) {
-        // Item exists locally - check if cloud version is newer
-        if (
-          cloudItem.updatedAt &&
-          (localItem as CollectionItem).updatedAt &&
-          new Date(cloudItem.updatedAt).getTime() >
-            new Date((localItem as CollectionItem).updatedAt as string).getTime()
-        ) {
-          console.log(`Updating ${getSingular(config.name)} ${cloudItem._id} with newer cloud version`)
-          await config.storage.update(config.collectionName, cloudItem._id, cloudItem)
-          newItems.push(cloudItem)
-          updatedCount++
-        } else {
-          // console.log(
-          //   `Skipping ${getSingular(config.name)} ${cloudItem._id}, local version is current or newer`,
-          // )
-          skippedCount++
-        }
-      } else {
-        // Item doesn't exist locally - create it with the SAME ID
-        console.log(`Creating new local ${getSingular(config.name)} from cloud with ID: ${cloudItem._id}`)
-        try {
-          const newItem = await config.storage.create(config.collectionName, {
-            ...cloudItem,
-            _id: cloudItem._id,
-          })
-          newItems.push(newItem)
-          createdCount++
-        } catch (error) {
-          console.error(`Error creating ${getSingular(config.name)} ${cloudItem._id}:`, error)
-        }
-      }
-    }
-
-    // Then sync local items to cloud
-    for (const localItem of localItems) {
-      if (!localItem._id) {
-        console.warn(`Skipping local ${getSingular(config.name)} without ID:`, localItem)
-        continue
-      }
-
-      const normalizedId = normalizeId(localItem._id)
-      const cloudItem = cloudItemsById.get(normalizedId)
-
-      if (!cloudItem) {
-        // Item exists locally but not in cloud - create it in cloud
-        console.log(`Creating ${getSingular(config.name)} in cloud with local ID: ${localItem._id}`)
-        try {
-          await performCloudOperation('post', `/${config.name}`, {
-            ...localItem,
-            _id: localItem._id,
-          })
-          cloudCreatedCount++
-        } catch (error) {
-          console.error(`Error creating ${getSingular(config.name)} ${localItem._id} in cloud:`, error)
-        }
-      } else {
-        // Item exists in both local and cloud - check if local version is newer
-        if (
-          (localItem as CollectionItem).updatedAt &&
-          cloudItem.updatedAt &&
-          new Date((localItem as CollectionItem).updatedAt as string).getTime() >
-            new Date(cloudItem.updatedAt).getTime()
-        ) {
-          // Local item is newer, update cloud version
-          // console.log(`Updating cloud ${getSingular(config.name)} ${localItem._id} with newer local version`)
-          try {
-            await performCloudOperation('patch', `/${config.name}/${localItem._id}`, localItem)
-            cloudCreatedCount++ // Reuse this counter for updates too
-          } catch (error) {
-            console.error(
-              `Error updating ${getSingular(config.name)} ${localItem._id} in cloud:`,
-              (error as any)?.data,
-            )
-          }
-        }
-      }
-    }
-
-    console.log(
-      `${capitalize(config.name)} sync complete. Updated locally: ${updatedCount}, Created locally: ${createdCount}, Created/Updated in cloud: ${cloudCreatedCount}, Skipped: ${skippedCount}`,
-    )
-
-    // If we have new or updated items, notify all windows
-    if (newItems.length > 0) {
-      BrowserWindow.getAllWindows().forEach(window => {
-        if (!window.isDestroyed()) {
-          window.webContents.send('sync:updates', { [config.name]: newItems })
-        }
-      })
-    }
-  } finally {
-    // Always release the sync flag when done
-    syncInProgress[config.name] = false
-  }
-}
-
 // Function to create standard CRUD methods for a collection
 function createCollectionMethods(config: CollectionConfig) {
   const singularName = getSingular(config.name)
@@ -806,6 +677,230 @@ async function performCloudOperation(
   }
 }
 
+// Generic function to sync cloud data to local for any collection
+async function syncCollectionToLocal(config: CollectionConfig, cloudData: CollectionItem[]) {
+  // Skip if a sync is already in progress for this collection
+  if (syncInProgress[config.name]) {
+    console.log(`Skipping ${config.name} sync - another sync already in progress`)
+    return
+  }
+
+  try {
+    // Set sync flag
+    syncInProgress[config.name] = true
+
+    console.log(`Syncing cloud ${config.name} to local storage`)
+    console.log(`Cloud ${config.name} count: ${cloudData.length}`)
+
+    // Get local items
+    const localItems = await config.storage.find(config.collectionName, {})
+    console.log(`Local ${config.name} count before sync: ${localItems.length}`)
+
+    // Create maps for efficient lookups
+    const localItemsById = new Map(localItems.map((item: CollectionItem) => [normalizeId(item._id), item]))
+    const cloudItemsById = new Map(cloudData.map((item: CollectionItem) => [normalizeId(item._id), item]))
+
+    // Keep track of items we process
+    let updatedCount = 0
+    let createdCount = 0
+    let skippedCount = 0
+    let cloudCreatedCount = 0
+    const newItems: any[] = []
+
+    // For debugging, temporarily limit to 2 folders if this is a folder sync
+    let itemsToProcess = cloudData
+    // if (config.name === 'folders') {
+    //   console.log('DEBUG: Limiting folder sync to first 5 items for debugging')
+    //   itemsToProcess = cloudData.slice(0, 5)
+    // }
+
+    // First sync cloud items to local
+    for (const cloudItem of itemsToProcess) {
+      if (!cloudItem._id) {
+        console.warn(`Skipping cloud ${getSingular(config.name)} without ID:`, cloudItem)
+        continue
+      }
+
+      const normalizedId = normalizeId(cloudItem._id)
+      const localItem = localItemsById.get(normalizedId)
+
+      if (localItem) {
+        // Item exists locally - check if cloud version is newer
+        // Use cloudItem.updatedAt and localItem.lastUpdated
+        const cloudTimestamp = cloudItem.updatedAt ? new Date(cloudItem.updatedAt).getTime() : 0
+        const localTimestamp = (localItem as any).lastUpdated // Use lastUpdated for local
+          ? new Date((localItem as any).lastUpdated).getTime()
+          : 0
+
+        // DEBUG: Log detailed timestamp comparison for all items
+        console.log(`DEBUG: ${getSingular(config.name)} ${cloudItem._id} timestamp comparison:`, {
+          cloudUpdatedAt: cloudItem.updatedAt,
+          cloudTimestamp,
+          localLastUpdated: (localItem as any).lastUpdated,
+          localTimestamp,
+          diff: cloudTimestamp - localTimestamp,
+          isNewer: cloudTimestamp > localTimestamp,
+        })
+
+        if (cloudTimestamp > localTimestamp) {
+          console.log(`Updating ${getSingular(config.name)} ${cloudItem._id} with newer cloud version`)
+          // FIX: Ensure lastUpdated is preserved and synchronized with the cloud's updatedAt
+          const updatedItem = {
+            ...cloudItem,
+            lastUpdated: cloudItem.updatedAt ? new Date(cloudItem.updatedAt).getTime() : Date.now(),
+          }
+          await config.storage.update(config.collectionName, cloudItem._id, updatedItem)
+
+          // DEBUG: Verify the lastUpdated was properly set after the update
+          const verifyItem = await config.storage.findById(config.collectionName, cloudItem._id)
+          console.log(`DEBUG: After update, ${getSingular(config.name)} ${cloudItem._id} has:`, {
+            lastUpdated: verifyItem.lastUpdated,
+            hasLastUpdated: !!verifyItem.lastUpdated,
+            updatedAt: verifyItem.updatedAt,
+            hasUpdatedAt: !!verifyItem.updatedAt,
+          })
+
+          // FIX: Also keep the newItems array consistent with what we stored
+          newItems.push(updatedItem)
+          updatedCount++
+        } else {
+          // console.log(
+          //   `Skipping ${getSingular(config.name)} ${cloudItem._id}, local version is current or newer`,
+          // )
+          skippedCount++
+        }
+      } else {
+        // Item doesn't exist locally - create it with the SAME ID
+        console.log(`Creating new local ${getSingular(config.name)} from cloud with ID: ${cloudItem._id}`)
+        try {
+          // FIX: Ensure lastUpdated is properly set when creating new items
+          const newItemData = {
+            ...cloudItem,
+            _id: cloudItem._id,
+            lastUpdated: cloudItem.updatedAt ? new Date(cloudItem.updatedAt).getTime() : Date.now(),
+          }
+          const newItem = await config.storage.create(config.collectionName, newItemData)
+          newItems.push(newItem) // Notify with the newly created local item structure
+          createdCount++
+        } catch (error) {
+          console.error(`Error creating ${getSingular(config.name)} ${cloudItem._id}:`, error)
+        }
+      }
+    }
+
+    // Then sync local items to cloud
+    for (const localItem of localItems) {
+      if (!localItem._id) {
+        console.warn(`Skipping local ${getSingular(config.name)} without ID:`, localItem)
+        continue
+      }
+
+      const normalizedId = normalizeId(localItem._id)
+      const cloudItem = cloudItemsById.get(normalizedId)
+
+      if (!cloudItem) {
+        // Item exists locally but not in cloud - create it in cloud
+        console.log(`Creating ${getSingular(config.name)} in cloud with local ID: ${localItem._id}`)
+        try {
+          // Send local data (which includes lastUpdated) to cloud
+          await performCloudOperation('post', `/${config.name}`, {
+            ...localItem,
+            _id: localItem._id, // Ensure cloud uses the same ID
+          })
+          cloudCreatedCount++
+        } catch (error) {
+          console.error(`Error creating ${getSingular(config.name)} ${localItem._id} in cloud:`, error)
+        }
+      } else {
+        // Item exists in both local and cloud - check if local version is newer
+        // Use localItem.lastUpdated and cloudItem.updatedAt
+        const localTimestamp = (localItem as any).lastUpdated // Use lastUpdated for local
+          ? new Date((localItem as any).lastUpdated).getTime()
+          : 0
+        const cloudTimestamp = cloudItem.updatedAt ? new Date(cloudItem.updatedAt).getTime() : 0
+
+        // DEBUG: Log local-to-cloud timestamp comparison
+        console.log(`DEBUG: Local-to-cloud compare ${getSingular(config.name)} ${localItem._id}:`, {
+          localLastUpdated: (localItem as any).lastUpdated,
+          localTimestamp,
+          cloudUpdatedAt: cloudItem.updatedAt,
+          cloudTimestamp,
+          diff: localTimestamp - cloudTimestamp,
+          isNewer: localTimestamp > cloudTimestamp,
+        })
+
+        // IMPORTANT: To break the endless loop, we need to make these comparison stricter
+        // Only update cloud if local is actually substantially newer (> 1 second difference)
+        const SUBSTANTIAL_TIME_DIFFERENCE = 1000 // 1 second in milliseconds
+        if (localTimestamp > cloudTimestamp + SUBSTANTIAL_TIME_DIFFERENCE) {
+          // Local item is newer, update cloud version
+          console.log(`Updating cloud ${getSingular(config.name)} ${localItem._id} with newer local version`)
+          try {
+            // DEBUG: Log details before update
+            console.log(`DEBUG: Sending to cloud for ${localItem._id}:`, {
+              hasLocalLastUpdated: !!(localItem as any).lastUpdated,
+              localLastUpdated: (localItem as any).lastUpdated,
+              localTimestamp,
+              cloudUpdatedAt: cloudItem.updatedAt,
+              localUpdatedAt: (localItem as any).updatedAt,
+            })
+
+            // Send local data (which includes lastUpdated) to cloud
+            // When updating cloud, make sure we're sending a modified version that includes updatedAt
+            // to ensure cloud timestamp is aligned with local
+            await performCloudOperation('patch', `/${config.name}/${localItem._id}`, {
+              ...localItem,
+              updatedAt: localItem.lastUpdated, // Ensure cloud updatedAt matches local lastUpdated
+            })
+            cloudCreatedCount++ // Reuse this counter for updates too
+          } catch (error) {
+            console.error(
+              `Error updating ${getSingular(config.name)} ${localItem._id} in cloud:`,
+              (error as any)?.response?.data || error, // Log response data if available
+            )
+          }
+        } else if (localTimestamp > cloudTimestamp) {
+          // Local is newer but only by a small amount - log but don't update
+          console.log(
+            `Skipping cloud update for ${getSingular(config.name)} ${localItem._id} - difference too small (${localTimestamp - cloudTimestamp}ms)`,
+          )
+        }
+      }
+    }
+
+    // Record sync results for throttling future operations
+    const lastSyncKey = `last_sync_${config.name}` as keyof typeof syncResults
+    syncResults[lastSyncKey] = {
+      timestamp: Date.now(),
+      updatedCount: updatedCount + createdCount,
+    }
+    console.log(`DEBUG: Recorded sync results for ${config.name}:`, syncResults[lastSyncKey])
+
+    console.log(
+      `${capitalize(config.name)} sync complete. Updated locally: ${updatedCount}, Created locally: ${createdCount}, Created/Updated in cloud: ${cloudCreatedCount}, Skipped: ${skippedCount}`,
+    )
+
+    // If we have new or updated items, notify all windows
+    if (newItems.length > 0) {
+      console.log(`DEBUG: Sending sync:updates for ${config.name} with ${newItems.length} items`)
+      BrowserWindow.getAllWindows().forEach(window => {
+        if (!window.isDestroyed()) {
+          console.log('sync:updates called')
+          // Send the *new local state* or *cloud state that triggered update*
+          // Using newItems which currently holds cloud data for updates, local data for creates.
+          // Consider fetching the updated local item after storage.update for consistency if needed.
+          window.webContents.send('sync:updates', { [config.name]: newItems })
+        }
+      })
+    } else {
+      console.log(`DEBUG: No sync:updates sent for ${config.name} - no new items detected`)
+    }
+  } finally {
+    // Always release the sync flag when done
+    syncInProgress[config.name] = false
+  }
+}
+
 // In the syncCloudDataToLocal function - simplify to use same IDs
 async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
   // Only sync collection-level data for now
@@ -851,6 +946,30 @@ async function performCloudOperationAsync(
         cleanEndpoint === 'dialogue'
       ) {
         console.log('Background sync: carefully updating local storage with cloud data')
+
+        // Add a condition to only sync if there's a reasonable expectation of changes
+        // Check if we've recently synced this collection and no changes were detected
+        if (syncInProgress[cleanEndpoint]) {
+          console.log(`Background sync: Skipping ${cleanEndpoint} sync - already in progress`)
+          return
+        }
+
+        // Check if we had a very recent sync with no changes
+        const lastSyncKey = `last_sync_${cleanEndpoint}`
+        const lastSyncTime = syncResults[lastSyncKey]?.timestamp || 0
+        const lastSyncUpdates = syncResults[lastSyncKey]?.updatedCount || 0
+        const now = Date.now()
+
+        // If we had a sync with no updates in the last 10 seconds, skip this sync
+        const MIN_SYNC_INTERVAL = 10000 // 10 seconds
+        if (lastSyncTime > 0 && now - lastSyncTime < MIN_SYNC_INTERVAL && lastSyncUpdates === 0) {
+          console.log(
+            `Background sync: Skipping ${cleanEndpoint} sync - recent sync with no changes (${now - lastSyncTime}ms ago)`,
+          )
+          return
+        }
+
+        // Proceed with sync
         await syncCloudDataToLocal(cleanEndpoint, cloudResult.data)
       }
       // For individual item requests, we might just want to update if it exists
