@@ -2,6 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'Ibarra Real Nova';
+  src: url('../styles/fonts/Ibarra_Real_Nova/IbarraRealNova-VariableFont_wght.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Mukta';
+  src: url('./fonts/Mukta/Mukta-Light.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('./fonts/Geist/Geist-VariableFont_wght.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+:root {
+  --font-ibarra: 'Ibarra Real Nova', serif;
+  --font-mukta: 'Mukta', sans-serif;
+  --font-geist: 'Geist', sans-serif;
+}
+
 /* Add styles for the transparent title bar */
 body {
   background-color: #fffce8; /* Match the backgroundColor in BrowserWindow */
