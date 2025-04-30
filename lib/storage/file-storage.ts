@@ -104,12 +104,12 @@ export class FileStorageAdapter implements StorageAdapter {
   }
 
   async findById(collection: string, id: string): Promise<Document | null> {
-    console.log('\n=== FileStorageAdapter.findById ===')
-    console.log('Collection:', collection)
-    console.log('Document ID:', id)
+    // console.log('\n=== FileStorageAdapter.findById ===')
+    // console.log('Collection:', collection)
+    // console.log('Document ID:', id)
 
     const filePath = this.getDocumentPath(collection, id)
-    console.log('Looking for file:', filePath)
+    // console.log('Looking for file:', filePath)
 
     if (!fs.existsSync(filePath)) {
       console.log('File not found')

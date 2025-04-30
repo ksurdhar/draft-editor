@@ -4,6 +4,7 @@ import type { NextApiResponse } from 'next'
 import { storage } from '@lib/storage'
 import { DEFAULT_DOCUMENT_CONTENT, DEFAULT_DOCUMENT_TITLE } from '@lib/constants'
 import { createPermission } from '@lib/mongo-utils'
+import { computeEntityHash } from '../../../utils/computeEntityHash'
 
 const handlers = {
   async POST(req: ExtendedApiRequest, res: NextApiResponse) {
@@ -41,6 +42,14 @@ const handlers = {
     if (req.body._id) {
       console.log('Using client-supplied ID:', req.body._id)
       documentData._id = req.body._id
+    }
+
+    // If client supplied a hash, use it, otherwise generate one
+    if (!documentData.hash) {
+      documentData.hash = computeEntityHash(documentData)
+      console.log('Generated hash for new document:', documentData.hash)
+    } else {
+      console.log('Using client-supplied hash:', documentData.hash)
     }
 
     const newDocument = await storage.create('documents', documentData)

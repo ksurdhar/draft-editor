@@ -1,6 +1,7 @@
 import { NextApiResponse } from 'next'
 import { storage } from '@lib/storage'
 import withHybridAuth, { ExtendedApiRequest } from '@lib/with-hybrid-auth'
+import { computeEntityHash } from '../../../utils/computeEntityHash'
 
 export default withHybridAuth(async function handler(req: ExtendedApiRequest, res: NextApiResponse) {
   const { user } = req
@@ -26,11 +27,23 @@ export default withHybridAuth(async function handler(req: ExtendedApiRequest, re
           return res.status(404).json({ error: 'Folder not found' })
         }
 
-        const updatedFolder = await storage.update('folders', id, {
+        const updateData = {
           ...req.body,
           userId: user.sub, // Ensure userId cannot be changed
           lastUpdated: Date.now(),
-        })
+        }
+
+        // If client supplied a hash, use it, otherwise generate one
+        if (!updateData.hash) {
+          // Create a merged version of the folder to generate a hash
+          const mergedFolder = { ...folder, ...updateData }
+          updateData.hash = computeEntityHash(mergedFolder)
+          console.log('Generated hash for updated folder:', updateData.hash)
+        } else {
+          console.log('Using client-supplied hash:', updateData.hash)
+        }
+
+        const updatedFolder = await storage.update('folders', id, updateData)
 
         if (!updatedFolder) {
           return res.status(404).json({ error: 'Folder not found' })

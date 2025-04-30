@@ -1,6 +1,4 @@
 import { DocumentData, VersionData } from '@typez/globals'
-import axios, { AxiosRequestConfig } from 'axios'
-import authService from './auth-service'
 import {
   documentStorage,
   folderStorage,
@@ -10,7 +8,8 @@ import {
 } from './storage-adapter'
 import { DEFAULT_DOCUMENT_CONTENT } from '../lib/constants'
 import { isOnline } from './network-detector'
-import { BrowserWindow } from 'electron'
+import { performCloudOperationAsync, performCloudOperation, forceFullSync } from './sync-service'
+import { computeEntityHash } from '../utils/computeEntityHash'
 
 // We'll always use local storage and sync with cloud when possible
 export const BASE_URL = 'https://www.whetstone-writer.com/api'
@@ -20,37 +19,24 @@ const CHARACTERS_COLLECTION = 'characters'
 const DIALOGUE_ENTRIES_COLLECTION = 'dialogue'
 const VERSIONS_COLLECTION = 'versions'
 
-// Reference to the network detector
-let networkDetector: {
-  reportNetworkFailure: () => void
-  reportNetworkSuccess: () => void
-} | null = null
+// Track whether initial sync has been performed
+let initialSyncPerformed = false
 
-// Function to set the network detector reference
-export const setNetworkDetector = (detector: {
-  reportNetworkFailure: () => void
-  reportNetworkSuccess: () => void
-}) => {
-  networkDetector = detector
+// Define collection configuration interface
+export interface CollectionConfig {
+  name: string // API endpoint name (e.g., 'documents')
+  storage: any // Storage adapter reference
+  collectionName: string // Storage collection name
+  defaultValues?: (data: any) => any // Function to add default values on creation
+  specialEndpoints?: Record<string, (method: string, match: RegExpMatchArray, data?: any) => Promise<any>>
 }
 
-// Helper to determine if an error is a network connectivity error
-export function isNetworkError(error: any): boolean {
-  return (
-    !error.response && // No response from server
-    (error.code === 'ECONNABORTED' || // Connection timeout
-      error.code === 'ECONNREFUSED' || // Connection refused
-      error.code === 'ENOTFOUND' || // DNS lookup failed
-      error.message.includes('Network Error') || // Generic network error
-      error.message.includes('timeout')) // Timeout error
-  )
-}
-
-// Function to normalize ID format to string
-function normalizeId(id: any): string {
-  if (!id) return ''
-  // Convert ObjectId or other objects to string
-  return id.toString ? id.toString() : String(id)
+// Define a basic interface for collection items
+export interface CollectionItem {
+  _id: string | number
+  updatedAt?: string | number | Date
+  hash?: string
+  [key: string]: any
 }
 
 // Helper function to capitalize first letter
@@ -64,38 +50,6 @@ function getSingular(collectionName: string): string {
   if (collectionName === 'dialogue') return 'dialogueEntry'
   // Default case: remove trailing 's'
   return collectionName.endsWith('s') ? collectionName.slice(0, -1) : collectionName
-}
-
-// Track if a sync operation is in progress
-let syncInProgress: Record<string, boolean> = {
-  documents: false,
-  folders: false,
-  characters: false,
-  dialogue: false,
-}
-
-// Track results of sync operations
-let syncResults: Record<string, { timestamp: number; updatedCount: number }> = {
-  last_sync_documents: { timestamp: 0, updatedCount: 0 },
-  last_sync_folders: { timestamp: 0, updatedCount: 0 },
-  last_sync_characters: { timestamp: 0, updatedCount: 0 },
-  last_sync_dialogue: { timestamp: 0, updatedCount: 0 },
-}
-
-// Define collection configuration interface
-interface CollectionConfig {
-  name: string // API endpoint name (e.g., 'documents')
-  storage: any // Storage adapter reference
-  collectionName: string // Storage collection name
-  defaultValues?: (data: any) => any // Function to add default values on creation
-  specialEndpoints?: Record<string, (method: string, match: RegExpMatchArray, data?: any) => Promise<any>>
-}
-
-// Define a basic interface for collection items
-interface CollectionItem {
-  _id: string | number
-  updatedAt?: string | number | Date
-  [key: string]: any
 }
 
 // Define configurations for each collection
@@ -274,13 +228,6 @@ const collections: Record<string, CollectionConfig> = {
           return { data: cloudResponse.data?.dialogues || [] }
         } catch (error: any) {
           console.error('Error in dialogue detection (via Next.js API):', error)
-
-          // If there's a network error, report it
-          if (error && isNetworkError(error) && networkDetector) {
-            console.log('Network error detected during dialogue detection')
-            networkDetector.reportNetworkFailure()
-          }
-
           throw error
         }
       },
@@ -317,11 +264,33 @@ async function handleCollectionGet(config: CollectionConfig, queryParams: Record
   return { data: items }
 }
 
-// Generic function to handle collection-level POST (create)
+// Add this comment to the ensureEntityHash function
+/**
+ * Ensures an entity has a hash, computing one if needed
+ * Note: This function only computes a hash if one doesn't already exist.
+ * This prevents duplication of hash generation between Next.js API and Electron app.
+ *
+ * The order of hash generation is:
+ * 1. Next.js API adds hashes when documents/folders are created/updated through the web app
+ * 2. Electron app respects those hashes and only computes new ones for local-only entities
+ * 3. When syncing, we keep the existing hash if available, computing new ones only when needed
+ */
+function ensureEntityHash(entity: CollectionItem): CollectionItem {
+  if (!entity.hash) {
+    const hash = computeEntityHash(entity)
+    console.log(`Computing hash for entity: ${hash}`)
+    return { ...entity, hash }
+  }
+  return entity
+}
+
+// Find the handleCollectionCreate function and modify it to ensure hash is set
 async function handleCollectionCreate(config: CollectionConfig, data: any) {
-  const processedData = config.defaultValues
-    ? config.defaultValues(data)
-    : { ...data, lastUpdated: Date.now() }
+  // Add hash to the data if missing
+  let processedData = config.defaultValues ? config.defaultValues(data) : { ...data, lastUpdated: Date.now() }
+
+  // Ensure the entity has a hash
+  processedData = ensureEntityHash(processedData)
 
   const newItem = await config.storage.create(config.collectionName, processedData)
   console.log(`Created ${config.name.slice(0, -1)}:`, newItem)
@@ -349,9 +318,40 @@ async function handleEntityGet(
   return { data: item }
 }
 
-// Generic function to handle entity-level PATCH (update)
+// Find the handleEntityUpdate function and modify it to ensure hash is set
 async function handleEntityUpdate(config: CollectionConfig, id: string, data: any) {
   if (!data) return { data: null }
+
+  // If we're directly updating the hash field, use that
+  if (data.hash) {
+    console.log(
+      `Updating ${getSingular(config.name)} ${id} in collection ${config.collectionName} with provided hash:`,
+      data.hash,
+    )
+    const updateResult = await config.storage.update(config.collectionName, id, data)
+    console.log(`${capitalize(getSingular(config.name))} update result:`, updateResult)
+    return { data: updateResult }
+  }
+
+  // For other updates, we need to get the current item first to compute an updated hash
+  const currentItem = await config.storage.findById(config.collectionName, id)
+  if (!currentItem) {
+    console.log(`${getSingular(config.name)} ${id} not found for update`)
+    return { data: null }
+  }
+
+  // Merge current item with updates
+  const updatedItem = { ...currentItem, ...data }
+
+  // Ensure hash is set on the merged item
+  const itemWithHash = ensureEntityHash(updatedItem)
+
+  // Only include the hash in our update if it changed or wasn't present
+  if (itemWithHash.hash !== currentItem.hash) {
+    data.hash = itemWithHash.hash
+    console.log(`Updating hash for ${getSingular(config.name)} ${id} to:`, data.hash)
+  }
+
   console.log(`Updating ${getSingular(config.name)} ${id} in collection ${config.collectionName}:`, data)
   const updateResult = await config.storage.update(config.collectionName, id, data)
   console.log(`${capitalize(getSingular(config.name))} update result:`, updateResult)
@@ -583,9 +583,27 @@ const makeRequest = async (
 
     // If we're online, perform cloud operation (including dialogue detection now)
     if (isOnline()) {
+      // If this is a GET for documents/folders and we haven't done the initial sync,
+      // trigger a full sync
+      if (
+        method === 'get' &&
+        (cleanEndpoint === 'documents' ||
+          cleanEndpoint.startsWith('documents?') ||
+          cleanEndpoint === 'folders') &&
+        !initialSyncPerformed
+      ) {
+        console.log('First load detected, performing full sync with cloud...')
+        initialSyncPerformed = true
+
+        // We need to wait a moment for collections to be fully defined before forcing sync
+        setTimeout(() => {
+          forceFullSync(collections)
+        }, 1000)
+      }
+
       // Since we're now using the same IDs for both local and cloud,
       // we can simply pass the same endpoint to the cloud operation
-      performCloudOperationAsync(method, endpoint, data, cleanEndpoint, localResult)
+      performCloudOperationAsync(method, endpoint, data, cleanEndpoint, localResult, collections)
     } else {
       console.log('Skipping cloud sync - offline')
     }
@@ -595,399 +613,5 @@ const makeRequest = async (
   } catch (error) {
     console.error(`Error in makeRequest:`, error)
     throw error
-  }
-}
-
-// Handles all cloud API operations
-async function performCloudOperation(
-  method: 'get' | 'delete' | 'patch' | 'post',
-  endpoint: string,
-  data?: any,
-) {
-  // console.log('Performing cloud operation:', { method, endpoint })
-
-  // Ensure endpoint format is correct for cloud API
-  endpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
-  const url = `${BASE_URL}${endpoint}`
-
-  // Get fresh access token
-  let token = authService.getAccessToken()
-
-  // If we have a token and it's expired, try to refresh
-  if (token && authService.isTokenExpired(token)) {
-    console.log('Token expired, attempting to refresh...')
-    try {
-      await authService.refreshTokens()
-      token = authService.getAccessToken() // Get fresh token after refresh
-      console.log('Token refreshed successfully')
-    } catch (error) {
-      console.error('Failed to refresh token:', error)
-
-      // Check if this was a network error
-      if (error && isNetworkError(error) && networkDetector) {
-        console.log('Network error detected when refreshing token')
-        networkDetector.reportNetworkFailure()
-      }
-
-      throw new Error('Authentication expired. Please log in again.')
-    }
-  }
-
-  if (!token) {
-    console.error('No access token available')
-    throw new Error('No authentication token available. Please log in.')
-  }
-
-  const config: AxiosRequestConfig = {
-    headers: {
-      'x-whetstone-authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  }
-
-  try {
-    let response
-    if (method === 'patch' || method === 'post') {
-      response = await axios[method](url, data, config)
-    } else {
-      response = await axios[method](url, config)
-    }
-
-    // If we successfully made a request and we have the network detector,
-    // report that the network is working (especially important if we thought we were offline)
-    if (networkDetector && !isOnline()) {
-      console.log('API request succeeded while system thought we were offline - reporting success')
-      networkDetector.reportNetworkSuccess()
-    }
-
-    return response
-  } catch (error: any) {
-    console.error('API request failed:', {
-      status: error.response?.status,
-      data: error.response?.data,
-    })
-
-    // Check if this is a network connectivity error
-    if (isNetworkError(error) && networkDetector) {
-      console.log('Network error detected during API request:', error.message)
-      networkDetector.reportNetworkFailure()
-    }
-
-    throw error
-  }
-}
-
-// Generic function to sync cloud data to local for any collection
-async function syncCollectionToLocal(config: CollectionConfig, cloudData: CollectionItem[]) {
-  // Skip if a sync is already in progress for this collection
-  if (syncInProgress[config.name]) {
-    console.log(`Skipping ${config.name} sync - another sync already in progress`)
-    return
-  }
-
-  try {
-    // Set sync flag
-    syncInProgress[config.name] = true
-
-    console.log(`Syncing cloud ${config.name} to local storage`)
-    console.log(`Cloud ${config.name} count: ${cloudData.length}`)
-
-    // Get local items
-    const localItems = await config.storage.find(config.collectionName, {})
-    console.log(`Local ${config.name} count before sync: ${localItems.length}`)
-
-    // Create maps for efficient lookups
-    const localItemsById = new Map(localItems.map((item: CollectionItem) => [normalizeId(item._id), item]))
-    const cloudItemsById = new Map(cloudData.map((item: CollectionItem) => [normalizeId(item._id), item]))
-
-    // Keep track of items we process
-    let updatedCount = 0
-    let createdCount = 0
-    let skippedCount = 0
-    let cloudCreatedCount = 0
-    const newItems: any[] = []
-
-    // For debugging, temporarily limit to 2 folders if this is a folder sync
-    let itemsToProcess = cloudData
-    // if (config.name === 'folders') {
-    //   console.log('DEBUG: Limiting folder sync to first 5 items for debugging')
-    //   itemsToProcess = cloudData.slice(0, 5)
-    // }
-
-    // First sync cloud items to local
-    for (const cloudItem of itemsToProcess) {
-      if (!cloudItem._id) {
-        console.warn(`Skipping cloud ${getSingular(config.name)} without ID:`, cloudItem)
-        continue
-      }
-
-      const normalizedId = normalizeId(cloudItem._id)
-      const localItem = localItemsById.get(normalizedId)
-
-      if (localItem) {
-        // Item exists locally - check if cloud version is newer
-        // Use cloudItem.updatedAt and localItem.lastUpdated
-        const cloudTimestamp = cloudItem.updatedAt ? new Date(cloudItem.updatedAt).getTime() : 0
-        const localTimestamp = (localItem as any).lastUpdated // Use lastUpdated for local
-          ? new Date((localItem as any).lastUpdated).getTime()
-          : 0
-
-        // DEBUG: Log detailed timestamp comparison for all items
-        console.log(`DEBUG: ${getSingular(config.name)} ${cloudItem._id} timestamp comparison:`, {
-          cloudUpdatedAt: cloudItem.updatedAt,
-          cloudTimestamp,
-          localLastUpdated: (localItem as any).lastUpdated,
-          localTimestamp,
-          diff: cloudTimestamp - localTimestamp,
-          isNewer: cloudTimestamp > localTimestamp,
-        })
-
-        if (cloudTimestamp > localTimestamp) {
-          console.log(`Updating ${getSingular(config.name)} ${cloudItem._id} with newer cloud version`)
-          // FIX: Ensure lastUpdated is preserved and synchronized with the cloud's updatedAt
-          const updatedItem = {
-            ...cloudItem,
-            lastUpdated: cloudItem.updatedAt ? new Date(cloudItem.updatedAt).getTime() : Date.now(),
-          }
-          await config.storage.update(config.collectionName, cloudItem._id, updatedItem)
-
-          // DEBUG: Verify the lastUpdated was properly set after the update
-          const verifyItem = await config.storage.findById(config.collectionName, cloudItem._id)
-          console.log(`DEBUG: After update, ${getSingular(config.name)} ${cloudItem._id} has:`, {
-            lastUpdated: verifyItem.lastUpdated,
-            hasLastUpdated: !!verifyItem.lastUpdated,
-            updatedAt: verifyItem.updatedAt,
-            hasUpdatedAt: !!verifyItem.updatedAt,
-          })
-
-          // FIX: Also keep the newItems array consistent with what we stored
-          newItems.push(updatedItem)
-          updatedCount++
-        } else {
-          // console.log(
-          //   `Skipping ${getSingular(config.name)} ${cloudItem._id}, local version is current or newer`,
-          // )
-          skippedCount++
-        }
-      } else {
-        // Item doesn't exist locally - create it with the SAME ID
-        console.log(`Creating new local ${getSingular(config.name)} from cloud with ID: ${cloudItem._id}`)
-        try {
-          // FIX: Ensure lastUpdated is properly set when creating new items
-          const newItemData = {
-            ...cloudItem,
-            _id: cloudItem._id,
-            lastUpdated: cloudItem.updatedAt ? new Date(cloudItem.updatedAt).getTime() : Date.now(),
-          }
-          const newItem = await config.storage.create(config.collectionName, newItemData)
-          newItems.push(newItem) // Notify with the newly created local item structure
-          createdCount++
-        } catch (error) {
-          console.error(`Error creating ${getSingular(config.name)} ${cloudItem._id}:`, error)
-        }
-      }
-    }
-
-    // Then sync local items to cloud
-    for (const localItem of localItems) {
-      if (!localItem._id) {
-        console.warn(`Skipping local ${getSingular(config.name)} without ID:`, localItem)
-        continue
-      }
-
-      const normalizedId = normalizeId(localItem._id)
-      const cloudItem = cloudItemsById.get(normalizedId)
-
-      if (!cloudItem) {
-        // Item exists locally but not in cloud - create it in cloud
-        console.log(`Creating ${getSingular(config.name)} in cloud with local ID: ${localItem._id}`)
-        try {
-          // Send local data (which includes lastUpdated) to cloud
-          await performCloudOperation('post', `/${config.name}`, {
-            ...localItem,
-            _id: localItem._id, // Ensure cloud uses the same ID
-          })
-          cloudCreatedCount++
-        } catch (error) {
-          console.error(`Error creating ${getSingular(config.name)} ${localItem._id} in cloud:`, error)
-        }
-      } else {
-        // Item exists in both local and cloud - check if local version is newer
-        // Use localItem.lastUpdated and cloudItem.updatedAt
-        const localTimestamp = (localItem as any).lastUpdated // Use lastUpdated for local
-          ? new Date((localItem as any).lastUpdated).getTime()
-          : 0
-        const cloudTimestamp = cloudItem.updatedAt ? new Date(cloudItem.updatedAt).getTime() : 0
-
-        // DEBUG: Log local-to-cloud timestamp comparison
-        console.log(`DEBUG: Local-to-cloud compare ${getSingular(config.name)} ${localItem._id}:`, {
-          localLastUpdated: (localItem as any).lastUpdated,
-          localTimestamp,
-          cloudUpdatedAt: cloudItem.updatedAt,
-          cloudTimestamp,
-          diff: localTimestamp - cloudTimestamp,
-          isNewer: localTimestamp > cloudTimestamp,
-        })
-
-        // IMPORTANT: To break the endless loop, we need to make these comparison stricter
-        // Only update cloud if local is actually substantially newer (> 1 second difference)
-        const SUBSTANTIAL_TIME_DIFFERENCE = 1000 // 1 second in milliseconds
-        if (localTimestamp > cloudTimestamp + SUBSTANTIAL_TIME_DIFFERENCE) {
-          // Local item is newer, update cloud version
-          console.log(`Updating cloud ${getSingular(config.name)} ${localItem._id} with newer local version`)
-          try {
-            // DEBUG: Log details before update
-            console.log(`DEBUG: Sending to cloud for ${localItem._id}:`, {
-              hasLocalLastUpdated: !!(localItem as any).lastUpdated,
-              localLastUpdated: (localItem as any).lastUpdated,
-              localTimestamp,
-              cloudUpdatedAt: cloudItem.updatedAt,
-              localUpdatedAt: (localItem as any).updatedAt,
-            })
-
-            // Send local data (which includes lastUpdated) to cloud
-            // When updating cloud, make sure we're sending a modified version that includes updatedAt
-            // to ensure cloud timestamp is aligned with local
-            await performCloudOperation('patch', `/${config.name}/${localItem._id}`, {
-              ...localItem,
-              updatedAt: localItem.lastUpdated, // Ensure cloud updatedAt matches local lastUpdated
-            })
-            cloudCreatedCount++ // Reuse this counter for updates too
-          } catch (error) {
-            console.error(
-              `Error updating ${getSingular(config.name)} ${localItem._id} in cloud:`,
-              (error as any)?.response?.data || error, // Log response data if available
-            )
-          }
-        } else if (localTimestamp > cloudTimestamp) {
-          // Local is newer but only by a small amount - log but don't update
-          console.log(
-            `Skipping cloud update for ${getSingular(config.name)} ${localItem._id} - difference too small (${localTimestamp - cloudTimestamp}ms)`,
-          )
-        }
-      }
-    }
-
-    // Record sync results for throttling future operations
-    const lastSyncKey = `last_sync_${config.name}` as keyof typeof syncResults
-    syncResults[lastSyncKey] = {
-      timestamp: Date.now(),
-      updatedCount: updatedCount + createdCount,
-    }
-    console.log(`DEBUG: Recorded sync results for ${config.name}:`, syncResults[lastSyncKey])
-
-    console.log(
-      `${capitalize(config.name)} sync complete. Updated locally: ${updatedCount}, Created locally: ${createdCount}, Created/Updated in cloud: ${cloudCreatedCount}, Skipped: ${skippedCount}`,
-    )
-
-    // If we have new or updated items, notify all windows
-    if (newItems.length > 0) {
-      console.log(`DEBUG: Sending sync:updates for ${config.name} with ${newItems.length} items`)
-      BrowserWindow.getAllWindows().forEach(window => {
-        if (!window.isDestroyed()) {
-          console.log('sync:updates called')
-          // Send the *new local state* or *cloud state that triggered update*
-          // Using newItems which currently holds cloud data for updates, local data for creates.
-          // Consider fetching the updated local item after storage.update for consistency if needed.
-          window.webContents.send('sync:updates', { [config.name]: newItems })
-        }
-      })
-    } else {
-      console.log(`DEBUG: No sync:updates sent for ${config.name} - no new items detected`)
-    }
-  } finally {
-    // Always release the sync flag when done
-    syncInProgress[config.name] = false
-  }
-}
-
-// In the syncCloudDataToLocal function - simplify to use same IDs
-async function syncCloudDataToLocal(endpoint: string, cloudData: any) {
-  // Only sync collection-level data for now
-  const collectionConfig = Object.values(collections).find(config => config.name === endpoint)
-
-  if (collectionConfig && Array.isArray(cloudData)) {
-    await syncCollectionToLocal(collectionConfig, cloudData)
-  }
-}
-
-// Performs cloud operations asynchronously without blocking
-async function performCloudOperationAsync(
-  method: 'get' | 'delete' | 'patch' | 'post',
-  endpoint: string,
-  data?: any,
-  cleanEndpoint?: string,
-  localResult?: any,
-) {
-  try {
-    console.log('Starting background cloud operation:', { method, endpoint })
-
-    // Ensure ID consistency between local and cloud for document creation
-    if (method === 'post' && localResult?.data?._id) {
-      // Create a copy of the data with the local document's ID
-      const updatedData = data ? { ...data } : {}
-      // Ensure we use the same ID for cloud operations
-      updatedData._id = localResult.data._id
-      console.log('Using local document ID for cloud operation:', localResult.data._id)
-      // Use the updated data for the cloud operation
-      data = updatedData
-    }
-
-    const cloudResult = await performCloudOperation(method, endpoint, data)
-
-    // For GET operations, we can still sync data in the background
-    // But we need to be careful not to create duplicates
-    if (method === 'get' && cloudResult && cloudResult.data && cleanEndpoint) {
-      // Handle bulk syncing more carefully depending on the endpoint
-      if (
-        cleanEndpoint === 'documents' ||
-        cleanEndpoint === 'folders' ||
-        cleanEndpoint === 'characters' ||
-        cleanEndpoint === 'dialogue'
-      ) {
-        console.log('Background sync: carefully updating local storage with cloud data')
-
-        // Add a condition to only sync if there's a reasonable expectation of changes
-        // Check if we've recently synced this collection and no changes were detected
-        if (syncInProgress[cleanEndpoint]) {
-          console.log(`Background sync: Skipping ${cleanEndpoint} sync - already in progress`)
-          return
-        }
-
-        // Check if we had a very recent sync with no changes
-        const lastSyncKey = `last_sync_${cleanEndpoint}`
-        const lastSyncTime = syncResults[lastSyncKey]?.timestamp || 0
-        const lastSyncUpdates = syncResults[lastSyncKey]?.updatedCount || 0
-        const now = Date.now()
-
-        // If we had a sync with no updates in the last 10 seconds, skip this sync
-        const MIN_SYNC_INTERVAL = 10000 // 10 seconds
-        if (lastSyncTime > 0 && now - lastSyncTime < MIN_SYNC_INTERVAL && lastSyncUpdates === 0) {
-          console.log(
-            `Background sync: Skipping ${cleanEndpoint} sync - recent sync with no changes (${now - lastSyncTime}ms ago)`,
-          )
-          return
-        }
-
-        // Proceed with sync
-        await syncCloudDataToLocal(cleanEndpoint, cloudResult.data)
-      }
-      // For individual item requests, we might just want to update if it exists
-      else if (cleanEndpoint.includes('/')) {
-        // This is a request for a specific item, handled separately
-        console.log('Background sync for individual item, handled separately')
-      }
-    } else if (method !== 'get') {
-      // For non-GET operations (mutating operations), log the result
-      console.log(
-        `Background cloud ${method.toUpperCase()} operation completed:`,
-        cloudResult ? 'success' : 'no result',
-      )
-    }
-
-    console.log('Background cloud operation completed successfully')
-  } catch (error) {
-    console.error('Background cloud operation failed:', error)
-    // We don't propagate this error since it's a background operation
   }
 }

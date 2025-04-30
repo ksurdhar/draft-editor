@@ -1,6 +1,7 @@
 import { NextApiResponse } from 'next'
 import { storage } from '@lib/storage'
 import withHybridAuth, { ExtendedApiRequest } from '@lib/with-hybrid-auth'
+import { computeEntityHash } from '../../../utils/computeEntityHash'
 
 export default withHybridAuth(async function handler(req: ExtendedApiRequest, res: NextApiResponse) {
   const { user } = req
@@ -44,6 +45,15 @@ export default withHybridAuth(async function handler(req: ExtendedApiRequest, re
         if (_id) {
           console.log('Using client-supplied ID for folder:', _id)
           folderData._id = _id
+        }
+
+        // If client supplied a hash, use it, otherwise generate one
+        if (!req.body.hash) {
+          folderData.hash = computeEntityHash(folderData)
+          console.log('Generated hash for new folder:', folderData.hash)
+        } else {
+          folderData.hash = req.body.hash
+          console.log('Using client-supplied hash:', folderData.hash)
         }
 
         const newFolder = await storage.create('folders', folderData)

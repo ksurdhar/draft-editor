@@ -1,11 +1,13 @@
 import { BrowserWindow, app, ipcMain, dialog } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
-import apiService, { setNetworkDetector, BASE_URL, isNetworkError } from './api-service'
+import apiService, { BASE_URL } from './api-service'
+
 import { initNetworkDetection, isOnline } from './network-detector'
 import { createAppWindow } from './app'
 import { createAuthWindow, createLogoutWindow } from './auth-process'
 import authService from './auth-service'
+import { isNetworkError, setNetworkDetector } from './sync-service'
 
 let mainWindow: BrowserWindow | null = null
 

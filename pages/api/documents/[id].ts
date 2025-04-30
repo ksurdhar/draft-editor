@@ -1,6 +1,7 @@
 import withHybridAuth, { ExtendedApiRequest } from '@lib/with-hybrid-auth'
 import type { NextApiResponse } from 'next'
 import { storage } from '@lib/storage'
+import { computeEntityHash } from '../../../utils/computeEntityHash'
 
 export default withHybridAuth(async function documentHandler(req: ExtendedApiRequest, res: NextApiResponse) {
   const { query, method, user } = req
@@ -76,6 +77,16 @@ export default withHybridAuth(async function documentHandler(req: ExtendedApiReq
             updateData.content = JSON.stringify(req.body.content)
           }
         }
+      }
+
+      // If client supplied a hash, use it, otherwise generate one
+      if (!updateData.hash) {
+        // Create a merged version of the document to generate a hash
+        const mergedDoc = { ...document, ...updateData }
+        updateData.hash = computeEntityHash(mergedDoc)
+        console.log('Generated hash for updated document:', updateData.hash)
+      } else {
+        console.log('Using client-supplied hash:', updateData.hash)
       }
 
       const updatedDocument = await storage.update('documents', documentId, updateData)
