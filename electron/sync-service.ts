@@ -51,6 +51,15 @@ let syncInProgress: Record<string, boolean> = {
   characters: false,
 }
 
+// Track when each collection was last fully synced
+export let lastFullSyncTime: Record<string, number> = {
+  documents: 0,
+  folders: 0,
+  characters: 0,
+  dialogue: 0,
+  versions: 0,
+}
+
 // Track results of sync operations
 let syncResults: Record<string, { timestamp: number; updatedCount: number }> = {
   last_sync_documents: { timestamp: 0, updatedCount: 0 },
@@ -81,8 +90,11 @@ export function completeAppStartup() {
 }
 
 // Function to force a full sync of all collections
-export async function forceFullSync(collections: Record<string, CollectionConfig>) {
-  console.log('Forcing full sync of all collections')
+export async function forceFullSync(
+  collections: Record<string, CollectionConfig>,
+  specificCollection?: string,
+) {
+  console.log(`Forcing full sync of ${specificCollection || 'all'} collections`)
 
   // Reset sync results to force sync
   syncResults = {
@@ -96,13 +108,17 @@ export async function forceFullSync(collections: Record<string, CollectionConfig
 
   try {
     // Request each collection to trigger sync
-    const endpoints = ['documents', 'folders', 'characters']
+    const endpoints = specificCollection ? [specificCollection] : ['documents', 'folders', 'characters']
+
     for (const endpoint of endpoints) {
       console.log(`Forcing sync for collection: ${endpoint}`)
       try {
         const cloudResult = await performCloudOperation('get', `/${endpoint}`)
         if (cloudResult && cloudResult.data) {
           await syncCloudDataToLocal(endpoint, cloudResult.data, collections)
+
+          // Update last full sync time for this collection
+          lastFullSyncTime[endpoint] = Date.now()
         }
       } catch (error) {
         console.error(`Error during forced sync of ${endpoint}:`, error)
@@ -510,7 +526,7 @@ export async function performCloudOperationAsync(
   collections?: Record<string, CollectionConfig>,
 ) {
   try {
-    console.trace('Starting background cloud operation:', { method, endpoint })
+    console.log('Starting background cloud operation:', { method, endpoint })
 
     // Ensure ID consistency between local and cloud for document creation
     if (method === 'post' && localResult?.data?._id) {
@@ -591,6 +607,104 @@ export async function performCloudOperationAsync(
   } catch (error) {
     console.error('Background cloud operation failed:', error)
     // We don't propagate this error since it's a background operation
+  }
+}
+
+// Function to specifically sync an individual entity from cloud to local
+export async function performEntityCloudSync(
+  collectionName: string,
+  entityId: string,
+  localEntity: any,
+  collections: Record<string, CollectionConfig>,
+  prioritizeFresh = false,
+) {
+  try {
+    console.log(`Starting individual entity sync for ${collectionName}/${entityId}`)
+
+    // Find the corresponding collection config
+    const config = Object.values(collections).find(c => c.name === collectionName)
+    if (!config) {
+      console.error(`No collection config found for ${collectionName}`)
+      return
+    }
+
+    // Request the latest data from the cloud
+    const cloudResponse = await performCloudOperation('get', `/${collectionName}/${entityId}`)
+    const cloudEntity = cloudResponse?.data
+
+    if (!cloudEntity || !cloudEntity._id) {
+      console.log(`No valid cloud data found for ${collectionName}/${entityId}`)
+      return
+    }
+
+    // Check if we have a local entity
+    if (!localEntity || !localEntity._id) {
+      console.log(`No local entity found for ${collectionName}/${entityId}, creating from cloud...`)
+      // Create the local entity with the cloud data
+      const newItemData = {
+        ...cloudEntity,
+        _id: cloudEntity._id,
+        lastUpdated: cloudEntity.updatedAt ? new Date(cloudEntity.updatedAt).getTime() : Date.now(),
+      }
+
+      await config.storage.create(config.collectionName, newItemData)
+      console.log(`Created local ${getSingular(config.name)} from cloud with ID: ${cloudEntity._id}`)
+
+      // Notify UI of the change
+      notifyEntityUpdate(collectionName, [newItemData])
+      return
+    }
+
+    // Both entities exist - compare using hash if available, otherwise timestamps
+    let shouldUpdate = false
+
+    if (cloudEntity.hash && localEntity.hash) {
+      // Use hash comparison when available
+      shouldUpdate = cloudEntity.hash !== localEntity.hash
+      console.log(
+        `Hash comparison: cloud=${cloudEntity.hash}, local=${localEntity.hash}, different=${shouldUpdate}`,
+      )
+    } else {
+      // Fall back to timestamp comparison
+      const cloudTime = cloudEntity.updatedAt ? new Date(cloudEntity.updatedAt).getTime() : 0
+      const localTime = localEntity.lastUpdated || 0
+
+      // Update if cloud is newer or if we're prioritizing freshness
+      shouldUpdate = cloudTime > localTime || prioritizeFresh
+      console.log(`Time comparison: cloud=${cloudTime}, local=${localTime}, update=${shouldUpdate}`)
+    }
+
+    if (shouldUpdate) {
+      console.log(`Updating ${getSingular(config.name)} ${entityId} with newer cloud version`)
+
+      // Update the local entity with the cloud data
+      const updatedItem = {
+        ...cloudEntity,
+        lastUpdated: cloudEntity.updatedAt ? new Date(cloudEntity.updatedAt).getTime() : Date.now(),
+      }
+
+      await config.storage.update(config.collectionName, entityId, updatedItem)
+      console.log(`Updated local ${getSingular(config.name)} from cloud with ID: ${entityId}`)
+
+      // Notify UI of the change
+      notifyEntityUpdate(collectionName, [updatedItem])
+    } else {
+      console.log(`Local ${getSingular(config.name)} ${entityId} is up to date with cloud`)
+    }
+  } catch (error) {
+    console.error(`Error syncing individual entity ${collectionName}/${entityId}:`, error)
+  }
+}
+
+// Helper function to notify UI of entity updates
+function notifyEntityUpdate(collectionName: string, entities: any[]) {
+  if (entities.length > 0) {
+    console.log(`Notifying UI of updated ${collectionName}:`, entities.length)
+    BrowserWindow.getAllWindows().forEach(window => {
+      if (!window.isDestroyed()) {
+        window.webContents.send('sync:updates', { [collectionName]: entities })
+      }
+    })
   }
 }
 

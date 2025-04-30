@@ -8,7 +8,13 @@ import {
 } from './storage-adapter'
 import { DEFAULT_DOCUMENT_CONTENT } from '../lib/constants'
 import { isOnline } from './network-detector'
-import { performCloudOperationAsync, performCloudOperation, forceFullSync } from './sync-service'
+import {
+  performCloudOperationAsync,
+  performCloudOperation,
+  forceFullSync,
+  lastFullSyncTime,
+  performEntityCloudSync,
+} from './sync-service'
 import { computeEntityHash } from '../utils/computeEntityHash'
 
 // We'll always use local storage and sync with cloud when possible
@@ -18,9 +24,6 @@ const FOLDERS_COLLECTION = 'folders'
 const CHARACTERS_COLLECTION = 'characters'
 const DIALOGUE_ENTRIES_COLLECTION = 'dialogue'
 const VERSIONS_COLLECTION = 'versions'
-
-// Track whether initial sync has been performed
-let initialSyncPerformed = false
 
 // Define collection configuration interface
 export interface CollectionConfig {
@@ -583,27 +586,62 @@ const makeRequest = async (
 
     // If we're online, perform cloud operation (including dialogue detection now)
     if (isOnline()) {
-      // If this is a GET for documents/folders and we haven't done the initial sync,
-      // trigger a full sync
+      // Check if this is a collection GET request that should trigger sync
       if (
         method === 'get' &&
         (cleanEndpoint === 'documents' ||
           cleanEndpoint.startsWith('documents?') ||
-          cleanEndpoint === 'folders') &&
-        !initialSyncPerformed
+          cleanEndpoint === 'folders' ||
+          cleanEndpoint === 'characters')
       ) {
-        console.log('First load detected, performing full sync with cloud...')
-        initialSyncPerformed = true
+        // Extract the base collection name without query params
+        const collectionName = cleanEndpoint.split('?')[0]
 
-        // We need to wait a moment for collections to be fully defined before forcing sync
-        setTimeout(() => {
-          forceFullSync(collections)
-        }, 1000)
+        // Check if we need to perform a full sync for this collection
+        const FULL_SYNC_INTERVAL = 5000 // 5 seconds
+        const lastSyncTime = lastFullSyncTime?.[collectionName] || 0
+        const now = Date.now()
+
+        if (now - lastSyncTime > FULL_SYNC_INTERVAL) {
+          console.log(`Collection ${collectionName} hasn't been fully synced recently, triggering sync...`)
+
+          // We need a short delay to ensure collections are fully defined
+          setTimeout(() => {
+            forceFullSync(collections, collectionName)
+          }, 100)
+        } else {
+          console.log(
+            `Collection ${collectionName} was synced ${Math.round((now - lastSyncTime) / 1000)}s ago, using background sync`,
+          )
+
+          // Since we're now using the same IDs for both local and cloud,
+          // we can simply pass the same endpoint to the cloud operation
+          performCloudOperationAsync(method, endpoint, data, cleanEndpoint, localResult, collections)
+        }
       }
+      // Check if this is an individual entity GET request
+      else if (
+        method === 'get' &&
+        (cleanEndpoint.match(/^documents\/[^\/]+$/) ||
+          cleanEndpoint.match(/^folders\/[^\/]+$/) ||
+          cleanEndpoint.match(/^characters\/[^\/]+$/))
+      ) {
+        // Extract entity ID and collection name
+        const [collectionName, entityId] = cleanEndpoint.split('/')
+        console.log(`Individual ${collectionName} entity request for ID: ${entityId}`)
 
-      // Since we're now using the same IDs for both local and cloud,
-      // we can simply pass the same endpoint to the cloud operation
-      performCloudOperationAsync(method, endpoint, data, cleanEndpoint, localResult, collections)
+        // Perform cloud operation to get the latest version
+        // but don't wait for it - let the local result return immediately
+        const prioritizeFresh = true
+
+        performEntityCloudSync(collectionName, entityId, localResult.data, collections, prioritizeFresh)
+
+        // We'll still return the local result immediately for responsiveness
+        // The UI will update when the cloud sync completes if needed
+      } else {
+        // For other endpoints, use normal async cloud operation
+        performCloudOperationAsync(method, endpoint, data, cleanEndpoint, localResult, collections)
+      }
     } else {
       console.log('Skipping cloud sync - offline')
     }
