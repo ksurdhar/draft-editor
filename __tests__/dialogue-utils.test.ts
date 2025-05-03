@@ -20,6 +20,8 @@ import {
   sampleDetectedDialogues,
   sampleProcessedDialogues,
   sampleProcessedMarks,
+  doc1DetectedDialogues,
+  sampleDoc1,
 } from './dialogue-util-setup'
 
 // Helper function to create a Tiptap editor instance
@@ -568,7 +570,7 @@ describe('Dialogue Utilities', () => {
   })
 })
 
-describe('Dialogue Utilities Integration', () => {
+describe.only('Dialogue Utilities Integration', () => {
   let editor: Editor
 
   beforeEach(() => {
@@ -757,6 +759,63 @@ describe('Dialogue Utilities Integration', () => {
 
     // Should have both original confirmed mark and two new marks
     expect(finalMarks.length).toBe(3)
+
+    // Group and check conversations
+    const groupedDialogues = groupDialogueMarks(finalMarks)
+    expect(groupedDialogues.length).toBe(1)
+
+    // The first two dialogues should be in the named conversation
+    const johnAndMaryDialogues = groupedDialogues[0].dialogues
+    expect(johnAndMaryDialogues.length).toBe(3)
+
+    // Check that the naming is propagated correctly
+    const johnDialogue = johnAndMaryDialogues.find(d => d.content === 'John: This is a line of dialogue.')
+    expect(johnDialogue?.conversationId).toBe('test-doc-conv1')
+
+    // The conversation should have the new name on newly created marks
+    const maryDialogue = johnAndMaryDialogues.find(d => d.content === 'Mary: And this is my response.')
+    expect(maryDialogue?.conversationName).toBe('Conversation about something')
+  })
+
+  it('should simulate full dialogue sync flow - real document', () => {
+    editor = createEditor(sampleDoc1)
+
+    // 1. Mock the server responses
+    const mockDetectionResponse = doc1DetectedDialogues
+
+    const mockNamingResponse = {
+      names: [{ id: 'conv1', name: 'Conversation about something' }],
+    }
+
+    // 2. Get confirmed marks
+    const confirmedMarks = getConfirmedMarksFromDoc(editor.state.doc)
+
+    // 3. Process with naming information
+    const documentId = 'test-doc'
+    const nameMap = new Map(mockNamingResponse.names.map(n => [`${documentId}-${n.id}`, n.name]))
+
+    // 4. Process detection result
+    const { processedDialogues } = processDialogueDetectionResult(mockDetectionResponse, documentId, nameMap)
+
+    // 5. Apply marks in sequence as in the hook
+    let tr = editor.state.tr
+
+    // Apply new dialogue marks
+    const { tr: markedTr } = applyDialogueMarks(editor, processedDialogues, confirmedMarks)
+    tr = markedTr
+
+    // Preserve confirmed marks
+    const { tr: preservedTr } = preserveConfirmedMarks(editor, confirmedMarks, tr)
+    tr = preservedTr
+
+    // Dispatch transaction
+    editor.view.dispatch(tr)
+
+    // 6. Verify results
+    const finalMarks = processDialogueMarks(editor.state.doc)
+
+    // Should have both original confirmed mark and two new marks
+    expect(finalMarks.length).toBe(3) // should be no greater then the number of detected dialogues, but get back many more.
 
     // Group and check conversations
     const groupedDialogues = groupDialogueMarks(finalMarks)

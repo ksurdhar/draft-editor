@@ -220,6 +220,315 @@ const sampleDetectedDialogues: DialogueDetection[] = [
   },
 ]
 
+const doc1DetectedDialogues: DialogueDetection[] = [
+  {
+    character: 'Kyhia',
+    snippet: 'Come on you bastard,',
+    conversationId: 'conv1',
+  },
+  {
+    character: 'Kyhia',
+    snippet: 'Hello?',
+    conversationId: 'conv1',
+  },
+  {
+    character: 'Kyhia',
+    snippet: 'Are you there, Fire?',
+    conversationId: 'conv1',
+  },
+  {
+    character: 'Dark Voice',
+    snippet: 'What did you expect? Did you really think it was going to start speaking back to you?',
+    conversationId: 'conv1',
+  },
+  {
+    character: 'Dark Voice',
+    snippet: 'You’re losing grip, girl. You’re going completely mad.',
+    conversationId: 'conv1',
+  },
+  {
+    character: 'Kyhia',
+    snippet: 'Whoever’s there, show yourself, or I start shooting,',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Kyhia',
+    snippet: 'Not one step closer,',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'What fortune we meet again, eh?',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'Funny meeting you here — how fortuitous',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'You’re the one from Rumor’s!',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'Are you following me?',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'You—just intruded into my camp.',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'You were in Rumor & Mills.',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Kyhia',
+    snippet: 'Where’s your ship?',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Kyhia',
+    snippet: 'Crew kick you out?',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'What? What are you talking about?',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Kyhia',
+    snippet: 'Your clothes. That cloak—those are sailing raiments.',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'Go away.',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'No. What are you doing here?',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'Minding my own damn business.',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'You do know its like, supah dangerous in here, right?',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Kyhia',
+    snippet:
+      'And that it’s completely against The Prophet’s Law to travel through here without a priest’s blessing?',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'As in, if Halcyon finds you in here they’ll string you up like that. No trial or nothing.',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Kyhia',
+    snippet:
+      'I don’t even know who or what this Halcyon is everyone keeps mentioning, and I really don’t care, so I’d appreciate it if you would just—',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'Hang on—who are you?',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Kyhia',
+    snippet: 'Who are you, and what do you want?',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'How in fuck’s beard did you manage to start a fire?',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'Oh, settle down, Spikes, I’m not about huck the dang thing.',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'May I?',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Kyhia',
+    snippet: 'You didn’t answer my question.',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'August X, grovechaser extraordinaire.',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'Ta,',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'I’m serious, howd’ja do it? I tried for about an hour before all my attempts fizzled out.',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Kyhia',
+    snippet: 'I chipped off southern facing bark on older pines to start it.',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'I’m impressed.',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Kyhia',
+    snippet:
+      'What business does a girl wearing sailor’s raiments have in The Forest / The Wilds? Shouldn’t you be swimming somewhere off the western coast looking for fallen stars?',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'I’m trying to reach the Vale of Alasair,',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'My mother is sick and needs medicine from their alchemists.',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Kyhia',
+    snippet: 'And is your boat broken? Did your crew kick you out?',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'Well,',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet:
+      'For a sailor you make a pretty good fire. I can see how a crew might not want you on the ship. Might make a crew nervous to have you around.',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Kyhia',
+    snippet: 'My turn,',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Kyhia',
+    snippet: 'What are you doing here?',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'Why, fortune seeking of course.',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet:
+      'Forget it, I should know bettah than to ask someone who visits Rumor’s. What kind of provincal backwater did you bumble from that you haven’t heard of grovechasing?',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'Seriously?',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'Rare woods? A religious empire building a tower into heaven needs heaps of rare woods?',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'None of this is ringing any bells for you?',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Kyhia',
+    snippet: 'What?',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'You keep staring at me like I’ve sprouted wings or something,',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'But I’m pretty certain between the two of us, you’re the odd duck.',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'We should travel together,',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Kyhia',
+    snippet: 'Why?',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'First, I can tell that you’re lost, and I have a wayfinder.',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'I am not,',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'Second, you make a mean fire.',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'Third, we’re both criminals,',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'Honestly, your firemaking skills are wicked well if nothing else, you make a mean fire.',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet: 'but to be honest, I’m enchanted by your strangeness. you’re wild odd, lady.',
+    conversationId: 'conv2',
+  },
+  {
+    character: 'Blonde Woman',
+    snippet:
+      'well, for one, we’re both outlaws now. law breakers should stick together. thick as thieves right?',
+    conversationId: 'conv2',
+  },
+]
+
 // Sample processed dialogues
 const sampleProcessedDialogues = [
   {
@@ -1125,4 +1434,5 @@ export {
   sampleProcessedDialogues,
   sampleProcessedMarks,
   sampleDoc1,
+  doc1DetectedDialogues,
 }
