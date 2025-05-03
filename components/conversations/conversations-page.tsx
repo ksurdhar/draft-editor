@@ -9,63 +9,7 @@ import ConversationsSidebar from './conversations-sidebar'
 import { Separator } from '@components/ui/separator'
 import { useAPI } from '@components/providers'
 import { toast } from 'sonner'
-
-// Re-use the CharacterData interface (consider moving to a shared types file later)
-interface CharacterData {
-  _id: string
-  name: string
-  motivation: string
-  description: string
-  traits: string[]
-  relationships?: Array<{
-    characterId: string
-    relationshipType: string
-    description: string
-  }>
-  userId?: string
-  documentIds?: string[]
-  lastUpdated?: number
-  isArchived?: boolean
-}
-
-// DialogueEntry type (from character-detail)
-interface DialogueEntry {
-  characterId: string
-  characterName: string
-  documentId?: string
-  documentTitle?: string
-  contentNode: TiptapNode
-}
-
-// ConversationGroup type (from character-detail)
-interface ConversationGroup {
-  conversationId: string
-  conversationName: string | null
-  documentId: string
-  documentTitle: string
-  entries: DialogueEntry[]
-  lastUpdated?: number
-}
-
-// Reuse the SyncUpdates interface from characters-page
-interface SyncUpdates {
-  documents?: any[]
-  folders?: any[]
-  characters?: CharacterData[]
-}
-
-// Add local Tiptap type definitions (mirroring character-detail/index.tsx)
-interface TiptapMark {
-  type: string
-  attrs?: Record<string, any>
-}
-interface TiptapNode {
-  type: string
-  content?: TiptapNode[]
-  text?: string
-  marks?: TiptapMark[]
-  attrs?: Record<string, any>
-}
+import { CharacterData, ConversationGroup, TiptapNode, TiptapMark, SyncUpdates } from '@typez/globals'
 
 // Helper function to extract all conversations from a document
 const extractAllConversations = (

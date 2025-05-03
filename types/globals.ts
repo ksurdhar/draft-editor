@@ -71,3 +71,57 @@ export type FolderData = {
   folderIndex: number // Position within the parent folder, lower numbers appear first
   hash?: string // Added for content-based sync
 }
+
+// Conversation and Character interfaces moved from conversation components
+export interface TiptapMark {
+  type: string
+  attrs?: Record<string, any>
+}
+
+export interface TiptapNode {
+  type: string
+  content?: TiptapNode[]
+  text?: string
+  marks?: TiptapMark[]
+  attrs?: Record<string, any>
+}
+
+export interface CharacterData {
+  _id: string
+  name: string
+  motivation: string
+  description: string
+  traits: string[]
+  relationships?: Array<{
+    characterId: string
+    relationshipType: string
+    description: string
+  }>
+  userId?: string
+  documentIds?: string[]
+  lastUpdated?: number
+  isArchived?: boolean
+}
+
+export interface DialogueEntry {
+  characterId: string
+  characterName: string
+  documentId?: string
+  documentTitle?: string
+  contentNode: TiptapNode
+}
+
+export interface ConversationGroup {
+  conversationId: string
+  conversationName: string | null
+  documentId: string
+  documentTitle: string
+  entries: DialogueEntry[]
+  lastUpdated?: number
+}
+
+export interface SyncUpdates {
+  documents?: any[]
+  folders?: any[]
+  characters?: CharacterData[]
+}

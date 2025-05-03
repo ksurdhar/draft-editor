@@ -4,41 +4,13 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react'
 import { Card, CardContent, CardHeader } from '@components/ui/card'
 import { Typography } from '@mui/material'
 import TiptapJsonRenderer from '@components/tiptap-json-renderer'
-import EditorComponent from '@components/editor' // Import Editor
-import { useAPI, useNavigation } from '@components/providers' // Import API hook and useNavigation
-import { Loader } from '@components/loader' // Import Loader
-import { debounce } from '@lib/utils' // Import debounce
-import { DocumentData } from '@typez/globals' // Import DocumentData type
-import { Input } from '@components/ui/input' // Add Input for editing name
-import { Switch } from '@components/ui/switch' // Import Switch component
-
-// --- Type Definitions (Should match or be imported from a shared location) ---
-interface TiptapMark {
-  type: string
-  attrs?: Record<string, any>
-}
-interface TiptapNode {
-  type: string
-  content?: TiptapNode[]
-  text?: string
-  marks?: TiptapMark[]
-  attrs?: Record<string, any>
-}
-interface DialogueEntry {
-  characterId: string
-  characterName: string
-  documentId?: string
-  documentTitle?: string
-  contentNode: TiptapNode
-}
-interface ConversationGroup {
-  conversationId: string
-  conversationName?: string | null
-  documentId: string
-  documentTitle: string
-  entries: DialogueEntry[]
-  lastUpdated?: number
-}
+import EditorComponent from '@components/editor'
+import { useAPI, useNavigation } from '@components/providers'
+import { Loader } from '@components/loader'
+import { debounce } from '@lib/utils'
+import { DocumentData, TiptapMark, TiptapNode, DialogueEntry, ConversationGroup } from '@typez/globals'
+import { Input } from '@components/ui/input'
+import { Switch } from '@components/ui/switch'
 
 // --- Component Props ---
 interface ConversationPreviewProps {
@@ -223,6 +195,8 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({
   const [isScreenplayMode, setIsScreenplayMode] = useState(true) // Default to screenplay mode (current view mode)
   const [editingEntryIndex, setEditingEntryIndex] = useState<number | null>(null)
   const [editingContent, setEditingContent] = useState<string>('')
+  // Add cursor position state
+  const [cursorPosition, setCursorPosition] = useState<{ start: number; end: number } | null>(null)
 
   // Update local state if the conversation prop changes from parent
   useEffect(() => {
@@ -370,6 +344,7 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({
     setEditingEntryIndex(entryIndex)
     // Extract text content from the TiptapNode
     setEditingContent(content.text || '')
+    setCursorPosition(null) // Reset cursor position when starting to edit
   }
 
   const handleSaveEdit = async (entryIndex: number) => {
@@ -418,6 +393,7 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({
       // Exit edit mode for this entry
       setEditingEntryIndex(null)
       setEditingContent('')
+      setCursorPosition(null) // Reset cursor position when finished editing
     } catch (error) {
       console.error('Error saving dialogue edit:', error)
     }
@@ -599,7 +575,14 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({
                     // Replace input with textarea for multi-line support
                     <textarea
                       value={editingContent}
-                      onChange={e => setEditingContent(e.target.value)}
+                      onChange={e => {
+                        setEditingContent(e.target.value)
+                        // Store current cursor position
+                        setCursorPosition({
+                          start: e.target.selectionStart,
+                          end: e.target.selectionEnd,
+                        })
+                      }}
                       onBlur={() => handleSaveEdit(entryIndex)}
                       onKeyDown={e => {
                         if (e.key === 'Enter' && e.shiftKey) {
@@ -611,6 +594,7 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({
                         } else if (e.key === 'Escape') {
                           setEditingEntryIndex(null)
                           setEditingContent('')
+                          setCursorPosition(null) // Reset cursor position when canceling
                         }
                       }}
                       className="m-0 w-full flex-1 resize-none overflow-hidden border-none bg-transparent p-0 font-editor2 text-[18px] leading-normal focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
@@ -621,8 +605,15 @@ const ConversationPreview: React.FC<ConversationPreviewProps> = ({
                           // Auto-resize textarea to fit content
                           el.style.height = 'auto'
                           el.style.height = el.scrollHeight + 'px'
-                          // Focus at end of text
-                          el.selectionStart = el.selectionEnd = el.value.length
+
+                          // If we have a stored cursor position, restore it
+                          if (cursorPosition) {
+                            el.selectionStart = cursorPosition.start
+                            el.selectionEnd = cursorPosition.end
+                          } else {
+                            // Only position cursor at end when first opening the editor
+                            el.selectionStart = el.selectionEnd = el.value.length
+                          }
                         }
                       }}
                     />
