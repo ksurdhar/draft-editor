@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Editor } from '@tiptap/react'
 import { Node as ProseMirrorNode } from 'prosemirror-model'
-import { findAllMatches } from '../../lib/search'
+import {
+  getConfirmedMarksFromDoc,
+  processDialogueDetectionResult,
+  applyDialogueMarks,
+  preserveConfirmedMarks,
+} from '../../lib/utils/dialogue-utils'
 
 // Hook for handling dialogue confirmation
 export const useDialogueConfirmation = (editor: Editor | null, debouncedSave: (data: any) => void) => {
@@ -91,29 +96,8 @@ export const useDialogueSync = (
         throw new Error('Invalid response from dialogue detection')
       }
 
-      // Store confirmed marks before making changes
-      const confirmedRanges = new Map<
-        string,
-        {
-          character: string
-          conversationId: string
-          conversationName?: string | null
-        }
-      >()
-
-      editor.state.doc.descendants((node: ProseMirrorNode, pos: number) => {
-        if (node.isText) {
-          const dialogueMark = node.marks.find(mark => mark.type.name === 'dialogue')
-          if (dialogueMark?.attrs.userConfirmed) {
-            const rangeKey = `${pos}-${pos + node.nodeSize}`
-            confirmedRanges.set(rangeKey, {
-              character: dialogueMark.attrs.character,
-              conversationId: dialogueMark.attrs.conversationId,
-              conversationName: dialogueMark.attrs.conversationName,
-            })
-          }
-        }
-      })
+      // Get all confirmed dialogue marks using the utility function
+      const confirmedRanges = getConfirmedMarksFromDoc(editor.state.doc)
 
       // Group detected dialogues by conversationId for naming
       const conversationSnippets: Record<string, string[]> = {}
@@ -148,98 +132,19 @@ export const useDialogueSync = (
         }
       }
 
-      // Start a Tiptap transaction to batch changes
+      // Process the detected dialogues with the utility function
+      const { processedDialogues } = processDialogueDetectionResult(detectedDialogues, documentId, nameMap)
+
+      // Apply the dialogue marks to the document using the utility functions
       let tr = editor.state.tr
 
-      // 1. Remove all *existing* non-confirmed dialogue marks first
-      editor.state.doc.descendants((node: ProseMirrorNode, pos: number) => {
-        if (node.isText) {
-          const dialogueMark = node.marks.find(mark => mark.type.name === 'dialogue')
-          if (dialogueMark && !dialogueMark.attrs.userConfirmed) {
-            tr = tr.removeMark(pos, pos + node.nodeSize, editor.schema.marks.dialogue)
-          }
-        }
-      })
+      // First, apply new dialogue marks
+      const { tr: markedTr } = applyDialogueMarks(editor, processedDialogues, confirmedRanges)
+      tr = markedTr
 
-      // Apply the transaction to remove marks before adding new ones
-      editor.view.dispatch(tr)
-      tr = editor.state.tr // Get a new transaction based on the updated state
-
-      // 2. Apply *new* marks from AI, skipping confirmed ranges
-      for (const dialogue of detectedDialogues) {
-        const matches = findAllMatches(editor.state.doc, dialogue.snippet)
-        for (const match of matches) {
-          const rangeKey = `${match.from}-${match.to}`
-          // Construct the unique conversation ID
-          const uniqueConversationId = dialogue.conversationId
-            ? `${documentId}-${dialogue.conversationId}`
-            : `${documentId}-unknown`
-
-          if (confirmedRanges.has(rangeKey)) {
-            // If confirmed, ensure its ID matches what we expect, otherwise log potential issue
-            const confirmedAttrs = confirmedRanges.get(rangeKey)
-            if (confirmedAttrs?.conversationId !== uniqueConversationId) {
-              console.warn(
-                `Confirmed range ${rangeKey} has ID ${confirmedAttrs?.conversationId}, but new detection suggests ${uniqueConversationId} for snippet "${dialogue.snippet}". Keeping confirmed ID.`,
-              )
-            }
-            continue
-          }
-
-          // Get conversation name from the map or keep the existing one
-          const conversationName = nameMap.get(uniqueConversationId) || null
-
-          tr = tr.addMark(
-            match.from,
-            match.to,
-            editor.schema.marks.dialogue.create({
-              character: dialogue.character,
-              conversationId: uniqueConversationId, // Use unique ID
-              conversationName: conversationName,
-              userConfirmed: false,
-            }),
-          )
-        }
-      }
-
-      // 3. Re-apply confirmed marks
-      confirmedRanges.forEach((attrs, rangeKey) => {
-        const [from, to] = rangeKey.split('-').map(Number)
-        // Construct the unique conversation ID expected for the confirmed mark
-        const uniqueConversationId = attrs.conversationId
-          ? `${documentId}-${attrs.conversationId}`
-          : `${documentId}-unknown`
-        let needsReapply = true
-        editor.state.doc.nodesBetween(from, to, (node: ProseMirrorNode, pos: number) => {
-          // Check if a confirmed mark with the *correct unique ID* already exists
-          if (pos === from && node.isText) {
-            const existingMark = node.marks.find(m => m.type.name === 'dialogue')
-            if (
-              existingMark &&
-              existingMark.attrs.userConfirmed &&
-              existingMark.attrs.character === attrs.character &&
-              existingMark.attrs.conversationId === uniqueConversationId // Check unique ID
-            ) {
-              needsReapply = false
-            }
-          }
-        })
-
-        if (needsReapply && !isNaN(from) && !isNaN(to)) {
-          // Apply the mark with the unique ID, preserving existing conversationName
-          tr = tr.addMark(
-            from,
-            to,
-            editor.schema.marks.dialogue.create({
-              ...attrs,
-              conversationId: uniqueConversationId,
-              // Keep existing conversationName if it exists
-              conversationName: attrs.conversationName || nameMap.get(uniqueConversationId) || null,
-              userConfirmed: true,
-            }),
-          )
-        }
-      })
+      // Then ensure confirmed marks are preserved
+      const { tr: preservedTr } = preserveConfirmedMarks(editor, confirmedRanges, tr)
+      tr = preservedTr
 
       // Dispatch the final transaction
       editor.view.dispatch(tr)

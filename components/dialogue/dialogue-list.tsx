@@ -4,6 +4,13 @@ import { RefreshIcon, CheckCircleIcon, EyeIcon, EyeOffIcon, TrashIcon } from '@h
 import { CheckCircleIcon as CheckCircleIconSolid } from '@heroicons/react/solid'
 import { ListItem } from '../list-item'
 import { Editor } from '@tiptap/react'
+import {
+  processDialogueMarks,
+  groupDialogueMarks,
+  getBaseConversationDisplay,
+  ProcessedDialogueMark,
+  GroupedDialogue,
+} from '../../lib/utils/dialogue-utils'
 
 interface DialogueListProps {
   documentId: string
@@ -16,31 +23,6 @@ interface DialogueListProps {
   onToggleFocus: (conversationId: string) => void
   onUpdateConversationName: (conversationId: string, newName: string) => void
   onRemoveAllDialogueMarks?: () => void
-}
-
-interface DialogueMark {
-  type: 'dialogue'
-  attrs: {
-    character: string
-    conversationId: string
-    conversationName?: string
-    userConfirmed?: boolean
-  }
-}
-
-interface ProcessedDialogueMark {
-  id: string
-  character: string
-  content: string
-  conversationId: string | null
-  conversationName: string | null
-  userConfirmed?: boolean
-}
-
-interface GroupedDialogue {
-  conversationId: string
-  conversationName: string | null
-  dialogues: ProcessedDialogueMark[]
 }
 
 const DialogueList = ({
@@ -57,19 +39,6 @@ const DialogueList = ({
   const [editingConversationId, setEditingConversationId] = useState<string | null>(null)
   const [conversationNameInput, setConversationNameInput] = useState('')
 
-  // Helper function to get the display part of the conversation ID
-  const getBaseConvDisplay = (uniqueId: string | null): string => {
-    if (!uniqueId || uniqueId === 'unknown') {
-      return 'Unknown'
-    }
-    const parts = uniqueId.split('-')
-    const lastPart = parts[parts.length - 1]
-    if (lastPart.startsWith('conv')) {
-      return lastPart.substring(4) // Remove 'conv'
-    }
-    return lastPart // Fallback if format is unexpected
-  }
-
   useEffect(() => {
     if (!editor) {
       setProcessedMarks([])
@@ -79,73 +48,8 @@ const DialogueList = ({
     const calculateMarks = (): ProcessedDialogueMark[] => {
       if (!editor.state.doc) return []
 
-      const doc = editor.state.doc
-      const marks: ProcessedDialogueMark[] = []
-      let currentGroup: ProcessedDialogueMark | null = null
-
-      doc.descendants((node, pos) => {
-        if (node.isText && node.text) {
-          const text = node.text
-          const nodeEndPos = pos + node.nodeSize
-          const dialogueMarkData = node.marks.find(mark => mark.type.name === 'dialogue')
-
-          if (dialogueMarkData) {
-            const markAttrs = dialogueMarkData.attrs as DialogueMark['attrs']
-            const markInfo = {
-              character: markAttrs.character,
-              conversationId: markAttrs.conversationId || null,
-              conversationName: markAttrs.conversationName || null,
-              userConfirmed: markAttrs.userConfirmed || false,
-            }
-
-            if (
-              currentGroup &&
-              currentGroup.character === markInfo.character &&
-              currentGroup.conversationId === markInfo.conversationId &&
-              currentGroup.conversationName === markInfo.conversationName &&
-              pos === parseInt(currentGroup.id.split('-')[1], 10)
-            ) {
-              currentGroup.content += text
-              const [start] = currentGroup.id.split('-').map(Number)
-              currentGroup.id = `${start}-${nodeEndPos}`
-              if (markInfo.userConfirmed) {
-                currentGroup.userConfirmed = true
-              }
-            } else {
-              if (currentGroup) {
-                marks.push(currentGroup)
-              }
-              currentGroup = {
-                id: `${pos}-${nodeEndPos}`,
-                character: markInfo.character,
-                content: text,
-                conversationId: markInfo.conversationId,
-                conversationName: markInfo.conversationName,
-                userConfirmed: markInfo.userConfirmed,
-              }
-            }
-          } else {
-            if (currentGroup) {
-              marks.push(currentGroup)
-              currentGroup = null
-            }
-          }
-          return true
-        } else {
-          if (currentGroup) {
-            marks.push(currentGroup)
-            currentGroup = null
-          }
-          return true
-        }
-      })
-
-      if (currentGroup) {
-        marks.push(currentGroup)
-      }
-
-      const filteredMarks = marks.filter(mark => mark.content.trim().length > 0)
-      return filteredMarks
+      // Use the tested utility function instead of inline implementation
+      return processDialogueMarks(editor.state.doc)
     }
 
     setProcessedMarks(calculateMarks())
@@ -163,39 +67,8 @@ const DialogueList = ({
   }, [editor])
 
   const groupedDialogues = useMemo(() => {
-    type GroupData = { dialogues: ProcessedDialogueMark[]; conversationName: string | null }
-    const groups: Record<string, GroupData> = {}
-
-    processedMarks.forEach(mark => {
-      const convId = mark.conversationId ?? 'unknown'
-      if (!groups[convId]) {
-        groups[convId] = { dialogues: [], conversationName: null }
-      }
-
-      if (groups[convId].conversationName === null && mark.conversationName) {
-        groups[convId].conversationName = mark.conversationName
-      }
-
-      groups[convId].dialogues.push(mark)
-    })
-
-    const grouped: GroupedDialogue[] = Object.entries(groups)
-      .map(([conversationId, groupData]) => ({
-        conversationId,
-        conversationName: groupData.conversationName,
-        dialogues: groupData.dialogues.sort((a, b) => {
-          const [aStart] = a.id.split('-').map(Number)
-          const [bStart] = b.id.split('-').map(Number)
-          return aStart - bStart
-        }),
-      }))
-      .sort((a, b) => {
-        const firstAStart = a.dialogues[0]?.id.split('-').map(Number)[0] ?? Infinity
-        const firstBStart = b.dialogues[0]?.id.split('-').map(Number)[0] ?? Infinity
-        return firstAStart - firstBStart
-      })
-
-    return grouped
+    // Use the tested utility function instead of inline implementation
+    return groupDialogueMarks(processedMarks)
   }, [processedMarks])
 
   const handleDoubleClickConversation = (convId: string, currentName: string | null) => {
@@ -285,7 +158,7 @@ const DialogueList = ({
                         (
                         {group.conversationId === 'unknown'
                           ? 'Unknown'
-                          : getBaseConvDisplay(group.conversationId)}
+                          : getBaseConversationDisplay(group.conversationId)}
                         )
                       </span>
                     </>
@@ -294,7 +167,7 @@ const DialogueList = ({
                       Conversation{' '}
                       {group.conversationId === 'unknown'
                         ? 'Unknown'
-                        : getBaseConvDisplay(group.conversationId)}
+                        : getBaseConversationDisplay(group.conversationId)}
                     </>
                   )}
                 </span>

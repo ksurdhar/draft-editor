@@ -18,7 +18,8 @@
     "start-socket": "node websocket/server.js",
     "migrate-storage": "ts-node scripts/migrate-to-files.ts",
     "test:integration": "ts-node scripts/run-integration-tests.ts $*",
-    "test:integration:debug": "DEBUG=true ts-node scripts/run-integration-tests.ts $*"
+    "test:integration:debug": "DEBUG=true ts-node scripts/run-integration-tests.ts $*",
+    "test:dialogue": "jest --config=jest.config.dialogue.js"
   },
   "engines": {
     "node": "^20.0.0"
@@ -137,6 +138,7 @@
     "eslint-plugin-import": "^2.25.0",
     "eslint-plugin-prettier": "^5.2.3",
     "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
     "node-mocks-http": "^1.16.2",
     "postcss": "^8.4.14",
     "prettier": "^3.0.3",
