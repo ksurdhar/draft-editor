@@ -133,9 +133,12 @@ export function applyDialogueMarks(
   // Document size to validate positions
   const docSize = editor.state.doc.content.size
 
+  // Document content is available via editor.state.doc.textContent if needed for debugging
+
   // Apply new marks, skipping confirmed ranges
   for (const dialogue of processedDialogues) {
     const matches = findAllMatches(editor.state.doc, dialogue.snippet)
+
     for (const match of matches) {
       // Skip invalid matches or those out of bounds
       if (

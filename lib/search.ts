@@ -19,16 +19,21 @@ export function findAllMatches(
   if (!searchTerm) return matches
 
   // Create regex pattern based on options
-  let pattern = searchTerm
+  // Escape special regex characters to treat the search term as literal text
+  let pattern = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
   if (options.wholeWord) {
     pattern = `\\b${pattern}\\b`
   }
   const flags = options.matchCase ? 'g' : 'gi'
+
   const searchRegex = new RegExp(pattern, flags)
 
   doc.descendants((node, nodePos) => {
     if (node.isText) {
       let match
+      searchRegex.lastIndex = 0 // Reset regex state before each use
+
       while ((match = searchRegex.exec(node.text || '')) !== null) {
         matches.push({
           from: nodePos + match.index,
