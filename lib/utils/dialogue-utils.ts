@@ -1,6 +1,6 @@
 import { Editor } from '@tiptap/react'
 import { Node as ProseMirrorNode } from 'prosemirror-model'
-import { findAllMatches } from '../search'
+import { findAllMatches, findDialogueSnippet } from '../search'
 
 /**
  * Types to better define dialogue marks and API responses
@@ -137,7 +137,13 @@ export function applyDialogueMarks(
 
   // Apply new marks, skipping confirmed ranges
   for (const dialogue of processedDialogues) {
-    const matches = findAllMatches(editor.state.doc, dialogue.snippet)
+    // First try to find exact matches
+    let matches = findAllMatches(editor.state.doc, dialogue.snippet)
+
+    // If no exact matches found, try to find dialogue spanning multiple paragraphs
+    if (matches.length === 0) {
+      matches = findDialogueSnippet(editor.state.doc, dialogue.snippet)
+    }
 
     for (const match of matches) {
       // Skip invalid matches or those out of bounds

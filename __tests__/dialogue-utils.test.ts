@@ -832,3 +832,136 @@ describe('Dialogue Utilities Integration', () => {
     expect(sampleMark).toHaveProperty('conversationId')
   })
 })
+
+describe('Multi-paragraph Dialogue Detection', () => {
+  let editor: Editor
+
+  beforeEach(() => {
+    // Reset the document body before each test
+    document.body.innerHTML = ''
+    // Create editor with multi-paragraph content
+    editor = createEditor({
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Introduction text.' }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            {
+              type: 'text',
+              text: 'Forget it, I should know better than to ask someone who visits the cafe.',
+            },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'What kind of person would even care about that topic?' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Other text in between.' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'First part of second dialogue.' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Second part of second dialogue that continues.' }],
+        },
+      ],
+    })
+  })
+
+  afterEach(() => {
+    editor.destroy()
+  })
+
+  it('should detect dialogues that span multiple paragraphs', () => {
+    // Create a dialogue that spans two paragraphs
+    const multiParagraphDialogue = {
+      character: 'Character',
+      snippet:
+        'Forget it, I should know better than to ask someone who visits the cafe.\nWhat kind of person would even care about that topic?',
+      conversationId: 'conv1',
+      uniqueConversationId: 'test-doc-conv1',
+      conversationName: 'Test Conversation',
+    }
+
+    // Apply the dialogue mark
+    const { tr, marksApplied } = applyDialogueMarks(editor, [multiParagraphDialogue], [])
+
+    // Dispatch the transaction
+    editor.view.dispatch(tr)
+
+    // Verify the mark was applied
+    expect(marksApplied).toBe(1)
+
+    // Extract all dialogue marks
+    const processedMarks = processDialogueMarks(editor.state.doc)
+
+    // Verify we got marks for both paragraphs
+    // ProseMirror doesn't actually create a single mark spanning paragraphs,
+    // it creates separate marks with the same attributes
+    expect(processedMarks.length).toBe(2)
+
+    // Check that all marks have the correct character
+    const characterMarks = processedMarks.filter(m => m.character === 'Character')
+    expect(characterMarks.length).toBe(2)
+
+    // Check that we have both parts of the dialogue
+    const firstPart = characterMarks.find(m => m.content.includes('Forget it'))
+    const secondPart = characterMarks.find(m => m.content.includes('What kind of person'))
+    expect(firstPart).toBeDefined()
+    expect(secondPart).toBeDefined()
+  })
+
+  it('should handle multiple separate multi-paragraph dialogues', () => {
+    // Create two dialogues that each span multiple paragraphs
+    const dialogues = [
+      {
+        character: 'Character1',
+        snippet:
+          'Forget it, I should know better than to ask someone who visits the cafe.\nWhat kind of person would even care about that topic?',
+        conversationId: 'conv1',
+        uniqueConversationId: 'test-doc-conv1',
+        conversationName: 'Conversation 1',
+      },
+      {
+        character: 'Character2',
+        snippet: 'First part of second dialogue.\nSecond part of second dialogue that continues.',
+        conversationId: 'conv2',
+        uniqueConversationId: 'test-doc-conv2',
+        conversationName: 'Conversation 2',
+      },
+    ]
+
+    // Apply the dialogue marks
+    const { tr, marksApplied } = applyDialogueMarks(editor, dialogues, [])
+
+    // Dispatch the transaction
+    editor.view.dispatch(tr)
+
+    // Verify both marks were applied
+    expect(marksApplied).toBe(2)
+
+    // Extract all dialogue marks
+    const processedMarks = processDialogueMarks(editor.state.doc)
+
+    // Verify we got two marks
+    expect(processedMarks.length).toBe(4)
+
+    // Verify the first dialogue
+    const firstDialogue = processedMarks.find(m => m.character === 'Character1')
+    expect(firstDialogue).toBeDefined()
+    expect(firstDialogue?.content).toContain('Forget it, I should know better')
+
+    // Verify the second dialogue
+    const secondDialogue = processedMarks.find(m => m.character === 'Character2')
+    expect(secondDialogue).toBeDefined()
+    expect(secondDialogue?.content).toContain('First part of second dialogue')
+  })
+})
