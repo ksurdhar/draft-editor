@@ -567,3 +567,211 @@ describe('Dialogue Utilities', () => {
     })
   })
 })
+
+describe('Dialogue Utilities Integration', () => {
+  let editor: Editor
+
+  beforeEach(() => {
+    // Reset the document body before each test
+    document.body.innerHTML = ''
+    // Create editor with some initial content
+    editor = createEditor({
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Some introductory text.' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'John: This is a line of dialogue.' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Mary: And this is my response.' }],
+        },
+        {
+          type: 'paragraph',
+          content: [
+            {
+              type: 'text',
+              text: 'John: I have some existing marks.',
+              marks: [
+                {
+                  type: 'dialogue',
+                  attrs: {
+                    character: 'John',
+                    conversationId: 'test-doc-conv1',
+                    conversationName: 'Existing Conversation',
+                    userConfirmed: true,
+                  },
+                },
+              ],
+            },
+          ],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'This is not dialogue.' }],
+        },
+      ],
+    })
+  })
+
+  afterEach(() => {
+    editor.destroy()
+  })
+
+  it('should process and apply detected dialogues from server response', () => {
+    // 1. Mock the dialogue detection response from server
+    const mockDetectedDialogues = [
+      {
+        character: 'John',
+        snippet: 'John: This is a line of dialogue.',
+        conversationId: 'conv1',
+      },
+      {
+        character: 'Mary',
+        snippet: 'Mary: And this is my response.',
+        conversationId: 'conv1',
+      },
+      {
+        character: 'John',
+        snippet: 'John: I have some existing marks.',
+        conversationId: 'conv1',
+      },
+    ]
+
+    // 2. Get confirmed marks from document
+    const confirmedMarks = getConfirmedMarksFromDoc(editor.state.doc)
+
+    // Verify we have one confirmed mark initially
+    expect(confirmedMarks.length).toBe(1)
+    expect(confirmedMarks[0].attrs.character).toBe('John')
+    expect(confirmedMarks[0].attrs.userConfirmed).toBe(true)
+
+    // 3. Create name map (simulating server response for conversation naming)
+    const documentId = 'test-doc'
+    const nameMap = new Map<string, string>([['test-doc-conv1', 'Existing Conversation']])
+
+    // 4. Process dialogue detection result
+    const { processedDialogues } = processDialogueDetectionResult(mockDetectedDialogues, documentId, nameMap)
+
+    // 5. Apply dialogue marks
+    const { tr: markedTr, marksApplied } = applyDialogueMarks(editor, processedDialogues, confirmedMarks)
+
+    // 6. Preserve confirmed marks
+    const { tr: finalTr, confirmedMarksPreserved } = preserveConfirmedMarks(editor, confirmedMarks, markedTr)
+
+    // 7. Dispatch the transaction
+    editor.view.dispatch(finalTr)
+
+    // 8. Verify results
+    expect(marksApplied).toBe(2) // Two new marks applied (existing confirmed mark is skipped)
+    expect(confirmedMarksPreserved).toBeGreaterThanOrEqual(0) // Some marks may need preserving
+
+    // 9. Extract all dialogue marks after processing
+    const allMarks = processDialogueMarks(editor.state.doc)
+
+    // Should have 3 marks total now
+    expect(allMarks.length).toBe(3)
+
+    // Check that marks have the right properties
+    const marksByContent = new Map(allMarks.map(mark => [mark.content, mark]))
+
+    // First dialogue line should be marked
+    const firstDialogueMark = marksByContent.get('John: This is a line of dialogue.')
+    expect(firstDialogueMark).toBeDefined()
+    expect(firstDialogueMark?.character).toBe('John')
+    expect(firstDialogueMark?.conversationId).toBe('test-doc-conv1')
+    expect(firstDialogueMark?.userConfirmed).toBe(false) // Not confirmed yet
+
+    // Second dialogue line should be marked
+    const secondDialogueMark = marksByContent.get('Mary: And this is my response.')
+    expect(secondDialogueMark).toBeDefined()
+    expect(secondDialogueMark?.character).toBe('Mary')
+    expect(secondDialogueMark?.conversationId).toBe('test-doc-conv1')
+
+    // The confirmed mark should still be present and still confirmed
+    const confirmedDialogueMark = marksByContent.get('John: I have some existing marks.')
+    expect(confirmedDialogueMark).toBeDefined()
+    expect(confirmedDialogueMark?.userConfirmed).toBe(true)
+
+    // 10. Group dialogues by conversation
+    const groupedDialogues = groupDialogueMarks(allMarks)
+
+    // Should have 1 conversation group
+    expect(groupedDialogues.length).toBe(1)
+    expect(groupedDialogues[0].conversationId).toBe('test-doc-conv1')
+    expect(groupedDialogues[0].conversationName).toBe('Existing Conversation')
+    expect(groupedDialogues[0].dialogues.length).toBe(3)
+  })
+
+  it('should simulate full dialogue sync flow', () => {
+    // This test simulates the flow in useDialogueSync hook in dialogue-hooks.ts
+
+    // 1. Mock the server responses
+    const mockDetectionResponse = [
+      {
+        character: 'John',
+        snippet: 'John: This is a line of dialogue.',
+        conversationId: 'conv1',
+      },
+      {
+        character: 'Mary',
+        snippet: 'Mary: And this is my response.',
+        conversationId: 'conv1',
+      },
+    ]
+
+    const mockNamingResponse = {
+      names: [{ id: 'conv1', name: 'Conversation about something' }],
+    }
+
+    // 2. Get confirmed marks
+    const confirmedMarks = getConfirmedMarksFromDoc(editor.state.doc)
+
+    // 3. Process with naming information
+    const documentId = 'test-doc'
+    const nameMap = new Map(mockNamingResponse.names.map(n => [`${documentId}-${n.id}`, n.name]))
+
+    // 4. Process detection result
+    const { processedDialogues } = processDialogueDetectionResult(mockDetectionResponse, documentId, nameMap)
+
+    // 5. Apply marks in sequence as in the hook
+    let tr = editor.state.tr
+
+    // Apply new dialogue marks
+    const { tr: markedTr } = applyDialogueMarks(editor, processedDialogues, confirmedMarks)
+    tr = markedTr
+
+    // Preserve confirmed marks
+    const { tr: preservedTr } = preserveConfirmedMarks(editor, confirmedMarks, tr)
+    tr = preservedTr
+
+    // Dispatch transaction
+    editor.view.dispatch(tr)
+
+    // 6. Verify results
+    const finalMarks = processDialogueMarks(editor.state.doc)
+
+    // Should have both original confirmed mark and two new marks
+    expect(finalMarks.length).toBe(3)
+
+    // Group and check conversations
+    const groupedDialogues = groupDialogueMarks(finalMarks)
+    expect(groupedDialogues.length).toBe(1)
+
+    // The first two dialogues should be in the named conversation
+    const johnAndMaryDialogues = groupedDialogues[0].dialogues
+    expect(johnAndMaryDialogues.length).toBe(3)
+
+    // Check that the naming is propagated correctly
+    const johnDialogue = johnAndMaryDialogues.find(d => d.content === 'John: This is a line of dialogue.')
+    expect(johnDialogue?.conversationId).toBe('test-doc-conv1')
+
+    // The conversation should have the new name on newly created marks
+    const maryDialogue = johnAndMaryDialogues.find(d => d.content === 'Mary: And this is my response.')
+    expect(maryDialogue?.conversationName).toBe('Conversation about something')
+  })
+})

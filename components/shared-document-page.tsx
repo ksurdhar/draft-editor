@@ -362,6 +362,8 @@ export default function SharedDocumentPage() {
     isDialogueMode,
   })
 
+  console.log('documentContent', documentContent)
+
   return (
     <Layout documentId={id} onToggleGlobalSearch={handleToggleGlobalSearch}>
       {!skipAnimation && (
