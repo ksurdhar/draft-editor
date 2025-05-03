@@ -24,14 +24,18 @@ export const calculateMoveUpdates = (
 ) => {
   // Get all items in the target folder
   const folderItems = [
-    ...docs.filter(d => {
-      if (!targetFolderId) return !d.parentId || d.parentId === 'root'
-      return d.parentId === targetFolderId
-    }),
-    ...folders.filter(f => {
-      if (!targetFolderId) return !f.parentId || f.parentId === 'root'
-      return f.parentId === targetFolderId
-    }),
+    ...docs
+      .filter(d => {
+        if (!targetFolderId) return !d.parentId || d.parentId === 'root'
+        return d.parentId === targetFolderId
+      })
+      .map(doc => ({ ...doc, isDocument: true })),
+    ...folders
+      .filter(f => {
+        if (!targetFolderId) return !f.parentId || f.parentId === 'root'
+        return f.parentId === targetFolderId
+      })
+      .map(folder => ({ ...folder, isDocument: false })),
   ].sort((a, b) => (a.folderIndex || 0) - (b.folderIndex || 0))
 
   // Remove the moved item from the list if it's already in this folder
@@ -39,7 +43,9 @@ export const calculateMoveUpdates = (
 
   // Get the moved item
   const movedDoc = docs.find(d => d._id === itemId)
-  const movedItem = movedDoc || folders.find(f => f._id === itemId)
+  const movedItem = movedDoc
+    ? { ...movedDoc, isDocument: true }
+    : { ...folders.find(f => f._id === itemId)!, isDocument: false }
 
   if (!movedItem) {
     throw new Error(`Could not find item to move: ${itemId}`)
@@ -51,7 +57,7 @@ export const calculateMoveUpdates = (
   // Create updates with sequential indices
   const updates = filteredItems.map((item, index) => ({
     id: item._id,
-    isDocument: 'content' in item,
+    isDocument: item.isDocument,
     folderIndex: index,
   }))
 
@@ -101,6 +107,8 @@ export const moveItem = async (
       folderIndex: targetIndex || 0,
       lastUpdated: Date.now(),
     })
+
+    console.log('updates', updates)
 
     // Then update all other items' positions
     await Promise.all(
