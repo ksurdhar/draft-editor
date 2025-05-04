@@ -14,6 +14,7 @@ import { DialogueHighlight } from '../lib/tiptap-extensions/dialogue-highlight'
 import { DialogueFocus } from '../lib/tiptap-extensions/dialogue-focus'
 import { Scene } from '../lib/tiptap-extensions/scene'
 import { SceneHighlight } from '../lib/tiptap-extensions/scene-highlight'
+import { SceneKeymap } from '../lib/tiptap-extensions/scene-keymap'
 import BubbleMenuExtension from '@tiptap/extension-bubble-menu'
 import DialogueBubbleMenu from './dialogue-bubble-menu'
 
@@ -141,6 +142,7 @@ const EditorComponent = ({
         DialogueFocus,
         Scene,
         SceneHighlight,
+        SceneKeymap,
         BubbleMenuExtension.configure({
           pluginKey: 'dialogueBubbleMenu',
           tippyOptions: { duration: 100 },

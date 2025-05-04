@@ -401,8 +401,6 @@ export default function SharedDocumentPage() {
     }
   }, [showScenes, editor])
 
-  console.log('documentContent', documentContent)
-
   return (
     <Layout documentId={id} onToggleGlobalSearch={handleToggleGlobalSearch}>
       {!skipAnimation && (
