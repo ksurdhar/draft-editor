@@ -469,6 +469,15 @@ export default function SharedDocumentPage() {
                   const newShowDialogue = !showDialogue
                   setShowDialogue(newShowDialogue)
                   setIsDialogueMode(newShowDialogue)
+                  if (editor) {
+                    // Use command to update dialogue mode in editor
+                    editor.commands.setDialogueMode(newShowDialogue)
+
+                    // Also ensure scene mode is disabled when dialogue mode is enabled
+                    if (newShowDialogue) {
+                      editor.commands.setSceneMode(false)
+                    }
+                  }
                   if (newShowDialogue) {
                     // Disable other modes when dialogue mode is enabled
                     setShowScenes(false)
@@ -488,6 +497,16 @@ export default function SharedDocumentPage() {
                 onClick={() => {
                   const newShowScenes = !showScenes
                   setShowScenes(newShowScenes)
+                  if (editor) {
+                    // Use command to update scene mode and highlighting in editor
+                    editor.commands.setSceneMode(newShowScenes)
+                    editor.commands.setSceneHighlight(newShowScenes)
+
+                    // Also ensure dialogue mode is disabled when scene mode is enabled
+                    if (newShowScenes) {
+                      editor.commands.setDialogueMode(false)
+                    }
+                  }
                   if (newShowScenes) {
                     // Disable other modes when scene mode is enabled
                     setShowDialogue(false)

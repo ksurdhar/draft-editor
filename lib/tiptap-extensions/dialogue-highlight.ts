@@ -11,6 +11,7 @@ interface DialogueHighlightState {
   highlightAll: boolean // Flag for general highlighting
   focusedConversationId: string | null
   highlightCharacterName: string | null
+  dialogueMode: boolean // Track if dialogue mode is active
 }
 
 declare module '@tiptap/core' {
@@ -22,6 +23,8 @@ declare module '@tiptap/core' {
       setDialogueHighlightCharacter: (conversationId: string, characterName: string) => ReturnType
       /** Removes all dialogue highlighting */
       clearDialogueHighlight: () => ReturnType // Renamed for clarity
+      /** Set dialogue mode (for bubble menu and other UI elements) */
+      setDialogueMode: (active: boolean) => ReturnType
     }
   }
 }
@@ -76,6 +79,17 @@ export const DialogueHighlight = Extension.create<DialogueHighlightOptions>({
           }
           return true
         },
+      // New command for setting dialogue mode
+      setDialogueMode:
+        active =>
+        ({ tr, dispatch }) => {
+          if (dispatch) {
+            tr.setMeta(dialogueHighlightPluginKey, {
+              dialogueMode: active,
+            })
+          }
+          return true
+        },
     }
   },
 
@@ -88,7 +102,12 @@ export const DialogueHighlight = Extension.create<DialogueHighlightOptions>({
         state: {
           // Initialize state with highlighting off
           init(): DialogueHighlightState {
-            return { highlightAll: false, focusedConversationId: null, highlightCharacterName: null }
+            return {
+              highlightAll: false,
+              focusedConversationId: null,
+              highlightCharacterName: null,
+              dialogueMode: false,
+            }
           },
           // Apply state changes from meta transactions
           apply(tr, value): DialogueHighlightState {

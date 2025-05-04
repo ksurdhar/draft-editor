@@ -10,7 +10,7 @@ import FindPanel from './find-panel'
 import { SearchHighlight } from '../lib/tiptap-extensions/search-highlight'
 import { DiffHighlight } from '../lib/tiptap-extensions/diff-highlight'
 import { DialogueMark } from '../lib/tiptap-extensions/dialogue-mark'
-import { DialogueHighlight } from '../lib/tiptap-extensions/dialogue-highlight'
+import { DialogueHighlight, dialogueHighlightPluginKey } from '../lib/tiptap-extensions/dialogue-highlight'
 import { DialogueFocus } from '../lib/tiptap-extensions/dialogue-focus'
 import { Scene } from '../lib/tiptap-extensions/scene'
 import { SceneHighlight } from '../lib/tiptap-extensions/scene-highlight'
@@ -173,7 +173,7 @@ const EditorComponent = ({
         }
       },
     },
-    [content, diffMode, canEdit, isDialogueMode],
+    [content, diffMode, canEdit],
   )
 
   // Track content prop changes
@@ -271,7 +271,12 @@ const EditorComponent = ({
             const { selection } = state
             const { $from, $to } = selection
             const text = state.doc.textBetween($from.pos, $to.pos, ' ')
-            const show = !!isDialogueMode && !selection.empty && text.trim().length > 0
+
+            // Get dialogue mode state from the plugin instead of prop
+            const pluginState = dialogueHighlightPluginKey.getState(state)
+            const dialogueModeActive = pluginState?.dialogueMode || isDialogueMode
+
+            const show = !!dialogueModeActive && !selection.empty && text.trim().length > 0
 
             return show
           }}>

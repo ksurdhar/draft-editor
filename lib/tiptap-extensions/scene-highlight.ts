@@ -10,6 +10,7 @@ export interface SceneHighlightOptions {
 interface SceneHighlightState {
   highlightAll: boolean // Flag for general highlighting
   focusedSceneId: string | null
+  sceneMode: boolean // Track if scene mode is active
 }
 
 declare module '@tiptap/core' {
@@ -21,6 +22,8 @@ declare module '@tiptap/core' {
       setSceneFocus: (sceneId: string | null) => ReturnType
       /** Removes all scene highlighting */
       clearSceneHighlight: () => ReturnType
+      /** Set scene mode (for UI elements) */
+      setSceneMode: (active: boolean) => ReturnType
     }
   }
 }
@@ -71,6 +74,16 @@ export const SceneHighlight = Extension.create<SceneHighlightOptions>({
           }
           return true
         },
+      setSceneMode:
+        active =>
+        ({ tr, dispatch }) => {
+          if (dispatch) {
+            tr.setMeta(sceneHighlightPluginKey, {
+              sceneMode: active,
+            })
+          }
+          return true
+        },
     }
   },
 
@@ -83,7 +96,11 @@ export const SceneHighlight = Extension.create<SceneHighlightOptions>({
         state: {
           // Initialize state with highlighting off
           init(): SceneHighlightState {
-            return { highlightAll: false, focusedSceneId: null }
+            return {
+              highlightAll: false,
+              focusedSceneId: null,
+              sceneMode: false,
+            }
           },
           // Apply state changes from meta transactions
           apply(tr, value): SceneHighlightState {
