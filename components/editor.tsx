@@ -12,6 +12,8 @@ import { DiffHighlight } from '../lib/tiptap-extensions/diff-highlight'
 import { DialogueMark } from '../lib/tiptap-extensions/dialogue-mark'
 import { DialogueHighlight } from '../lib/tiptap-extensions/dialogue-highlight'
 import { DialogueFocus } from '../lib/tiptap-extensions/dialogue-focus'
+import { Scene } from '../lib/tiptap-extensions/scene'
+import { SceneHighlight } from '../lib/tiptap-extensions/scene-highlight'
 import BubbleMenuExtension from '@tiptap/extension-bubble-menu'
 import DialogueBubbleMenu from './dialogue-bubble-menu'
 
@@ -45,6 +47,17 @@ const editorStyles = `
   .dialogue-dimmed {
     opacity: 0.5; /* Adjust opacity as needed */
     transition: opacity 0.3s ease-in-out; /* Add a smooth transition */
+  }
+  .scene-node {
+    /* Base styling for scene nodes */
+    position: relative;
+    padding: 0.5rem 0;
+  }
+  .scene-highlighted {
+    background-color: rgba(167, 139, 250, 0.1); /* purple-300 with opacity */
+    border-left: 3px solid rgba(167, 139, 250, 0.5);
+    padding-left: 1rem;
+    margin-left: -1rem;
   }
 `
 
@@ -126,6 +139,8 @@ const EditorComponent = ({
         DialogueMark,
         DialogueHighlight,
         DialogueFocus,
+        Scene,
+        SceneHighlight,
         BubbleMenuExtension.configure({
           pluginKey: 'dialogueBubbleMenu',
           tippyOptions: { duration: 100 },

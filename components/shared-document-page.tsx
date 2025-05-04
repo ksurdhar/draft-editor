@@ -13,10 +13,19 @@ import { useCallback, useEffect, useState, useMemo } from 'react'
 import useSWR, { mutate } from 'swr'
 import { useDebouncedCallback } from 'use-debounce'
 import { motion, AnimatePresence } from 'framer-motion'
-import { EyeIcon, EyeOffIcon, ClockIcon, SearchIcon, ChatIcon, CodeIcon } from '@heroicons/react/outline'
+import {
+  EyeIcon,
+  EyeOffIcon,
+  ClockIcon,
+  SearchIcon,
+  ChatIcon,
+  CodeIcon,
+  DocumentIcon,
+} from '@heroicons/react/outline'
 import VersionList from '@components/version-list'
 import GlobalFind from '@components/global-find'
 import { DialogueList, useDialogue } from '@components/dialogue'
+import { SceneList } from './scene'
 import { renameItem, DocumentOperations } from '@lib/document-operations'
 import DebugPanel from './debug-panel'
 
@@ -94,6 +103,14 @@ export default function SharedDocumentPage() {
   const [initAnimate, setInitAnimate] = useState(false)
   const [isDialogueMode, setIsDialogueMode] = useState(false)
   const [showDebugPanel, setShowDebugPanel] = useState(false)
+  const [showScenes, setShowScenes] = useState(false)
+  const [focusedSceneId, setFocusedSceneId] = useState<string | null>(null)
+  const [showVersions, setShowVersions] = useState(false)
+  const [showDialogue, setShowDialogue] = useState(false)
+  const [showGlobalFind, setShowGlobalFind] = useState(false)
+  const [diffContent, setDiffContent] = useState<any>(null)
+  const [showInitialLoader, setShowInitialLoader] = useState(false)
+  const [dialogueDoc, setDialogueDoc] = useState<any>(null)
 
   useEffect(() => {
     if (databaseDoc) {
@@ -198,12 +215,6 @@ export default function SharedDocumentPage() {
   const [recentlySaved, setRecentlySaved] = useState(false)
   const skipAnimation = searchParams.get('from') === 'tree'
   const [showTree, setShowTree] = useState(true)
-  const [showVersions, setShowVersions] = useState(false)
-  const [showDialogue, setShowDialogue] = useState(false)
-  const [showGlobalFind, setShowGlobalFind] = useState(false)
-  const [diffContent, setDiffContent] = useState<any>(null)
-  const [showInitialLoader, setShowInitialLoader] = useState(false)
-  const [dialogueDoc, setDialogueDoc] = useState<any>(null)
 
   const debouncedSave = useDebouncedCallback((data: Partial<DocumentData>) => {
     mutate(`/documents/${documentId}/versions`)
@@ -346,6 +357,11 @@ export default function SharedDocumentPage() {
 
   const handleEditorReady = (editorInstance: any) => {
     setEditor(editorInstance)
+
+    // Apply initial scene highlighting state
+    if (editorInstance && editorInstance.isEditable) {
+      editorInstance.commands.setSceneHighlight(!!showScenes)
+    }
   }
 
   const {
@@ -361,6 +377,29 @@ export default function SharedDocumentPage() {
     setDialogueDoc,
     isDialogueMode,
   })
+
+  const handleToggleFocusScene = (sceneId: string) => {
+    setFocusedSceneId(focusedSceneId === sceneId ? null : sceneId)
+  }
+
+  const handleUpdateSceneTitle = (sceneId: string, newTitle: string) => {
+    if (editor) {
+      editor.commands.updateSceneTitle(sceneId, newTitle)
+    }
+  }
+
+  const handleAddScene = () => {
+    if (editor) {
+      editor.commands.createScene()
+    }
+  }
+
+  // Toggle scene highlighting when showScenes changes
+  useEffect(() => {
+    if (editor && editor.isEditable) {
+      editor.commands.setSceneHighlight(!!showScenes)
+    }
+  }, [showScenes, editor])
 
   console.log('documentContent', documentContent)
 
@@ -390,6 +429,7 @@ export default function SharedDocumentPage() {
                   if (!showTree) {
                     setShowGlobalFind(false)
                     setShowDialogue(false)
+                    setShowScenes(false)
                   }
                 }}
                 className="rounded-lg p-1.5 transition-colors hover:bg-white/[.1]"
@@ -406,6 +446,7 @@ export default function SharedDocumentPage() {
                   if (!showGlobalFind) {
                     setShowTree(false)
                     setShowDialogue(false)
+                    setShowScenes(false)
                   }
                 }}
                 className="rounded-lg p-1.5 transition-colors hover:bg-white/[.1]"
@@ -417,6 +458,7 @@ export default function SharedDocumentPage() {
                   setShowVersions(!showVersions)
                   if (!showVersions) {
                     setShowDialogue(false)
+                    setShowScenes(false)
                     setDiffContent(null)
                   }
                 }}
@@ -429,14 +471,40 @@ export default function SharedDocumentPage() {
                   const newShowDialogue = !showDialogue
                   setShowDialogue(newShowDialogue)
                   setIsDialogueMode(newShowDialogue)
+                  if (newShowDialogue) {
+                    // Disable other modes when dialogue mode is enabled
+                    setShowScenes(false)
+                  }
                   if (!newShowDialogue) {
                     setShowVersions(false)
                     setDiffContent(null)
                   }
                 }}
-                className="rounded-lg p-1.5 transition-colors hover:bg-white/[.1]"
+                className={`rounded-lg p-1.5 transition-colors hover:bg-white/[.1] ${
+                  showDialogue ? 'bg-white/[.1]' : ''
+                }`}
                 title={showDialogue ? 'Hide dialogue' : 'Show dialogue'}>
                 <ChatIcon className="h-4 w-4 text-black/70" />
+              </button>
+              <button
+                onClick={() => {
+                  const newShowScenes = !showScenes
+                  setShowScenes(newShowScenes)
+                  if (newShowScenes) {
+                    // Disable other modes when scene mode is enabled
+                    setShowDialogue(false)
+                    setIsDialogueMode(false)
+                  }
+                  if (!newShowScenes) {
+                    setShowVersions(false)
+                    setDiffContent(null)
+                  }
+                }}
+                className={`rounded-lg p-1.5 transition-colors hover:bg-white/[.1] ${
+                  showScenes ? 'bg-white/[.1]' : ''
+                }`}
+                title={showScenes ? 'Hide scenes' : 'Show scenes'}>
+                <DocumentIcon className="h-4 w-4 text-black/70" />
               </button>
               <button
                 onClick={() => setShowDebugPanel(!showDebugPanel)}
@@ -579,6 +647,34 @@ export default function SharedDocumentPage() {
                     onToggleFocus={toggleConversationFocus}
                     onUpdateConversationName={handleUpdateConversationName}
                     onRemoveAllDialogueMarks={removeAllDialogueMarks}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Scene Sidebar */}
+          <AnimatePresence initial={false}>
+            {showScenes && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.98, filter: 'blur(8px)' }}
+                animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+                exit={{ opacity: 0, scale: 0.98, filter: 'blur(8px)' }}
+                transition={{
+                  opacity: { duration: 0.5, ease: [0.23, 1, 0.32, 1] },
+                  scale: { duration: 0.25, ease: [0.23, 1, 0.32, 1] },
+                  filter: { duration: 0.4, ease: [0.23, 1, 0.32, 1] },
+                }}
+                style={{ willChange: 'filter' }}
+                className="h-screen w-full bg-white/[.02] backdrop-blur-xl">
+                <div className="h-[calc(100vh_-_60px)] overflow-y-auto p-4">
+                  <SceneList
+                    editor={editor}
+                    documentId={documentId}
+                    onUpdateSceneTitle={handleUpdateSceneTitle}
+                    focusedSceneId={focusedSceneId}
+                    onToggleFocus={handleToggleFocusScene}
+                    onAddScene={handleAddScene}
                   />
                 </div>
               </motion.div>
