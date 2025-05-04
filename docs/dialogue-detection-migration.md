@@ -14,7 +14,7 @@ This document explains the migration of dialogue detection functionality from th
 ### After Migration
 
 - Dialogue detection is now performed via the Next.js API
-- The Electron app calls the `/api/dialogue/detect` endpoint
+- The Electron app calls the `/api/ai/dialogue` endpoint
 - OpenAI API calls are made from the Next.js server
 - OpenAI API key only needs to be available in the Next.js environment
 - Endpoint is protected with hybrid authentication (same as other API endpoints)

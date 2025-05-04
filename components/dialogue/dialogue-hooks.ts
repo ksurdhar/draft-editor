@@ -83,7 +83,7 @@ export const useDialogueSync = (
       })
 
       const text = editor.state.doc.textContent
-      const response = await post('/dialogue/detect', {
+      const response = await post('/ai/dialogue', {
         text,
         knownCharacters: Array.from(knownCharacters),
       })
@@ -113,7 +113,7 @@ export const useDialogueSync = (
       let nameMap = new Map<string, string>()
       if (Object.keys(conversationSnippets).length > 0) {
         try {
-          const nameResponse = await post('/dialogue/name-conversations', {
+          const nameResponse = await post('/ai/name-conversations', {
             conversations: Object.entries(conversationSnippets).map(([id, snippets]) => ({
               id,
               snippets,

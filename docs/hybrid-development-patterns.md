@@ -117,7 +117,7 @@ Example: Dialogue Detection
 ```typescript
 try {
   // Try to use the Next.js API
-  const response = await performCloudOperation('post', '/api/dialogue/detect', data)
+  const response = await performCloudOperation('post', '/api/ai/dialogue', data)
   return response.data
 } catch (error) {
   if (isNetworkError(error)) {

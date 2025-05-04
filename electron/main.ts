@@ -300,7 +300,7 @@ app
         const messageId = payload.messageId || `ai-${Date.now()}`
 
         // Start the streaming process (this doesn't return the stream)
-        await streamCloudChatResponse('/dialogue/chat', payload, messageId)
+        await streamCloudChatResponse('/ai/chat', payload, messageId)
 
         // Return success (the actual content comes via IPC events)
         return { success: true }

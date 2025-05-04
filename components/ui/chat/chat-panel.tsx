@@ -358,7 +358,7 @@ export function ChatPanel({ isOpen, onClose, className, documentId, documentCont
         }
       } else {
         // In the browser, use fetch directly for streaming instead of the post method from useAPI
-        const res = await fetch('/api/dialogue/chat', {
+        const res = await fetch('/api/ai/chat', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

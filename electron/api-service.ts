@@ -196,7 +196,7 @@ const collections: Record<string, CollectionConfig> = {
     }),
     specialEndpoints: {
       // Handle dialogue entries by character
-      '^dialogue/character/(.+)$': async (method, match, _data) => {
+      '^ai/character/(.+)$': async (method, match, _data) => {
         const characterId = match[1]
         console.log('Getting dialogue entries for character:', characterId)
         if (method === 'get') {
@@ -205,7 +205,7 @@ const collections: Record<string, CollectionConfig> = {
         return { data: null }
       },
       // Handle dialogue entries by document
-      '^dialogue/document/(.+)$': async (method, match, _data) => {
+      '^ai/document/(.+)$': async (method, match, _data) => {
         const documentId = match[1]
         console.log('Getting dialogue entries for document:', documentId)
         if (method === 'get') {
@@ -214,7 +214,7 @@ const collections: Record<string, CollectionConfig> = {
         return { data: null }
       },
       // Handle dialogue detection
-      '^dialogue/detect$': async (method, match, data) => {
+      '^ai/dialogue$': async (method, match, data) => {
         if (method !== 'post' || !data?.text) {
           console.log('Invalid request for dialogue detection:', { method, data })
           return { data: null }
@@ -222,7 +222,7 @@ const collections: Record<string, CollectionConfig> = {
         console.log('Detecting dialogue in text:', data.text.substring(0, 100) + '...')
         try {
           // Call the Next.js API endpoint instead of the local service
-          const cloudResponse = await performCloudOperation('post', '/dialogue/detect', { text: data.text })
+          const cloudResponse = await performCloudOperation('post', '/ai/dialogue', { text: data.text })
           console.log(
             'Dialogue detection (via Next.js API) successful:',
             cloudResponse.data?.dialogues?.length || 0,
@@ -535,12 +535,12 @@ const apiService = {
 
   // Add special methods for dialogue entries by character/document
   getDialogueEntriesByCharacter: async (characterId: string) => {
-    const result = await makeRequest('get', `/dialogue/character/${characterId}`)
+    const result = await makeRequest('get', `/ai/character/${characterId}`)
     return result.data
   },
 
   getDialogueEntriesByDocument: async (documentId: string) => {
-    const result = await makeRequest('get', `/dialogue/document/${documentId}`)
+    const result = await makeRequest('get', `/ai/document/${documentId}`)
     return result.data
   },
 }
